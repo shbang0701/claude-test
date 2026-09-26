@@ -18,6 +18,7 @@ from com.sun.star.sheet.CellInsertMode import ROWS as INSERT_ROWS
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import lo  # noqa: E402
+from xlrack import LC  # noqa: E402  랙 목록 열 위치 (U · 높이 · 면 · 장비명 · 시스템 · 모델 · 구분 · 시트 · 이동)
 
 XL = os.path.join(os.path.dirname(HERE), "01_엑셀_장비도면")
 LOG = []
@@ -52,7 +53,24 @@ def start():
     else:
         raise SystemExit("soffice 연결 실패")
     desk = ctx.ServiceManager.createInstanceWithContext("com.sun.star.frame.Desktop", ctx)
-    return proc, desk
+    return proc, desk, ctx
+
+
+def ui_paste(doc, ctx, sheet, src, dst):
+    """화면에서 하는 [복사] → [붙여넣기]와 같게 (병합 칸 위에 붙여넣기는 UNO copyRange로는 안 됨).
+    LibreOffice의 '덮어쓰기 확인' 창은 [예]로 간주하도록 끈다 (Excel은 확인 없이 덮어씀)."""
+    cp = ctx.ServiceManager.createInstanceWithContext("com.sun.star.configuration.ConfigurationProvider", ctx)
+    acc = cp.createInstanceWithArguments("com.sun.star.configuration.ConfigurationUpdateAccess",
+                                         (pv("nodepath", "/org.openoffice.Office.Calc/Input"),))
+    acc.setPropertyValue("ReplaceCellsWarning", False)
+    acc.commitChanges()
+    ctl = doc.getCurrentController()
+    ctl.setActiveSheet(sheet)
+    disp = ctx.ServiceManager.createInstanceWithContext("com.sun.star.frame.DispatchHelper", ctx)
+    ctl.select(src)
+    disp.executeDispatch(ctl.getFrame(), ".uno:Copy", "", 0, ())
+    ctl.select(dst)
+    disp.executeDispatch(ctl.getFrame(), ".uno:Paste", "", 0, ())
 
 
 def load(desk, path):
@@ -89,7 +107,7 @@ def main(out):
     shutil.copy(os.path.join(XL, "1_장비도면_라이브러리.xlsx"), lib)
     shutil.copy(os.path.join(XL, "3_랙_빈양식.xlsx"), rack)
     pos = json.load(open(os.path.join(HERE, "palette_positions.json")))
-    proc, desk = start()
+    proc, desk, ctx = start()
     try:
         L = load(desk, lib)
         R = load(desk, rack)
@@ -134,6 +152,15 @@ def main(out):
             x.CellStyle = sty
         bd = cell(dev, r0, c0 + 11).TopBorder
         log(bd.OuterLineWidth > 0 or bd.LineWidth > 0, "셀 스타일 적용 후에도 포트 테두리 유지 (스타일에 테두리 미포함)")
+        # 3-1) 디스크 용량: 베이 1에 셀 스타일 + 용량 입력 → 그 디스크 칸을 복사해 베이 2–4 디스크 칸에 한 번에 붙여넣기
+        #      (전면 틀 4행부터: BOX 1 모듈 5행, 디스크 칸 6–10행, 베이 번호 11행 · 베이 1 = 5–6열, 베이 2–4 = 7–12열)
+        dev.getCellRangeByPosition(5 - 1, 6 - 1, 6 - 1, 10 - 1).CellStyle = "디스크 장착"
+        cell(dev, 6, 5).setString("1.92T SSD")
+        ui_paste(R, ctx, dev, dev.getCellRangeByPosition(5 - 1, 6 - 1, 6 - 1, 10 - 1),
+                 dev.getCellRangeByPosition(7 - 1, 6 - 1, 12 - 1, 10 - 1))
+        ok = all(cell(dev, 6, c).getString() == "1.92T SSD" and cell(dev, 11, c).getString() == str((c - 3) // 2)
+                 and dev.getCellRangeByPosition(c - 1, 6 - 1, c, 10 - 1).getIsMerged() for c in (7, 9, 11))
+        log(ok, "디스크 용량: 베이 1에 입력 → 베이 2–4에 한 번에 붙여넣기 (병합 · 베이 번호 유지)")
         # 4) 표 작성 (번호 2열, 면 4, 포트명 6, 용도 12, 케이블 17, 상대 장비 24, 위치 32, 포트 38, 라벨 44, 비고 51)
         t0 = rear_top + 10 + 1 + 2   # 간격 1 + 제목 행 1 + 머리글 1
         rows = [(1, "후면", "S1-P1", "인터커넥트", "QSFP56 DAC 2m", "IB-SW-01", "R05 U40", "P1", "R05-D101"),
@@ -158,7 +185,9 @@ def main(out):
         R.Sheets.removeByName("부품")
         # 5) 랙에 장비 추가: 목록 한 줄
         rk = R.Sheets.getByName("랙")
-        vals = {35: 12, 37: 2, 39: "양면", 42: "GPU-01", 48: "DL380 Gen11 + IB", 55: "서버", 58: "U12 GPU-01"}
+        col = {k: v[0] for k, v in LC.items()}
+        vals = {col["U"]: 12, col["높이"]: 2, col["면"]: "양면", col["장비명"]: "GPU-01", col["모델"]: "DL380 Gen11 + IB",
+                col["구분"]: "서버", col["시트"]: "U12 GPU-01"}
         for c, v in vals.items():
             x = cell(rk, 6, c)
             x.setValue(v) if isinstance(v, int) else x.setString(v)
@@ -168,19 +197,33 @@ def main(out):
         log(got.startswith("GPU-01"), f"랙 실장도 자동 표시 (U13 행: '{got}')")
         log(cell(rk, top + 1, 3).getString() == "" and cell(rk, top + 1, 67).getValue() == 1,
             "2U 장비의 아래 U(U12)도 차지 표시(이름은 맨 위 U에만)")
-        link = cell(rk, 6, 63)
+        link = cell(rk, 6, col["이동"])
         log(link.getString() == "▶" and "HYPERLINK" in link.getFormula().upper(), "시트 이동 링크(▶) 자동 생성")
         summ = cell(rk, 49, 6).getString()
         log(summ.startswith("2 U"), f"전면 사용 U 합계 갱신 ('{summ}')")
         # 겹침 확인: 같은 U에 장비 하나 더
-        for c, v in {35: 13, 37: 1, 39: "양면", 42: "TEST", 55: "기타"}.items():
+        for c, v in {col["U"]: 13, col["높이"]: 1, col["면"]: "양면", col["장비명"]: "TEST", col["구분"]: "기타"}.items():
             x = cell(rk, 7, c)
             x.setValue(v) if isinstance(v, int) else x.setString(v)
         R.calculateAll()
         log(cell(rk, top, 3).getString().startswith("⚠"), "U 겹침 입력 시 '⚠ U 겹침' 경고")
-        for c in (35, 37, 39, 42, 55):
+        for c in (col["U"], col["높이"], col["면"], col["장비명"], col["구분"]):
             cell(rk, 7, c).setString("")
         R.calculateAll()
+        # 5-1) 선반: 선반 한 줄(구분 '선반') + 그 위 장비(면 '선반') → 겹침 경고 없음 · 장비 수에서 선반 제외
+        rows2 = ((7, {col["U"]: 5, col["높이"]: 2, col["면"]: "양면", col["장비명"]: "선반-U05", col["모델"]: "NAS · 미니 PC",
+                      col["구분"]: "선반"}),
+                 (8, {col["U"]: 5, col["높이"]: 1, col["면"]: "선반", col["장비명"]: "NAS-01", col["모델"]: "RS2821RP+",
+                      col["구분"]: "스토리지"}))
+        for rr, vv in rows2:
+            for c, v in vv.items():
+                x = cell(rk, rr, c)
+                x.setValue(v) if isinstance(v, int) else x.setString(v)
+        R.calculateAll()
+        u6 = cell(rk, 6 + (42 - 6), 3).getString()
+        cnt = cell(rk, 49, 15).getString()
+        log(u6.startswith("선반-U05") and not u6.startswith("⚠") and cnt.startswith("2"),
+            f"선반 + 선반 위 장비: 겹침 경고 없음 · 장비 수에서 선반 제외 (U6 '{u6}', {cnt})")
         # 6) 저장 · 인쇄(PDF)
         R.storeToURL(uno.systemPathToFileUrl(os.path.join(out, "rack_after.xlsx")),
                      (pv("FilterName", "Calc MS Excel 2007 XML"),))
@@ -194,8 +237,9 @@ def main(out):
         s2 = RX.Sheets.getByIndex(RX.Sheets.Count - 1)
         s2.Name = "U14 SRV-04"
         rk2 = RX.Sheets.getByName("랙")
-        row = 6 + 13
-        for c, v in {35: 14, 37: 2, 39: "양면", 42: "SRV-04", 48: "DL380 Gen10", 55: "서버", 58: "U14 SRV-04"}.items():
+        row = next(r for r in range(6, 46) if cell(rk2, r, col["장비명"]).getString() == "")   # 목록의 첫 빈 줄
+        for c, v in {col["U"]: 14, col["높이"]: 2, col["면"]: "양면", col["장비명"]: "SRV-04", col["모델"]: "DL380 Gen10",
+                     col["구분"]: "서버", col["시트"]: "U14 SRV-04"}.items():
             x = cell(rk2, row, c)
             x.setValue(v) if isinstance(v, int) else x.setString(v)
         RX.calculateAll()

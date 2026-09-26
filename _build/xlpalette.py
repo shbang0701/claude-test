@@ -5,7 +5,7 @@ from openpyxl.cell.rich_text import CellRichText, TextBlock
 from openpyxl.cell.text import InlineFont
 from xlkit import Canvas, P, side, fill, font, FONT
 from xlparts import _tw
-from xlparts import (port, pname, module, slot, vmod, strip, psu, fan, sff_bays, lff_bays, port_block,
+from xlparts import (port, pname, module, slot, vmod, strip, psu, fan, sff_bays, lff_bays, lff_bay, port_block,
                      ports_row, badge, ear_frame, side_tab, legend_colors, legend_ids, conn_table, TABLE_FULL,
                      TABLE_HALF, note, title)
 import xldevices as D
@@ -152,16 +152,10 @@ def _sw_block(kind):
     return f
 
 
-def _lff1(cv, r, c):
-    for y in (r, r + 1):
-        for x in range(c, c + 14):
-            cv.put(y, x, style="디스크 장착")
-            cv.cell_box(y, x)
-    cv.c(r, c).value = "1"
-    from xlkit import align
-    cv.c(r, c).alignment = align("left", "center", indent=1)
-    cv.merge(r, c, r + 1, c + 13)
-    return 2, 14
+def _raid_demo(cv, r, c):
+    """RAID 묶음 표시 예: SFF 6베이 중 1–2 = RAID1, 3–6 = RAID5."""
+    return sff_bays(cv, r, c, 6, 6, 1, bh=6, ttl=None, cap=["480G SSD"] * 2 + ["1.2T SAS"] * 4,
+                    raid=[(0, 1, "RAID1 · OS"), (2, 5, "RAID5 · DATA")])
 
 
 SECTIONS = [
@@ -208,12 +202,13 @@ SECTIONS = [
         ("D06", "팬", "6×3", lambda cv, r, c: fan(cv, r, c, 6, 3, "FAN 1")),
         ("D07", "큰 팬 (섀시)", "11×4", lambda cv, r, c: fan(cv, r, c, 11, 4, "FAN 1")),
     ]),
-    ("E. 디스크·베이  —  회색 = 장착, 흰색 = 비어 있음 (셀 스타일 '디스크 장착' / '디스크 빈칸')", [
-        ("E01", "SFF 2.5\" 8베이", "18×8", lambda cv, r, c: sff_bays(cv, r, c, 8, 4, 1, bh=6, ttl="BOX 1")),
-        ("E02", "SFF 10베이 (1U)", "22×3", lambda cv, r, c: (module(cv, r, c, 3, 22, None), sff_bays(cv, r, c + 1, 10, 4, 1, bh=3, pad=False))[0]),
-        ("E03", "SFF 베이 1개", "2×6", lambda cv, r, c: sff_bays(cv, r, c, 1, 1, 1, bh=6, pad=False)),
-        ("E04", "LFF 3.5\" 베이 1개", "14×2", _lff1),
-        ("E05", "LFF 12베이 (2U)", "58×8", lambda cv, r, c: lff_bays(cv, r, c, 4, 3, 6, bw=14)),
+    ("E. 디스크·베이  —  칸 안 작은 글씨 = 용량(한 칸 쓰고 복사) · 빈 베이 = '빈' · RAID = 굵은 바깥쪽 테두리 + 아래 칸에 표시", [
+        ("E01", "SFF 2.5\" 8베이 (2U 박스)", "18×8", lambda cv, r, c: sff_bays(cv, r, c, 8, 4, 1, bh=6, ttl="BOX 1", cap="1.2T SAS")),
+        ("E02", "SFF 10베이 (1U)", "22×3", lambda cv, r, c: (module(cv, r, c, 3, 22, None), sff_bays(cv, r, c + 1, 10, 4, 1, bh=3, pad=False, cap="1.2T"))[0]),
+        ("E03", "SFF 디스크 1개", "2×6", lambda cv, r, c: sff_bays(cv, r, c, 1, 1, 1, bh=6, pad=False, cap="1.2T SAS")),
+        ("E04", "LFF 3.5\" 디스크 1개", "14×2", lambda cv, r, c: lff_bay(cv, r, c, 14, 1, True, "8T NL-SAS")),
+        ("E05", "LFF 12베이 (2U)", "58×8", lambda cv, r, c: lff_bays(cv, r, c, 4, 3, 6, bw=14, cap="8T NL-SAS")),
+        ("E06", "RAID 묶음 표시 (예)", "14×8", _raid_demo),
     ]),
     ("F. 스위치·패치패널 포트 블록  —  칸 안 숫자 = 장비에 인쇄된 포트 번호, 연결되면 셀 스타일로 색 지정", [
         ("F01", "SFP 48포트 (홀수 위/짝수 아래)", "48×3", _sw_block("sfp")),

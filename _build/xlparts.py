@@ -123,8 +123,53 @@ def fan(cv, r, c, w=5, h=3, ttl="FAN 1"):
     return h, w
 
 
-def sff_bays(cv, r, c, n, filled, start=1, bh=6, ttl=None, pad=True, first_label=None):
-    """2.5인치(SFF) 세로 베이 n개. 각 베이 2칸 × bh행 (칸 안 아래쪽 = 베이 번호)."""
+RAID_LINE = side("thick", P["ink"])   # Excel [테두리 ▾ > 굵은 바깥쪽 테두리]와 같은 선
+
+
+def _on(filled, i):
+    """filled: 앞에서부터 장착된 개수(정수) 또는 장착된 순번 목록(0부터)."""
+    return i < filled if isinstance(filled, int) else i in filled
+
+
+def _cap(cap, i):
+    if isinstance(cap, (list, tuple)):
+        return cap[i] if i < len(cap) else None
+    return cap
+
+
+def bay_no(cv, r, c, r2, c2, text):
+    """베이 번호(장비에 인쇄된 번호) — 디스크 칸 밖, 작은 회색 글씨. 문자로 넣어 도면 번호와 섞이지 않게."""
+    cell = cv.c(r, c)
+    cell.value = str(text)
+    cell.font = font(6, False, P["s500"])
+    cell.alignment = align("center", "center")
+    cv.merge(r, c, r2, c2)
+
+
+def disk(cv, r, c, h, w, on=True, cap=None):
+    """디스크 1개(칸 안 작은 글씨 = 용량·종류). 빈 베이는 흰 칸에 '빈'."""
+    st = "디스크 장착" if on else "디스크 빈칸"
+    for rr in range(r, r + h):
+        for x in range(c, c + w):
+            cv.put(rr, x, style=st)
+            cv.cell_box(rr, x)
+    txt = cap if on else "빈"
+    if txt:
+        cv.c(r, c).value = txt
+    cv.merge(r, c, r + h - 1, c + w - 1)
+
+
+def raid_box(cv, r1, c1, r2, c2, label=None, label_rc=None):
+    """RAID 묶음 = 디스크 범위 굵은 바깥쪽 테두리 + 옆/아래 빈 칸에 'RAID1 · OS' 같은 표시."""
+    cv.outline(r1, c1, r2, c2, RAID_LINE, record=False)
+    if label and label_rc:
+        cv.text(label_rc[0], label_rc[1], label, sz=6.5, b=True, col=P["ink"])
+
+
+def sff_bays(cv, r, c, n, filled, start=1, bh=6, ttl=None, pad=True, cap=None, raid=()):
+    """2.5인치(SFF) 세로 베이 n개. 베이 = 2칸 × bh행: 위 bh-1행 = 디스크(칸 안에 용량),
+    맨 아래 1행 = 베이 번호. cap: 용량 글씨(하나 또는 베이별 목록).
+    raid: [(첫 순번, 끝 순번, 표시)] 순번은 0부터 — 굵은 테두리 + 아래 줄에 표시."""
     w = n * 2 + (2 if pad else 0)
     h = bh + (2 if pad else 0)
     if pad:
@@ -133,37 +178,44 @@ def sff_bays(cv, r, c, n, filled, start=1, bh=6, ttl=None, pad=True, first_label
     else:
         r0, c0 = r, c
     for i in range(n):
-        st = "디스크 장착" if i < filled else "디스크 빈칸"
         cc = c0 + i * 2
-        for rr in range(r0, r0 + bh):
-            for x in (cc, cc + 1):
-                cv.put(rr, x, style=st)
-                cv.cell_box(rr, x)
-        cv.c(r0, cc).value = str(start + i)
-        cv.merge(r0, cc, r0 + bh - 1, cc + 1)
+        on = _on(filled, i)
+        disk(cv, r0, cc, bh - 1, 2, on, _cap(cap, i))
+        bay_no(cv, r0 + bh - 1, cc, r0 + bh - 1, cc + 1, start + i)
+    for a, b, label in raid:
+        raid_box(cv, r0, c0 + a * 2, r0 + bh - 1, c0 + b * 2 + 1, label, (r0 + bh, c0 + a * 2))
     return h, w
 
 
-def lff_bays(cv, r, c, cols, rows, filled, start=1, bw=7, ttl=None, order="col"):
-    """3.5인치(LFF) 가로 베이: cols × rows, 각 베이 bw칸 × 2행."""
+def lff_bay(cv, r, c, bw, no, on=True, cap=None):
+    """3.5인치(LFF) 가로 베이 1개 = bw칸 × 2행: 왼쪽 2칸 베이 번호 + 디스크(칸 안에 용량)."""
+    bay_no(cv, r, c, r + 1, c + 1, no)
+    disk(cv, r, c + 2, 2, bw - 2, on, cap)
+    return 2, bw
+
+
+def lff_bays(cv, r, c, cols, rows, filled, start=1, bw=7, ttl=None, order="col", cap=None, raid=()):
+    """3.5인치(LFF) 가로 베이: cols × rows, 각 베이 bw칸 × 2행.
+    raid: [(첫 순번, 끝 순번, 표시)] — 묶음을 감싸는 굵은 테두리 + 위쪽 여백 줄에 표시."""
     w = cols * bw + 2
     h = rows * 2 + 2
     module(cv, r, c, h, w, ttl)
-    k = 0
+    pos = {}
     for j in range(cols):
         for i in range(rows):
             idx = (j * rows + i) if order == "col" else (i * cols + j)
-            st = "디스크 장착" if idx < filled else "디스크 빈칸"
             rr, cc = r + 1 + i * 2, c + 1 + j * bw
-            for y in (rr, rr + 1):
-                for x in range(cc, cc + bw):
-                    cv.put(y, x, style=st)
-                    cv.cell_box(y, x)
-            cell = cv.c(rr, cc)
-            cell.value = str(start + idx)
-            cell.alignment = align("left", "center", indent=1)
-            cv.merge(rr, cc, rr + 1, cc + bw - 1)
-            k += 1
+            lff_bay(cv, rr, cc, bw, start + idx, _on(filled, idx), _cap(cap, idx))
+            pos[idx] = (rr, cc)
+    for a, b, label in raid:
+        cells = [pos[k] for k in range(a, b + 1) if k in pos]
+        r1 = min(y for y, _ in cells)
+        r2 = max(y for y, _ in cells) + 1
+        c1 = min(x for _, x in cells)
+        c2 = max(x for _, x in cells) + bw - 1
+        # 표시는 묶음 바로 위(맨 위 줄 묶음) 또는 바로 아래(맨 아래 줄 묶음)의 여백 줄에
+        at = (r, c1 + 2) if r1 == r + 1 else (r + h - 1, c1 + 2) if r2 == r + h - 2 else None
+        raid_box(cv, r1, c1, r2, c2, label, at)
     return h, w
 
 

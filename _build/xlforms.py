@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """장비 시트(A4 가로) 구성: 제목 블록 · 전면/후면 도면 · 연결 표 · 인쇄 설정."""
+import math
 from xlkit import P, font, align, side, Border, COL, fill
 from xlparts import (side_tab, ear_frame, legend_colors, legend_ids, conn_table, TABLE_FULL,
-                     TABLE_HALF, note)
+                     TABLE_HALF, note, _tw)
 
 C_TAB = 2        # B열: 세로 탭
 C_FRAME = 3      # C열부터 장비 외곽
@@ -18,10 +19,23 @@ def u_rows(u):
     return min(u * 4, 38)
 
 
-def title_block(cv, name, model, doc="장비 전·후면 구성도", info=None):
+DOC = "장비 전·후면 구성도  ·  전면 = 랙 앞문 쪽에서 본 면"
+
+
+def title_block(cv, name, model, doc=DOC, info=None, role=None):
+    """role: 이름 옆 역할 배지(예: 본체 / I/O 드로어 / 디스크 선반) — 겉모양이 같은 박스를 구분."""
     cv.h(1, 24)
     cv.text(1, 2, name, sz=16, b=True, col=P["ink"])
-    cv.text(1, 15, model, sz=11, col=P["s700"])
+    mc = 15
+    if role:
+        bc = 2 + math.ceil(_tw(name, 16)) + 1
+        bw = max(4, math.ceil(_tw(role, 8.5)) + 2)
+        for x in range(bc, bc + bw):
+            cv.put(1, x, fl=fill(P["navy"]))
+        cv.put(1, bc, role, f=font(8.5, True, P["white"]), al=align("center"))
+        cv.merge(1, bc, 1, bc + bw - 1)
+        mc = max(15, bc + bw + 1)
+    cv.text(1, mc, model, sz=11, col=P["s700"])
     cv.text(1, C_LAST, doc, sz=8, col=P["s500"], h="right")
     for c in range(2, C_LAST + 1):
         cv.add_border(1, c, bottom=side("medium", P["navy"]))

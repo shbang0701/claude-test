@@ -68,7 +68,11 @@ def _port_style(name, color):
 
 
 NO_BORDER_STYLES = {f"포트 {n}" for _, n in USE} | {"포트 미연결", "디스크 장착", "디스크 빈칸", "모듈 채움",
-                                                     "포트명", "모듈 제목", "번호 배지", "구역 제목", "메모"}
+                                                     "포트명", "모듈 제목", "번호 배지", "구역 제목", "메모",
+                                                     "RAID 표시"}
+
+
+NO_FILL_STYLES = {"RAID 표시"}   # 적용해도 바탕색(모듈 회색 등)은 그대로
 
 
 def _defs():
@@ -80,10 +84,12 @@ def _defs():
     d.append(NamedStyle(name="포트명", font=font(6.5, False, P["s500"]), alignment=align("center")))
     d.append(NamedStyle(name="모듈 제목", font=font(7, True, P["ink"]), alignment=align("left", indent=0)))
     d.append(NamedStyle(name="모듈 채움", fill=fill(P["s150"])))
-    d.append(NamedStyle(name="디스크 장착", font=font(6.5, False, P["s700"]), fill=fill(P["disk"]),
-                        alignment=align("center", "bottom")))
-    d.append(NamedStyle(name="디스크 빈칸", font=font(6.5, False, P["s400"]), fill=fill(P["white"]),
-                        alignment=align("center", "bottom")))
+    # 디스크: 칸 안에 용량을 작은 글씨로 적는다 (빈 베이 = '빈')
+    d.append(NamedStyle(name="디스크 장착", font=font(6, False, P["ink"]), fill=fill(P["disk"]),
+                        alignment=align("center", "center", wrap=True)))
+    d.append(NamedStyle(name="디스크 빈칸", font=font(6, False, P["s400"]), fill=fill(P["white"]),
+                        alignment=align("center", "center", wrap=True)))
+    d.append(NamedStyle(name="RAID 표시", font=font(6.5, True, P["ink"]), alignment=align("left")))
     d.append(NamedStyle(name="번호 배지", font=font(8, True, P["white"]), fill=fill(P["navy"]),
                         alignment=align("center")))
     d.append(NamedStyle(name="케이블 라벨", font=font(8.5, False, P["ink"], MONO), fill=fill(P["tape"]),
@@ -281,6 +287,8 @@ def postprocess(path):
                     if cs.get("name") in NO_BORDER_STYLES:
                         xf = xfs[int(cs.get("xfId"))]
                         xf.set("applyBorder", "0")
+                        if cs.get("name") in NO_FILL_STYLES:
+                            xf.set("applyFill", "0")
                 data = etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
             zout.writestr(item, data)
     shutil.move(tmp, path)

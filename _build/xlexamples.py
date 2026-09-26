@@ -14,7 +14,10 @@ DEV = {
     "TOR-B":   dict(type="sw48", u=38, h=1, model="Cisco Nexus 93180YC-FX", short="Nexus 93180YC-FX", side="양면", kind="네트워크", sn="FDO2315A2BC", ip="10.10.0.38"),
     "SAN-A":   dict(type="san48", u=36, h=1, model="Brocade G620", short="Brocade G620", side="양면", kind="스토리지", sn="BRCAG1234A01", ip="10.10.0.36"),
     "SAN-B":   dict(type="san48", u=35, h=1, model="Brocade G620", short="Brocade G620", side="양면", kind="스토리지", sn="BRCAG1234A02", ip="10.10.0.35"),
-    "STG-01":  dict(type="unity", u=30, h=2, model="Dell EMC Unity XT 480 (DPE)", short="Unity XT 480", side="양면", kind="스토리지", sn="CKM00201900123", ip="10.10.0.30"),
+    "STG-01":  dict(type="unity", u=30, h=2, model="Dell EMC Unity XT 480 (DPE)", short="Unity XT 480", side="양면", kind="스토리지", sn="CKM00201900123", ip="10.10.0.30", sys="STG-01", role="컨트롤러"),
+    "STG-01-DAE1": dict(type="dae", u=32, h=2, model="Dell EMC Unity 25-드라이브 DAE (2U)", short="Unity DAE 25D", side="양면", kind="스토리지", sn="CKM00202000456", ip="-", sys="STG-01", role="디스크 선반"),
+    "AIX-01":  dict(type="power4u", u=22, h=4, model="IBM Power 4U 본체 (예: Power E1050)", short="Power 4U 본체", side="양면", kind="서버", sn="78A1B2C", ip="10.10.1.40", sys="AIX-01", role="본체"),
+    "AIX-01-IO1": dict(type="iodrawer", u=26, h=4, model="IBM EMX0 PCIe3 I/O 확장 드로어", short="EMX0 I/O 드로어", side="양면", kind="서버", sn="78C9D3E", ip="-", sys="AIX-01", role="I/O 드로어"),
     "SRV-01":  dict(type="dl380", u=20, h=2, model="HPE ProLiant DL380 Gen10", short="DL380 Gen10", side="양면", kind="서버", sn="SGH0123ABC", ip="10.10.1.21"),
     "SRV-02":  dict(type="dl380", u=18, h=2, model="HPE ProLiant DL380 Gen10", short="DL380 Gen10", side="양면", kind="서버", sn="SGH0123ABD", ip="10.10.1.22"),
     "SRV-03":  dict(type="r640", u=16, h=1, model="Dell PowerEdge R640", short="PowerEdge R640", side="양면", kind="서버", sn="7XK2Q53", ip="10.10.1.23"),
@@ -67,11 +70,51 @@ def _c7000():
     return L
 
 
-PORTS = {"dl380": _dl380, "r640": _r640, "unity": _unity, "c7000": _c7000}
+# IBM Power 본체 슬롯 구성(예시)과 I/O 드로어 카드 — 도면과 표가 같은 정의를 쓴다
+AIX_SLOTS = {1: ("NIC 4P 25G", 4), 2: ("FC 4P 32G", 4), 3: ("광케이블 어댑터 → IO1 P1", 2, True, "T"),
+             4: ("광케이블 어댑터 → IO1 P2", 2, True, "T")}
+IOD_CARDS = {(0, 1): ("FC 2P", 2)}
+
+
+def _power4u():
+    L = []
+    for s in range(1, 9):
+        spec = AIX_SLOTS.get(s)
+        if spec:
+            pre = spec[3] if len(spec) > 3 else "P"
+            L += [(f"c{s}p{j}", f"C{s}-{pre}{j}", "후면") for j in range(1, spec[1] + 1)]
+    L += [("hmc1", "HMC1", "후면"), ("hmc2", "HMC2", "후면")]
+    L += [(f"psu{i}", f"PSU{i}", "후면") for i in range(1, 5)]
+    return L
+
+
+def _iodrawer():
+    L = []
+    for m in (1, 2):
+        L += [(f"m{m}t1", f"P{m}-T1", "후면"), (f"m{m}t2", f"P{m}-T2", "후면")]
+        for j in range(1, 7):
+            spec = IOD_CARDS.get((m - 1, j))
+            if spec:
+                L += [(f"m{m}c{j}p{p}", f"P{m}-C{j}-T{p}", "후면") for p in range(1, spec[1] + 1)]
+    L += [("psu1", "PSU1", "후면"), ("psu2", "PSU2", "후면")]
+    return L
+
+
+def _dae():
+    L = []
+    for k in ("b", "a"):
+        up = k.upper()
+        L += [(f"lcc{k}_a", f"LCC{up}-A", "후면"), (f"lcc{k}_b", f"LCC{up}-B", "후면"), (f"psu{k}", f"PSU {up}", "후면")]
+    return L
+
+
+PORTS = {"dl380": _dl380, "r640": _r640, "unity": _unity, "c7000": _c7000, "power4u": _power4u,
+         "iodrawer": _iodrawer, "dae": _dae}
 
 # 번호 규칙: seq = 연결된 포트만 1부터 차례로 / face = 장비에 인쇄된 번호 / slot = 슬롯×100+포트
 NUMBERING = {"dl380": "seq", "r640": "seq", "unity": "seq", "c7000": "slot",
-             "sw48": "face", "rj48": "face", "san48": "face", "pp24": "face", "pdu": "face"}
+             "sw48": "face", "rj48": "face", "san48": "face", "pp24": "face", "pdu": "face",
+             "power4u": "seq", "iodrawer": "seq", "dae": "seq"}
 
 
 def face_name(dtype, key):
@@ -181,6 +224,30 @@ for i in (4, 5, 6):
     pwr("ENC-01", f"ac{i}", "PDU-B", c19=True, note="B 계통")
 cab("PDU-A", "input", "분전반 A", "A-12", "전원", "IEC309 32A", "A 계통 입력")
 cab("PDU-B", "input", "분전반 B", "B-12", "전원", "IEC309 32A", "B 계통 입력")
+
+# ── 여러 박스로 된 시스템 ── (기존 라벨이 바뀌지 않도록 목록 끝에 추가)
+# IBM Power 본체 + I/O 드로어 (시스템 AIX-01): 드로어는 본체의 광케이블 어댑터와 T1·T2 한 쌍씩 연결
+cab("AIX-01", "hmc1", "MGMT-SW", "p12", "관리", "UTP Cat6 / RJ45", "HMC 망")
+cab("AIX-01", "hmc2", "MGMT-SW", "p13", "관리", "UTP Cat6 / RJ45", "HMC 망")
+cab("AIX-01", "c1p1", "TOR-A", "p16", "서비스", "DAC 25G 3m")
+cab("AIX-01", "c1p2", "TOR-B", "p16", "서비스", "DAC 25G 3m")
+cab("AIX-01", "c2p1", "SAN-A", "p6", "스토리지", "OM4 LC-LC", "Fabric A")
+cab("AIX-01", "c2p2", "SAN-B", "p6", "스토리지", "OM4 LC-LC", "Fabric B")
+for _s, _m in ((3, 1), (4, 2)):
+    for _t in (1, 2):
+        cab("AIX-01", f"c{_s}p{_t}", "AIX-01-IO1", f"m{_m}t{_t}", "인터커넥트", "광케이블 CXP 3m",
+            f"드로어 P{_m} · T{_t}–T{_t} (한 쌍)")
+cab("AIX-01-IO1", "m1c1p1", "SAN-A", "p7", "스토리지", "OM4 LC-LC", "Fabric A")
+cab("AIX-01-IO1", "m1c1p2", "SAN-B", "p7", "스토리지", "OM4 LC-LC", "Fabric B")
+# 스토리지 컨트롤러 + 확장 선반 (시스템 STG-01)
+cab("STG-01", "a_sas0", "STG-01-DAE1", "lcca_a", "스토리지", "Mini-SAS HD 1m", "SP A → LCC A")
+cab("STG-01", "b_sas0", "STG-01-DAE1", "lccb_a", "스토리지", "Mini-SAS HD 1m", "SP B → LCC B")
+for _i, _pdu, _no in ((1, "PDU-A", 28), (2, "PDU-B", 28), (3, "PDU-A", 29), (4, "PDU-B", 29)):
+    cab("AIX-01", f"psu{_i}", _pdu, f"p{_no}", "전원", "C19-C20 2m", _pdu[-1] + " 계통")
+cab("AIX-01-IO1", "psu1", "PDU-A", "p10", "전원", "C13-C14 2m", "A 계통")
+cab("AIX-01-IO1", "psu2", "PDU-B", "p10", "전원", "C13-C14 2m", "B 계통")
+cab("STG-01-DAE1", "psua", "PDU-A", "p11", "전원", "C13-C14 2m", "A 계통")
+cab("STG-01-DAE1", "psub", "PDU-B", "p11", "전원", "C13-C14 2m", "B 계통")
 
 # 라벨 부여: 데이터 = R02-D###, 전원 = R02-P###
 _d = _p = 0

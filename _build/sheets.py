@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """장비 시트 조립: 양식(빈칸)과 예시(작성 완료)를 같은 함수로 만든다."""
 from xlkit import Canvas, P, font
-from xlforms import title_block, view, table_section, finish, u_rows, C_LAST
+from xlforms import title_block, view, table_section, finish, u_rows, C_LAST, DOC
 from xlparts import note
 import xldevices as D
 
@@ -10,14 +10,14 @@ TAB_EX = "377F3F"
 
 
 def device_sheet(wb, sheet_name, name, model, u, front, rear, n=None, info=None, rows=None, data=(),
-                 nrows=None, half=False, tab=TAB_FORM, split=None, doc="장비 전·후면 구성도", foot_note=None,
-                 labels=("전  면", "후  면"), back_link=False):
+                 nrows=None, half=False, tab=TAB_FORM, split=None, doc=DOC, foot_note=None,
+                 labels=("전  면", "후  면"), back_link=False, role=None):
     """표준 장비 시트.
     front/rear: 그리기 함수 (cv, r, c, n) 또는 None
     split: None=자동, 'rear'=후면부터 새 페이지, 'table'=표부터 새 페이지"""
     n = n or {}
     cv = Canvas(wb, sheet_name, tab)
-    r = title_block(cv, name, model, doc, info)
+    r = title_block(cv, name, model, doc, info, role)
     h = rows or u_rows(u)
     breaks = []
     draw_first = r
@@ -32,7 +32,8 @@ def device_sheet(wb, sheet_name, name, model, u, front, rear, n=None, info=None,
     draw_last = r - 1
     if foot_note:
         note(cv, r, 3, foot_note, sz=7)
-        r += 1
+        cv.h(r + 1, 6)
+        r += 2
     if split == "table" or (split is None and h > 12):
         breaks.append(r - 1)
     if nrows is None:
@@ -50,13 +51,13 @@ def add_back_link(cv):
 
 
 def tower_sheet(wb, sheet_name, name, model, n=None, info=None, data=(), nrows=16, tab=TAB_FORM,
-                slots=None, filled=4, back_link=False):
+                slots=None, filled=4, back_link=False, cap=None, raid=()):
     """타워: 전면·후면을 나란히(각 29칸 × 38행), 표는 다음 쪽."""
     n = n or {}
     cv = Canvas(wb, sheet_name, tab)
-    r = title_block(cv, name, model, "장비 전·후면 구성도", info)
+    r = title_block(cv, name, model, DOC, info)
     h = 38
-    view(cv, r, "전  면", rows=h, c=3, w=29, tab_c=2, draw=lambda cv_, rr, cc: D.tower_front(cv_, rr, cc, n, filled))
+    view(cv, r, "전  면", rows=h, c=3, w=29, tab_c=2, draw=lambda cv_, rr, cc: D.tower_front(cv_, rr, cc, n, filled, cap, raid))
     view(cv, r, "후  면", rows=h, c=34, w=29, tab_c=33,
          draw=lambda cv_, rr, cc: D.tower_rear(cv_, rr, cc, n, {1: ("NIC 2P", 2), 3: ("GPU", 0)} if slots is None else slots))
     draw_first, draw_last = r, r + h - 1
@@ -72,7 +73,7 @@ def tower_sheet(wb, sheet_name, name, model, n=None, info=None, data=(), nrows=1
 def free_sheet(wb, sheet_name="양식-자유형", tab=TAB_FORM):
     """생소한 장비용: 빈 틀(2U 앞·뒤) + 부품으로 채우기."""
     cv = Canvas(wb, sheet_name, tab)
-    r = title_block(cv, "장비명", "제조사 모델명  (생소한 장비 — 빈 틀에 부품을 붙여 구성)", "장비 전·후면 구성도")
+    r = title_block(cv, "장비명", "제조사 모델명  (생소한 장비 — 빈 틀에 부품을 붙여 구성)", DOC)
     top = r
     r = view(cv, r, "전  면", rows=10)
     r += 1
@@ -83,5 +84,26 @@ def free_sheet(wb, sheet_name="양식-자유형", tab=TAB_FORM):
                    "틀 없이 그리려면 틀 범위를 선택해 [모두 지우기]", sz=7)
     r += 1
     last = table_section(cv, r, [], 10, (top, bottom))
+    finish(cv, last)
+    return cv
+
+
+def small_sheet(wb, sheet_name, name, model, front, rear, n=None, info=None, data=(), nrows=10, tab=TAB_FORM,
+                rows=5, fw=29, role=None, foot_note=None, back_link=False):
+    """소형·데스크톱 장비(선반 위): 앞·뒤 나란히(각 fw칸 × rows행, 랙 귀 없음). 표는 같은 쪽."""
+    n = n or {}
+    cv = Canvas(wb, sheet_name, tab)
+    r = title_block(cv, name, model, DOC, info, role)
+    view(cv, r, "전면", rows=rows, c=3, w=fw, tab_c=2, ears=False, draw=lambda cv_, rr, cc: front(cv_, rr, cc, n))
+    view(cv, r, "후면", rows=rows, c=34, w=fw, tab_c=33, ears=False, draw=lambda cv_, rr, cc: rear(cv_, rr, cc, n))
+    draw_first, draw_last = r, r + rows - 1
+    r += rows + 1
+    if foot_note:
+        note(cv, r, 3, foot_note, sz=7)
+        cv.h(r + 1, 6)
+        r += 2
+    last = table_section(cv, r, list(data), nrows, (draw_first, draw_last))
+    if back_link:
+        add_back_link(cv)
     finish(cv, last)
     return cv

@@ -12,9 +12,12 @@ LAST = FIRST + UMAX - 1          # 47
 LROWS = 40
 LLAST = FIRST + LROWS - 1        # 45
 KIND_TINT = [("서버", "DCE8F6"), ("네트워크", "D5EEEE"), ("스토리지", "FBE4D3"), ("보안", "F8DCDA"),
-             ("전원", "EFE3F5"), ("기타", "E4E9EF")]
-# 목록 열
-LC = dict(U=(35, 2), 높이=(37, 2), 면=(39, 3), 장비명=(42, 6), 모델=(48, 7), 구분=(55, 3), 시트=(58, 5), 이동=(63, 1))
+             ("전원", "EFE3F5"), ("선반", "ECE7DC"), ("기타", "E4E9EF")]
+SIDES = "양면,전면,후면,선반,0U"
+# 목록 열 — 시스템 = 여러 박스가 한 시스템일 때 같은 이름(예: 본체 + I/O 드로어 = AIX-01)
+LC = dict(U=(34, 2), 높이=(36, 2), 면=(38, 2), 장비명=(40, 5), 시스템=(45, 3), 모델=(48, 6), 구분=(54, 3),
+          시트=(57, 6), 이동=(63, 1))
+NOT_DRAWN = ("0U", "선반")        # 실장도에 그리지 않는 면 (선반 위 장비는 선반 한 줄로 표시)
 HC = dict(u=65, fidx=66, fcnt=67, ridx=68, rcnt=69)
 
 
@@ -47,8 +50,8 @@ def build_rack(wb, rack="DC1-R02", info=None, devices=(), title_note=None):
     cv.text(4, 5, "앞에서 본 모습", sz=7, col=P["s500"])
     cv.text(4, 18, "후면", sz=9, b=True, col=P["navy"])
     cv.text(4, 21, "뒤에서 본 모습 (좌우 반대)", sz=7, col=P["s500"])
-    cv.text(4, 35, "장비 목록", sz=9, b=True, col=P["navy"])
-    cv.text(4, 40, "← 여기에 입력 (U = 장비 맨 아래 U 번호)", sz=7, col=P["s500"])
+    cv.text(4, 34, "장비 목록", sz=9, b=True, col=P["navy"])
+    cv.text(4, 39, "← 여기에 입력 (U = 장비 맨 아래 U 번호)", sz=7, col=P["s500"])
     # 머리글
     cv.h(5, 14)
     for c in list(range(2, 17)) + list(range(18, 33)):
@@ -82,11 +85,11 @@ def build_rack(wb, rack="DC1-R02", info=None, devices=(), title_note=None):
             cv.add_border(r, c, bottom=dotted)
         U = f"$BM{r}"
         ws.cell(r, HC["u"]).value = f"=B{r}"
-        base = f"ISNUMBER({LU})*({LU}<={U})*({LU}+{hh}-1>={U})"
-        ws.cell(r, HC["fcnt"]).value = f'=SUMPRODUCT({base}*({LS}<>"후면")*({LS}<>"0U"))'
-        ws.cell(r, HC["fidx"]).value = f'=SUMPRODUCT({base}*({LS}<>"후면")*({LS}<>"0U")*(ROW({LU})-{FIRST - 1}))'
-        ws.cell(r, HC["rcnt"]).value = f'=SUMPRODUCT({base}*({LS}<>"전면")*({LS}<>"0U"))'
-        ws.cell(r, HC["ridx"]).value = f'=SUMPRODUCT({base}*({LS}<>"전면")*({LS}<>"0U")*(ROW({LU})-{FIRST - 1}))'
+        base = f"ISNUMBER({LU})*({LU}<={U})*({LU}+{hh}-1>={U})" + "".join(f'*({LS}<>"{x}")' for x in NOT_DRAWN)
+        ws.cell(r, HC["fcnt"]).value = f'=SUMPRODUCT({base}*({LS}<>"후면"))'
+        ws.cell(r, HC["fidx"]).value = f'=SUMPRODUCT({base}*({LS}<>"후면")*(ROW({LU})-{FIRST - 1}))'
+        ws.cell(r, HC["rcnt"]).value = f'=SUMPRODUCT({base}*({LS}<>"전면"))'
+        ws.cell(r, HC["ridx"]).value = f'=SUMPRODUCT({base}*({LS}<>"전면")*(ROW({LU})-{FIRST - 1}))'
         for dc, ic, cc in ((3, "BN", "BO"), (19, "BP", "BQ")):
             idx = f"${ic}{r}"
             cnt = f"${cc}{r}"
@@ -145,7 +148,7 @@ def build_rack(wb, rack="DC1-R02", info=None, devices=(), title_note=None):
             if w > 1:
                 cv.merge(r, c0, r, c0 + w - 1)
     # 목록 선택 + 구분 색
-    for key, lst in (("면", "양면,전면,후면,0U"), ("구분", ",".join(k for k, _ in KIND_TINT))):
+    for key, lst in (("면", SIDES), ("구분", ",".join(k for k, _ in KIND_TINT))):
         c0 = LC[key][0]
         dv = DataValidation(type="list", formula1=f'"{lst}"', allow_blank=True, showErrorMessage=False)
         dv.add(f"{COL(c0)}{FIRST}:{COL(c0)}{LLAST}")
@@ -159,10 +162,10 @@ def build_rack(wb, rack="DC1-R02", info=None, devices=(), title_note=None):
     cv.h(r - 1, 6)
     cv.h(r, 14)
     cv.text(r, 2, "전면 사용", sz=7.5, col=P["s500"])
-    cv.put(r, 6, f'=SUMPRODUCT(ISNUMBER({LU})*({LS}<>"후면")*({LS}<>"0U")*{hh})&" U / {UMAX} U"',
+    cv.put(r, 6, f'=SUMPRODUCT(ISNUMBER({LU})*({LS}<>"후면")*({LS}<>"0U")*({LS}<>"선반")*{hh})&" U / {UMAX} U"',
            f=font(8.5, True, P["ink"]))
     cv.text(r, 13, "장비", sz=7.5, col=P["s500"])
-    cv.put(r, 15, f'=COUNTA({LN})&" 대"', f=font(8.5, True, P["ink"]))
+    cv.put(r, 15, f'=(COUNTA({LN})-COUNTIF({LK},"선반"))&" 대"', f=font(8.5, True, P["ink"]))
     x = 21
     for k, tint in KIND_TINT:
         cv.c(r, x).fill = fill(tint)
@@ -170,9 +173,14 @@ def build_rack(wb, rack="DC1-R02", info=None, devices=(), title_note=None):
         cv.text(r, x + 1, k, sz=7, col=P["s700"])
         x += 2 + int(_tw(k, 7) + 1)
     cv.h(r + 1, 13)
-    cv.text(r + 1, 2, title_note or "면: 양면 = 앞뒤 모두 차지(일반 서버) · 전면/후면 = 한쪽만 차지(짧은 장비) · 0U = 세로 PDU 등(실장도 제외)"
-            "  ·  U = 장비 맨 아래 U  ·  높이 비우면 1U", sz=7, col=P["s500"])
+    cv.text(r + 1, 2, "면: 양면 = 앞뒤 모두 차지 · 전면/후면 = 한쪽만 차지(짧은 장비) · 선반 = 선반·트레이 위 장비"
+            "(선반은 구분 '선반'으로 한 줄 따로) · 0U = 세로 PDU  ·  U = 맨 아래 U · 높이 비우면 1U  ·  시스템 = 한 시스템인 박스끼리 같은 이름",
+            sz=7, col=P["s500"])
     r += 1
+    if title_note:
+        cv.h(r + 1, 13)
+        cv.text(r + 1, 2, title_note, sz=7, col=P["s500"])
+        r += 1
     # 보조 열 숨김
     for c in HC.values():
         ws.column_dimensions[COL(c)].hidden = True

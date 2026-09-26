@@ -15,6 +15,9 @@ Office 2016에서 **복사해 붙여 쓰는 도구 모음**이다.
 | `library/02_Word_블록.docx` | 표현 유형별 블록 31개 + 행간 · 자간 · 줄바꿈 서식 팁 | [보기](preview/02_Word_블록.png) |
 | `library/03_슬라이드_요소.pptx` | 장면 조합 19장 + **도형 도구상자** 9장 (선 · 화살표 · 상자 · 말풍선 · 배지) | [보기](preview/03_슬라이드_요소.png) |
 | `library/04_Excel_시각서식.xlsx` | 셀 서식으로 만드는 시각 요소 · 함수 18개 · 리본 기능 12가지 | [보기](preview/04_Excel_시각서식.png) |
+| `library/05_Word_실무가이드.docx` | Word 기능 자체를 익히는 가이드 (15쪽, 기본/심화 구분) | [보기](preview/05_Word_실무가이드.png) |
+| `library/06_PPT_실무가이드.docx` | 마스터 · 도형 · 인쇄 (13쪽) | [보기](preview/06_PPT_실무가이드.png) |
+| `library/07_Excel_실무가이드.docx` | 임시 계산 · 수식 · 인쇄 (15쪽) | [보기](preview/07_Excel_실무가이드.png) |
 | `examples/운영매뉴얼_예시.docx` | 같은 스타일과 블록으로 만든 적용 예 (IT 운영 매뉴얼) | — |
 
 ## 5분 시작
@@ -43,6 +46,12 @@ Office 2016에서 **복사해 붙여 쓰는 도구 모음**이다.
 셀로 만드는 시각 요소(카드 · 배지 · 구분선 · 진행 막대 · 아이콘 · 셀 도식)
 · 표 서식 4종 · 한 장 요약 · 일정표(간트) · 자주 쓰는 함수 18개 · 미리 켜 둔 리본 기능 12가지
 
+## 두 종류의 문서
+
+- **00~04** — 복사해 쓰는 라이브러리. 만들어진 것을 가져다 쓴다.
+- **05~07** — Office 기능 자체를 익히는 실무 가이드. 빈 파일에서 시작하거나,
+  머리글·표·수식처럼 직접 다뤄야 할 때 본다. 각 항목에 [기본] / [심화] 가 붙어 있다.
+
 ## 읽을 것
 
 - `library/00_시작가이드.docx` — 인쇄해 두고 쓰는 본 가이드 (11쪽)
@@ -55,7 +64,9 @@ Office 2016에서 **복사해 붙여 쓰는 도구 모음**이다.
 pip install python-docx python-pptx openpyxl pillow
 python3 tools/build_assets.py && python3 tools/build_docx.py && \
 python3 tools/build_pptx.py && python3 tools/build_xlsx.py && \
-python3 tools/build_guide.py && python3 tools/build_example.py && python3 tools/build_preview.py
+python3 tools/build_guide.py && python3 tools/build_word_guide.py && \
+python3 tools/build_ppt_guide.py && python3 tools/build_excel_guide.py && \
+python3 tools/build_example.py && python3 tools/build_preview.py
 python3 tools/selftest.py     # 편집 · 복사 · 인쇄 시뮬레이션(LibreOffice 필요)
 ```
 

@@ -10,6 +10,7 @@ Office 2016에서 **복사해 붙여 쓰는 도구 모음**이다.
 
 | 파일 | 무엇 | 미리보기 |
 |---|---|---|
+| **`library/00_시작가이드.docx`** | **먼저 볼 것.** 찾아보기 표 · 문서 종류별 조립 순서 · 막히는 것 · 점검 목록 | [보기](preview/00_시작가이드.png) |
 | `library/01_문서_템플릿.docx` | 표지 · 목차 · 본문 구조가 갖춰진 문서 뼈대 (스타일 30종) | [보기](preview/01_문서_템플릿.png) |
 | `library/02_Word_블록.docx` | 표현 유형별 블록 31개 + 행간 · 자간 · 줄바꿈 서식 팁 | [보기](preview/02_Word_블록.png) |
 | `library/03_슬라이드_요소.pptx` | 장면 조합 19장 + **도형 도구상자** 9장 (선 · 화살표 · 상자 · 말풍선 · 배지) | [보기](preview/03_슬라이드_요소.png) |
@@ -18,7 +19,9 @@ Office 2016에서 **복사해 붙여 쓰는 도구 모음**이다.
 
 ## 5분 시작
 
-1. `preview/` 의 미리보기 이미지를 열어 필요한 장면 · 블록 번호를 찾는다.
+0. `library/00_시작가이드.docx` 를 연다. 2장의 **찾아보기 표**에서 전하려는 내용을 찾으면
+   Word 블록 번호 · PPT 쪽 번호 · Excel 시트가 한 줄로 나온다.
+1. `preview/` 의 미리보기 이미지를 열어 그 번호를 눈으로 확인한다.
 2. 해당 파일을 열고 그 부분을 선택해 복사한다.
 3. 작업 중인 문서에 붙여 넣는다. **다른 양식의 문서라면 붙여넣기 옵션에서 ‘원본 서식 유지’**.
 4. `〈 〉` 안의 글자를 실제 내용으로 바꾼다.
@@ -42,7 +45,8 @@ Office 2016에서 **복사해 붙여 쓰는 도구 모음**이다.
 
 ## 읽을 것
 
-- `guide/01_사용법.md` — 형식별 요점과 복사 · 인쇄 주의사항 (A4 두 장 분량)
+- `library/00_시작가이드.docx` — 인쇄해 두고 쓰는 본 가이드 (11쪽)
+- `guide/01_사용법.md` — 같은 내용의 짧은 글 버전
 - `guide/02_확인한_것.md` — 검증 범위와 Office 2016에서 직접 확인할 항목
 
 ## 다시 만들기 (선택)
@@ -51,7 +55,7 @@ Office 2016에서 **복사해 붙여 쓰는 도구 모음**이다.
 pip install python-docx python-pptx openpyxl pillow
 python3 tools/build_assets.py && python3 tools/build_docx.py && \
 python3 tools/build_pptx.py && python3 tools/build_xlsx.py && \
-python3 tools/build_example.py && python3 tools/build_preview.py
+python3 tools/build_guide.py && python3 tools/build_example.py && python3 tools/build_preview.py
 python3 tools/selftest.py     # 편집 · 복사 · 인쇄 시뮬레이션(LibreOffice 필요)
 ```
 

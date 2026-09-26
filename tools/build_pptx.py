@@ -61,7 +61,8 @@ def s_intro(prs):
           "*견주기   10 전·후 · 11 선택지 · 12 두 축 비교",
           "*숫자 보이기   13 지표 · 14 막대 · 15 추세와 구성비",
           "*보여주기   16 화면·사진 주석 · 17 여러 장",
-          "*정리하기   18 표 · 19 부품 · 20 마무리"]),
+          "*정리하기   18 표 · 19 부품 · 20 마무리",
+          "*부록   29 디자인 기준 · 30~31 아이콘 60종"]),
         ("어떻게 쓰나",
          ["*슬라이드 통째로: 왼쪽 목록에서 오른쪽 클릭 → 복사",
           "*도형만: Shift 클릭으로 여러 개 선택 후 복사",
@@ -655,6 +656,16 @@ def s_lines(prs):
     label(s, M + 6.4, yb + 4.3, 5.2, "참조·보조 관계", size=9, color=D.INK)
     a = shp(s, MSO_SHAPE.RIGHT_ARROW, M + 12.8, yb + 3.65, 5.2, 0.8, D.PRIMARY_TINT, D.PRIMARY_MID, 1.0)
     label(s, M + 12.8, yb + 4.6, 5.2, "굵은 화살표 도형", size=9, color=D.INK)
+    hdr(s, M, y + 12.5, LW, "선이 뜻하는 것 — 한 문서 안에서 규칙을 지킨다")
+    rules = [("현재 연결 · 주경로", D.PRIMARY_MID, 1.5, None),
+             ("예정 · 백업 · 논리", D.INK_FAINT, 1.25, "dash"),
+             ("특히 중요한 경로", D.PRIMARY, 2.25, None),
+             ("상태 표시", D.ST_BAD, 1.5, None)]
+    rw = LW / 4
+    for i, (nm, c, lwt, dash) in enumerate(rules):
+        rx = M + i * rw
+        conn(s, (rx, y + 13.5, rx + 1.2, y + 13.5), c, lwt, dash, head=None)
+        label(s, rx + 1.45, y + 13.2, rw - 1.55, nm, size=8.5, color=D.INK)
     RX = M + LW + 1.2; RW = CW - LW - 1.2
     how(s, RX, y, RW, [
         "*선 그리기  삽입 › 도형 › 선. Shift 를 누르면 수평·수직·45°로 고정된다",
@@ -1042,11 +1053,98 @@ def s_shortcuts(prs):
              align="l", anchor="ctr", margins=(0.4, 0.3, 0.05, 0.05))
     return s
 
+# ════════════════════════════════════════════════════════════════════════════
+#  부록 — 디자인 기준 · 아이콘
+# ════════════════════════════════════════════════════════════════════════════
+ICON_SRC = os.path.join(ASSETS, "아이콘_원본.pptx")
+# 원본 색 → 이 라이브러리 색
+ICON_DARK = {"1F3A5F": D.PRIMARY, "1E2A36": D.INK, "8C99A8": D.INK_FAINT}
+ICON_LIGHT = {"1F3A5F": D.WHITE, "1E2A36": D.WHITE, "8C99A8": "9DB6CA"}
+
+def _icon_grid(s, icons, mapping, label_color):
+    cols, iw = 10, 2.85
+    px, py = 3.06, 2.42
+    x0, y0 = M + 0.05, TOP + 0.35
+    for i, (nm, el) in enumerate(icons):
+        r, c = divmod(i, cols)
+        from pptx_lib import place_group
+        place_group(s, el, x0 + c * px, y0 + r * py, w=iw, mapping=mapping, name="아이콘-" + nm)
+
+def s_design_spec(prs):
+    s = slide(prs, "디자인 기준", "이 라이브러리가 쓰는 값. 새로 만들 때도 이 안에서 고른다.",
+              "쓰는 법: 색은 [도형 채우기] → 다른 채우기 색 → 사용자 지정 에서 RGB 값을 입력한다.")
+    y = TOP + 0.4
+    hdr(s, M, y, CW, "색")
+    sw = [("주색", D.PRIMARY, "제목 · 표 머리글 글자 · 강조"), ("보조", D.PRIMARY_MID, "선 · 화살표 · 번호"),
+          ("주색 바탕", D.PRIMARY_TINT, "표 머리글 · 강조 상자"), ("진한 주색", D.PRIMARY_DEEP, "아주 진한 강조"),
+          ("본문", D.INK, "글자"), ("보조 글자", D.INK_SOFT, "설명 · 캡션"),
+          ("흐린 글자", D.INK_FAINT, "라벨 · 주석"), ("선", D.LINE, "표 선 · 테두리"),
+          ("연한 바탕", D.SURFACE, "구분 · 비활성"), ("정상", D.ST_OK, "상태"),
+          ("주의", D.ST_WARN, "상태"), ("위험", D.ST_BAD, "상태")]
+    cw = (CW - 3 * 0.6) / 4
+    for i, (nm, c, use) in enumerate(sw):
+        r, col = divmod(i, 4)
+        x = M + col * (cw + 0.6); yy = y + 1.0 + r * 1.55
+        rect(s, x, yy, 1.15, 1.15, c, D.LINE if c in (D.SURFACE, D.LINE, D.WHITE) else None, 0.75)
+        rich(tbox(s, x + 1.4, yy - 0.05, cw - 1.4, 1.25, "", anchor="ctr", margins=(0, 0, 0, 0)),
+             [(nm + "   ", {"size": 9.5, "bold": True, "color": D.INK}),
+              ("#" + c + "\n", {"size": 8, "color": D.INK_FAINT}),
+              (use, {"size": 8.5, "color": D.INK_SOFT})], align="l", anchor="ctr", line=1.3,
+             margins=(0, 0, 0, 0))
+    y2 = y + 5.9
+    lw = (CW - 1.8) / 3
+    hdr(s, M, y2, lw, "글자")
+    ptable(s, M, y2 + 0.9, [lw * 0.46, lw * 0.28, lw * 0.26],
+           ["쓰는 곳", "크기", "굵기"],
+           [["슬라이드 제목", "19pt", "굵게"], ["구역 제목", "9.5pt", "굵게"],
+            ["본문", "10 ~ 11pt", "보통"], ["표 안", "9.5pt", "보통"],
+            ["주석 · 라벨", "8.5 ~ 9pt", "보통"]], row_h=0.95, head_h=1.0, size=9)
+    x2 = M + lw + 0.9
+    hdr(s, x2, y2, lw, "선")
+    for i, (nm, lwt) in enumerate([("0.75pt  가는 선", 0.75), ("1.0pt  기본", 1.0),
+                                   ("1.5pt  연결선", 1.5), ("2.25pt  강조", 2.25)]):
+        yy = y2 + 1.3 + i * 1.0
+        conn(s, (x2, yy, x2 + 3.6, yy), D.PRIMARY_MID, lwt, head=None)
+        label(s, x2 + 4.0, yy - 0.32, lw - 4.0, nm, size=9, color=D.INK)
+    label(s, x2, y2 + 5.5, lw, "네 가지 안에서만 쓴다", size=8.5, color=D.INK_FAINT)
+    x3 = M + 2 * (lw + 0.9)
+    hdr(s, x3, y2, lw, "간격 · 모서리")
+    lines_box(s, x3, y2 + 0.95, lw, 5.0,
+              ["*슬라이드 여백  좌우 1.6cm", "*본문 영역  위 3.05 ~ 아래 17.6cm",
+               "*도형 사이  0.4cm 이상", "*각진 모서리  장비 · 요소 · 표",
+               "*둥근 모서리  사람 · 외부 · 태그", "*그림자  쓰지 않는다"], size=9.5, bullet="", gap=7)
+    return s
+
+def s_icons_dark(prs):
+    s = slide(prs, "아이콘 60종", "구성도 · 흐름도에 쓰는 아이콘. 도형이라 색과 크기를 바꿀 수 있다.",
+              "쓰는 법: 아이콘을 클릭해 복사한 뒤 붙여 넣는다. 색은 [도형 채우기], 크기는 모서리를 Shift 로 끈다. 글자는 지워도 된다.")
+    from pptx_lib import load_groups
+    icons = load_groups(ICON_SRC, (5, 6, 7), "아이콘 세트-")
+    _icon_grid(s, icons, ICON_DARK, D.INK)
+    return s
+
+def s_icons_light(prs):
+    s = prs.slides.add_slide(prs.slide_layouts[6])
+    rect(s, 0, 0, W, H, D.PRIMARY_DEEP, None)
+    tbox(s, M, 1.05, CW - 8, 1.1, "아이콘 60종 — 밝은 색", size=19, bold=True, color=D.WHITE,
+         anchor="t", margins=(0, 0, 0, 0))
+    tbox(s, M, 2.05, CW - 8, 0.7, "어두운 배경 · 표지 · 섹션 장에 쓴다.", size=10, color="9DB6CA",
+         anchor="t", margins=(0, 0, 0, 0))
+    line_h(s, M, 2.72, CW, "2C4B66", 1.0)
+    from pptx_lib import load_groups
+    icons = load_groups(ICON_SRC, (5, 6, 7), "아이콘 세트-")
+    _icon_grid(s, icons, ICON_LIGHT, D.WHITE)
+    tbox(s, M, BOT + 0.35, CW, 0.6,
+         "쓰는 법: 어두운 배경 위에 올려 쓴다. 배경이 밝으면 앞 장(진한 색)을 쓴다.",
+         size=8.5, color="7C97AE", anchor="t", margins=(0, 0, 0, 0))
+    return s
+
 SLIDES = [s_intro, s_cover, s_agenda, s_message, s_summary, s_structure, s_tree, s_steps,
           s_timeline, s_before_after, s_options, s_matrix, s_kpi, s_bar, s_trend,
           s_annotate, s_gallery, s_table, s_closing,
           s_lines, s_boxes, s_callouts, s_process_parts, s_accent_parts, s_picture_parts,
-          s_tidy_align, s_tidy_color, s_shortcuts]
+          s_tidy_align, s_tidy_color, s_shortcuts,
+          s_design_spec, s_icons_dark, s_icons_light]
 
 def build():
     prs = Presentation()

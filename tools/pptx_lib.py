@@ -404,3 +404,48 @@ def conn(s, pts, color=D.PRIMARY_MID, lw=1.5, dash=None, head="triangle", tail=N
 def label(s, x, y, w, text, size=8.5, color=D.INK_FAINT, align="l", bold=False):
     return tbox(s, x, y, w, 0.6, text, size=size, bold=bold, color=color, align=align,
                 anchor="t", margins=(0, 0, 0, 0))
+
+# ── 외부 PPT에서 도형 가져오기 (아이콘 등) ─────────────────────────────────
+EMU_CM = 360000
+
+def load_groups(src_path, slide_idx, name_prefix):
+    """다른 pptx의 그룹 도형을 이름으로 골라 XML 째로 가져온다."""
+    from pptx import Presentation as _P
+    src = _P(src_path)
+    out = []
+    for i in slide_idx:
+        for sh in src.slides[i - 1].shapes:
+            if sh.shape_type == 6 and sh.name.startswith(name_prefix):
+                out.append((sh.name.replace(name_prefix, ""), copy.deepcopy(sh._element)))
+    return out
+
+def recolor(el, mapping):
+    """srgbClr 값을 통째로 바꾼다. {'1F3A5F': '14466B', ...}"""
+    for c in el.iter(qn('a:srgbClr')):
+        v = (c.get('val') or "").upper()
+        if v in mapping: c.set('val', mapping[v])
+    return el
+
+_gid = [900]
+def place_group(s, el, x, y, w=None, mapping=None, name=None):
+    """가져온 그룹을 슬라이드에 놓는다. w(cm)를 주면 비율을 유지해 크기를 맞춘다."""
+    new = copy.deepcopy(el)
+    if mapping: recolor(new, mapping)
+    grpPr = new.find(qn('p:grpSpPr'))
+    xfrm = grpPr.find(qn('a:xfrm'))
+    off, ext = xfrm.find(qn('a:off')), xfrm.find(qn('a:ext'))
+    cx, cy = int(ext.get('cx')), int(ext.get('cy'))
+    if w:
+        r = (w * EMU_CM) / cx
+        ext.set('cx', str(int(cx * r))); ext.set('cy', str(int(cy * r)))
+    off.set('x', str(int(x * EMU_CM))); off.set('y', str(int(y * EMU_CM)))
+    for p in new.iter(qn('p:cNvPr')):
+        _gid[0] += 1
+        p.set('id', str(_gid[0]))
+    if name:
+        nv = new.find(qn('p:nvGrpSpPr'))
+        if nv is not None:
+            c = nv.find(qn('p:cNvPr'))
+            if c is not None: c.set('name', name)
+    s.shapes._spTree.append(new)
+    return new

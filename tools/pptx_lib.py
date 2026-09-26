@@ -295,3 +295,112 @@ def ptable(s, x, y, widths, headers, rows, row_h=0.95, head_h=1.0, size=9.5,
             _apply_font(p.add_run(), size, r == 0, D.PRIMARY if r == 0 else D.INK)
             p.runs[0].text = str(val)
     return shp
+
+# ── 차트(편집 가능한 PowerPoint 기본 차트) ─────────────────────────────────
+def _chart_style(chart, size=9.5, legend=True, gridlines=True, value_fmt=None):
+    from pptx.enum.chart import XL_LEGEND_POSITION
+    chart.font.size = Pt(size)
+    chart.font.name = D.FONT_LATIN
+    chart.font.color.rgb = rgb(D.INK_SOFT)
+    try: chart.has_title = False
+    except Exception: pass
+    chart.has_legend = legend
+    if legend:
+        chart.legend.position = XL_LEGEND_POSITION.BOTTOM
+        chart.legend.include_in_layout = False
+    try:
+        va = chart.value_axis
+        va.has_major_gridlines = gridlines
+        if gridlines:
+            gl = va.major_gridlines.format.line
+            gl.color.rgb = rgb(D.LINE_SOFT); gl.width = Pt(0.75)
+        va.format.line.color.rgb = rgb(D.LINE)
+        va.has_minor_gridlines = False
+        if value_fmt: va.tick_labels.number_format = value_fmt; va.tick_labels.number_format_is_linked = False
+    except Exception: pass
+    try:
+        ca = chart.category_axis
+        ca.format.line.color.rgb = rgb(D.LINE)
+        ca.has_major_gridlines = False
+    except Exception: pass
+
+def bar_chart(s, x, y, w, h, cats, series, colors=None, stacked=False, legend=True,
+              gap=60, overlap=None):
+    from pptx.chart.data import CategoryChartData
+    from pptx.enum.chart import XL_CHART_TYPE
+    cd = CategoryChartData()
+    cd.categories = cats
+    for name, vals in series: cd.add_series(name, vals)
+    t = XL_CHART_TYPE.COLUMN_STACKED_100 if stacked else XL_CHART_TYPE.COLUMN_CLUSTERED
+    gf = s.shapes.add_chart(t, Cm(x), Cm(y), Cm(w), Cm(h), cd)
+    ch = gf.chart
+    _chart_style(ch, legend=legend and len(series) > 1)
+    plot = ch.plots[0]
+    plot.gap_width = gap
+    if overlap is not None: plot.overlap = overlap
+    palette = colors or [D.PRIMARY_MID, D.PRIMARY, D.INK_FAINT, D.ST_OK, D.ST_WARN, D.ST_BAD]
+    for i, sr in enumerate(ch.series):
+        sr.format.fill.solid(); sr.format.fill.fore_color.rgb = rgb(palette[i % len(palette)])
+        sr.format.line.fill.background()
+    return gf
+
+def line_chart(s, x, y, w, h, cats, series, colors=None, legend=True, markers=True):
+    from pptx.chart.data import CategoryChartData
+    from pptx.enum.chart import XL_CHART_TYPE
+    cd = CategoryChartData()
+    cd.categories = cats
+    for name, vals in series: cd.add_series(name, vals)
+    t = XL_CHART_TYPE.LINE_MARKERS if markers else XL_CHART_TYPE.LINE
+    gf = s.shapes.add_chart(t, Cm(x), Cm(y), Cm(w), Cm(h), cd)
+    ch = gf.chart
+    _chart_style(ch, legend=legend and len(series) > 1)
+    palette = colors or [D.PRIMARY, D.PRIMARY_MID, D.INK_FAINT]
+    for i, sr in enumerate(ch.series):
+        sr.format.line.color.rgb = rgb(palette[i % len(palette)])
+        sr.format.line.width = Pt(2.0)
+        sr.smooth = False
+    return gf
+
+# ── 도형 도구상자용 추가 도우미 ────────────────────────────────────────────
+def alpha(shape, color, pct):
+    """반투명 채우기(사진 위 글자 상자 등). pct: 0~100 (불투명도)."""
+    shape.fill.solid(); shape.fill.fore_color.rgb = rgb(color)
+    sf = shape.fill._xPr.find(qn('a:solidFill'))
+    clr = sf.find(qn('a:srgbClr'))
+    a = clr.makeelement(qn('a:alpha'), {'val': str(int(pct * 1000))})
+    clr.append(a)
+    return shape
+
+def shp(s, kind, x, y, w, h, fill=D.PRIMARY_TINT, line=D.PRIMARY_MID, lw=1.0, adj=None,
+        text=None, size=9.5, color=None, bold=True, rot=None):
+    sh = s.shapes.add_shape(kind, Cm(x), Cm(y), Cm(w), Cm(h))
+    _style(sh, fill, line, lw)
+    if adj is not None:
+        try:
+            for i, v in enumerate(adj if isinstance(adj, (list, tuple)) else [adj]):
+                sh.adjustments[i] = v
+        except Exception: pass
+    if rot: sh.rotation = rot
+    if text is not None:
+        set_text(sh, text, size=size, bold=bold, color=color or D.PRIMARY, align="c",
+                 margins=(0.1, 0.1, 0.02, 0.02))
+    return sh
+
+HEADS = {"삼각": "triangle", "스텔스": "stealth", "열린": "arrow", "원": "oval", "마름모": "diamond"}
+
+def conn(s, pts, color=D.PRIMARY_MID, lw=1.5, dash=None, head="triangle", tail=None,
+         kind=MSO_CONNECTOR.STRAIGHT, hw="med", hl="med"):
+    """(x1,y1,x2,y2) 연결선. kind 로 직선·꺾인선·곡선을 고른다."""
+    x1, y1, x2, y2 = pts
+    c = s.shapes.add_connector(kind, Cm(x1), Cm(y1), Cm(x2), Cm(y2))
+    c.line.color.rgb = rgb(color); c.line.width = Pt(lw)
+    c.shadow.inherit = False; _nostyle(c)
+    ln = c.line._get_or_add_ln()
+    if dash: ln.append(ln.makeelement(qn('a:prstDash'), {'val': dash}))
+    if tail: ln.append(ln.makeelement(qn('a:headEnd'), {'type': tail, 'w': hw, 'len': hl}))
+    if head: ln.append(ln.makeelement(qn('a:tailEnd'), {'type': head, 'w': hw, 'len': hl}))
+    return c
+
+def label(s, x, y, w, text, size=8.5, color=D.INK_FAINT, align="l", bold=False):
+    return tbox(s, x, y, w, 0.6, text, size=size, bold=bold, color=color, align=align,
+                anchor="t", margins=(0, 0, 0, 0))

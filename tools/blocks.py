@@ -25,7 +25,7 @@ def callout(kind, *runs, label=None):
 _VAR = re.compile(r"(<[^<>\n]{1,40}>)")
 
 def mono_runs(text):
-    """명령 블록 안의 <바꿔 넣을 값>을 IT-치환값 서식으로 구분해 준다."""
+    """명령 블록 안의 <바꿔 넣을 값>을 Doc-치환값 서식으로 구분해 준다."""
     out = []
     for seg in _VAR.split(text):
         if not seg: continue
@@ -77,17 +77,17 @@ def guides(items, start=0):
 
 # ── 표 ─────────────────────────────────────────────────────────────────────
 def info_table(pairs, lw=26):
-    """라벨 | 값 2열 정보표(IT-정보표)."""
+    """라벨 | 값 2열 정보표(Doc-정보표)."""
     rows = []
     for k, v in pairs:
         rows.append(TR([TC(td(k), w=PCT(lw), valign="center"),
                         TC(td(v), w=PCT(100 - lw), valign="center")]))
-    return TBL(rows, [lw, 100 - lw], style="ITTableInfo",
+    return TBL(rows, [lw, 100 - lw], style="DocTableInfo",
                look='<w:tblLook w:val="0680" w:firstRow="0" w:lastRow="0" w:firstColumn="1" '
                     'w:lastColumn="0" w:noHBand="1" w:noVBand="1"/>')
 
 def data_table(headers, rows, widths, caption=None, align=None):
-    """머리글 있는 기본 표(IT-표). rows 의 각 칸은 문자열 또는 run XML."""
+    """머리글 있는 기본 표(Doc-표). rows 의 각 칸은 문자열 또는 run XML."""
     out = tcap(caption) if caption else ""
     hr = TR([TC(th(h), w=PCT(w), valign="center") for h, w in zip(headers, widths)], header=True)
     body_rows = []
@@ -110,3 +110,41 @@ def screen(rid, caption, guide_items=None, w=14.0, h=None, ratio=9 / 16.0):
     x = P(IMG(rid, w, h, "screen"), style=sid("fig")) + fig_caption(caption)
     if guide_items: x += guides(guide_items)
     return x
+
+# ── 문서 조립용 공통 도우미 ────────────────────────────────────────────────
+from docx_lib import spacing, ind, pbdr, bdr, pt, cm, nonum
+
+def spacer(h_pt, after=0):
+    return P('', sp=spacing(after=after, line=pt(h_pt), rule="exact"))
+
+def rule(color=D.LINE, sz=6, before=0, after=8):
+    return P('', sp=spacing(before=pt(before), after=pt(after), line=pt(2), rule="exact"),
+             border=pbdr(bottom=bdr("bottom", sz, color, 0)))
+
+def big_title(text, pagebreak=False, sub=None):
+    """목차·표지처럼 차례에 넣지 않는 큰 제목(직접 서식)."""
+    x = P([R(text, sz=16.5, b=True, color=D.PRIMARY, track=-8)],
+          sp=spacing(before=0, after=pt(10), line=300), pagebreak=pagebreak,
+          border=pbdr(bottom=bdr("bottom", 6, "C9D6E2", 8)))
+    if sub: x += P([R(sub, sz=9.5, color=D.INK_SOFT)], sp=spacing(after=pt(8)))
+    return x
+
+def h1(t, num=True):  return P(R(t), style="Heading1", extra="" if num else nonum())
+def h2(t, num=True):  return P(R(t), style="Heading2", extra="" if num else nonum())
+def h3(t, num=True):  return P(R(t), style="Heading3", extra="" if num else nonum())
+def h4(t):            return P(R(t), style="Heading4")
+
+def para(*runs, **kw):
+    return P([x if isinstance(x, str) and x.startswith("<w:") else R(x) for x in runs], **kw)
+
+def lead(text, **kw):
+    return P(R(text), style=sid("lead"), **kw)
+
+def quote(text, source=None):
+    x = P(R(text), style=sid("quote"))
+    if source: x += P(R("— " + source), style=sid("quote"), sp=spacing(before=0, after=pt(6)))
+    return x
+
+def entry(name, when):
+    """블록 라이브러리의 한 항목: 제목 + 한 줄 설명."""
+    return h2(name) + (note(when) if when else "")

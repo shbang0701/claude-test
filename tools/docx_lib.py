@@ -24,30 +24,32 @@ NS = ('xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
 
 # 스타일 ID -> 사용자에게 보이는 이름
 S = {
-    "step":     ("ITStep",        "IT-단계"),
-    "stepbody": ("ITStepBody",    "IT-단계설명"),
-    "substep":  ("ITSubStep",     "IT-단계하위"),
-    "bullet":   ("ITBullet",      "IT-글머리"),
-    "check":    ("ITCheck",       "IT-체크"),
-    "cmd":      ("ITCmd",         "IT-명령"),
-    "out":      ("ITOut",         "IT-출력"),
-    "label":    ("ITLabel",       "IT-블록라벨"),
-    "fig":      ("ITFig",         "IT-그림"),
-    "guide":    ("ITScreenGuide", "IT-화면안내"),
-    "note":     ("ITWriteNote",   "IT-작성안내"),
-    "thead":    ("ITTHead",       "IT-표머리"),
-    "tbody":    ("ITTBody",       "IT-표본문"),
-    "tcap":     ("ITTableCap",    "IT-표제목"),
-    "small":    ("ITSmall",       "IT-보조설명"),
-    "caution":  ("ITCaution",     "IT-주의"),
-    "warn":     ("ITWarn",        "IT-경고"),
-    "ok":       ("ITOk",          "IT-확인"),
-    "info":     ("ITInfo",        "IT-참고"),
+    "lead":     ("DocLead",     "Doc-리드"),
+    "step":     ("DocStep",     "Doc-단계"),
+    "stepbody": ("DocStepBody", "Doc-단계설명"),
+    "substep":  ("DocSubStep",  "Doc-단계하위"),
+    "bullet":   ("DocBullet",   "Doc-글머리"),
+    "check":    ("DocCheck",    "Doc-체크"),
+    "cmd":      ("DocInput",    "Doc-입력"),
+    "out":      ("DocResult",   "Doc-결과"),
+    "label":    ("DocLabel",    "Doc-블록라벨"),
+    "fig":      ("DocFigure",   "Doc-그림"),
+    "guide":    ("DocFigGuide", "Doc-그림안내"),
+    "quote":    ("DocQuote",    "Doc-인용"),
+    "note":     ("DocWriteNote","Doc-작성안내"),
+    "thead":    ("DocTHead",    "Doc-표머리"),
+    "tbody":    ("DocTBody",    "Doc-표본문"),
+    "tcap":     ("DocTableCap", "Doc-표제목"),
+    "small":    ("DocSmall",    "Doc-보조설명"),
+    "caution":  ("DocCaution",  "Doc-주의"),
+    "warn":     ("DocWarn",     "Doc-경고"),
+    "ok":       ("DocOk",       "Doc-확인"),
+    "info":     ("DocInfo",     "Doc-참고"),
     # 글자 스타일
-    "code":     ("ITCode",        "IT-코드"),
-    "var":      ("ITVar",         "IT-치환값"),
-    "ui":       ("ITUi",          "IT-UI"),
-    "strong":   ("ITStrong",      "IT-강조"),
+    "code":     ("DocCode",     "Doc-코드"),
+    "var":      ("DocVar",      "Doc-치환값"),
+    "ui":       ("DocUi",       "Doc-UI"),
+    "strong":   ("DocStrong",   "Doc-강조"),
 }
 def sid(key): return S[key][0]
 
@@ -87,7 +89,7 @@ def rfonts(ascii_=D.FONT_LATIN, ea=D.FONT_EA, mono=False):
     return f'<w:rFonts w:ascii="{ascii_}" w:eastAsia="{ea}" w:hAnsi="{ascii_}" w:cs="{ascii_}"/>'
 
 def rpr(font=None, mono=False, b=False, sz=None, color=None, fill=None, track=None,
-        caps=False, noproof=False, style=None, u=False, i=False):
+        caps=False, noproof=False, style=None, u=False, i=False, scale=None):
     x = []
     if style: x.append(f'<w:rStyle w:val="{style}"/>')
     if mono or font: x.append(rfonts(font or D.FONT_LATIN, D.FONT_EA, mono))
@@ -97,6 +99,7 @@ def rpr(font=None, mono=False, b=False, sz=None, color=None, fill=None, track=No
     if noproof: x.append('<w:noProof/>')
     if color: x.append(f'<w:color w:val="{color}"/>')
     if track is not None: x.append(f'<w:spacing w:val="{track}"/>')
+    if scale is not None: x.append(f'<w:w w:val="{scale}"/>')
     if sz: x.append(f'<w:sz w:val="{hp(sz)}"/><w:szCs w:val="{hp(sz)}"/>')
     if u: x.append('<w:u w:val="single"/>')
     if fill: x.append(shd(fill))
@@ -152,7 +155,8 @@ def BR_PAGE(): return '<w:p><w:pPr><w:spacing w:after="0"/></w:pPr><w:r><w:br w:
 def EMPTY(after=0, sz=8): return P('', sp=spacing(after=after, line=pt(sz), rule="exact"))
 
 # ───────────────────────────── 표 ──────────────────────────────────────────
-def TC(paras, w=None, fill=None, span=None, valign="center", mar=None, borders=None, vmerge=None):
+def TC(paras, w=None, fill=None, span=None, valign="center", mar=None, borders=None, vmerge=None,
+       fit=False):
     if isinstance(paras, str): paras = [paras]
     x = []
     if w: x.append(f'<w:tcW w:w="{w}" w:type="pct"/>')
@@ -162,6 +166,7 @@ def TC(paras, w=None, fill=None, span=None, valign="center", mar=None, borders=N
     if borders: x.append(borders)
     if fill: x.append(shd(fill))
     if mar: x.append(mar)
+    if fit: x.append('<w:tcFitText w:val="true"/>')
     if valign: x.append(f'<w:vAlign w:val="{valign}"/>')
     return f'<w:tc><w:tcPr>{"".join(x)}</w:tcPr>{"".join(paras)}</w:tc>'
 
@@ -173,7 +178,7 @@ def TR(cells, header=False, cantsplit=True, height=None):
     trpr = f'<w:trPr>{"".join(x)}</w:trPr>' if x else ""
     return f'<w:tr>{trpr}{"".join(cells)}</w:tr>'
 
-def TBL(rows, widths, style="ITTable", indent=0, look='<w:tblLook w:val="0620" w:firstRow="1" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" w:noHBand="1" w:noVBand="1"/>',
+def TBL(rows, widths, style="DocTable", indent=0, look='<w:tblLook w:val="0620" w:firstRow="1" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" w:noHBand="1" w:noVBand="1"/>',
         borders=None, cellmar=None, layout="fixed"):
     """widths: 각 열의 백분율(합 100)."""
     grid = "".join(f'<w:gridCol w:w="{int(w * 94.68)}"/>' for w in widths)  # A4 본문폭 기준 근사
@@ -298,6 +303,11 @@ def styles_xml():
         ppr='<w:keepNext/><w:keepLines/>' + spacing(before=pt(9), after=pt(3)) + '<w:outlineLvl w:val="3"/>',
         rpr_=_rp(sz=10.5, b=True, color=D.INK_SOFT)))
 
+    # 도입 문장
+    st.append(_style(sid("lead"), S["lead"][1], based="Normal", nxt="Normal", ui=11,
+        ppr=spacing(before=0, after=pt(9), line=345),
+        rpr_=_rp(sz=11.5, color="2E3944")))
+
     # 절차
     st.append(_style(sid("step"), S["step"][1], based="Normal", nxt=sid("stepbody"), ui=12,
         ppr=('<w:keepNext/><w:keepLines/>' + numpr(3, 1) +
@@ -359,6 +369,13 @@ def styles_xml():
     st.append(_callout("ok",      S["ok"][1],      D.OK, D.OK_BG, D.OK_BDR))
     st.append(_callout("info",    S["info"][1],    D.NOTE, D.NOTE_BG, D.NOTE_BDR))
 
+    # 인용·발췌
+    st.append(_style(sid("quote"), S["quote"][1], based="Normal", nxt="Normal", ui=17,
+        ppr=(pbdr(left=bdr("left", 12, D.LINE, 10)) +
+             spacing(before=pt(6), after=pt(6), line=320) + ind(left=IND, right=cm(1.0)) +
+             '<w:contextualSpacing/>'),
+        rpr_=_rp(sz=10.5, color=D.INK_SOFT)))
+
     # 보조
     st.append(_style(sid("small"), S["small"][1], based="Normal", nxt="Normal", ui=18,
         ppr=spacing(before=0, after=pt(6), line=290) + ind(left=IND),
@@ -384,8 +401,8 @@ def styles_xml():
                   bdr("bottom", 8, D.PRIMARY_MID) + bdr("right", 0, "auto", val="nil") +
                   bdr("insideH", 4, D.LINE) + bdr("insideV", 0, "auto", val="nil") + '</w:tblBorders>'
                   + CELLMAR + '</w:tblPr>')
-    st.append('<w:style w:type="table" w:customStyle="1" w:styleId="ITTable">'
-              '<w:name w:val="IT-표"/><w:basedOn w:val="TableNormal"/><w:uiPriority w:val="19"/><w:qFormat/>'
+    st.append('<w:style w:type="table" w:customStyle="1" w:styleId="DocTable">'
+              '<w:name w:val="Doc-표"/><w:basedOn w:val="TableNormal"/><w:uiPriority w:val="19"/><w:qFormat/>'
               f'<w:rPr>{_rp(sz=9.5)}</w:rPr>' + tbl_common +
               '<w:tblStylePr w:type="firstRow"><w:pPr><w:keepNext/></w:pPr>'
               f'<w:rPr>{_rp(b=True, color=D.PRIMARY)}</w:rPr>'
@@ -393,8 +410,8 @@ def styles_xml():
               + shd(D.PRIMARY_TINT) + '</w:tcPr></w:tblStylePr>'
               '<w:tblStylePr w:type="band1Horz"><w:tcPr>' + shd(D.SURFACE) + '</w:tcPr></w:tblStylePr>'
               '</w:style>')
-    st.append('<w:style w:type="table" w:customStyle="1" w:styleId="ITTableInfo">'
-              '<w:name w:val="IT-정보표"/><w:basedOn w:val="TableNormal"/><w:uiPriority w:val="19"/><w:qFormat/>'
+    st.append('<w:style w:type="table" w:customStyle="1" w:styleId="DocTableInfo">'
+              '<w:name w:val="Doc-정보표"/><w:basedOn w:val="TableNormal"/><w:uiPriority w:val="19"/><w:qFormat/>'
               f'<w:rPr>{_rp(sz=9.5)}</w:rPr>'
               '<w:tblPr><w:tblBorders>' + bdr("top", 4, D.LINE) + bdr("left", 0, "auto", val="nil") +
               bdr("bottom", 4, D.LINE) + bdr("right", 0, "auto", val="nil") +

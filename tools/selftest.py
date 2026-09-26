@@ -11,8 +11,8 @@ from PIL import Image
 
 LIB = os.path.join(ROOT, "library")
 WORK = "/tmp/selftest"
-TPL = os.path.join(LIB, "01_운영매뉴얼_템플릿.docx")
-BLK = os.path.join(LIB, "02_Word_블록라이브러리.docx")
+TPL = os.path.join(LIB, "01_문서_템플릿.docx")
+BLK = os.path.join(LIB, "02_Word_블록.docx")
 
 def pdf(path, tag):
     out = os.path.join(WORK, tag)
@@ -52,18 +52,19 @@ def t1_edit_and_add_steps():
     # 내용 교체
     n = 0
     for p in doc.paragraphs:
-        if "〈시스템명〉" in p.text:
-            for r in p.runs: r.text = r.text.replace("〈시스템명〉", "사내 포털")
+        if "〈문서 제목〉" in p.text or "〈항목 1〉" in p.text:
+            for r in p.runs:
+                r.text = r.text.replace("〈문서 제목〉", "신입 사원 안내서").replace("〈항목 1〉", "출입 등록")
             n += 1
     # 긴 설명 입력
-    tgt = find(doc, "최근 200 줄에서") or find(doc, "최근 200줄에서")
+    tgt = find(doc, "〈보충 설명이 필요한 단계에만")
     if tgt:
-        set_text(tgt, "최근 200줄에서 ERROR 또는 WARN 문자열을 찾는다. 오류가 반복되는 시각과 "
-                      "메시지 패턴을 함께 확인하면 원인 구간을 좁히는 데 도움이 된다. 로그 양이 많아 "
-                      "화면에서 확인하기 어려우면 grep 으로 먼저 걸러낸 뒤 파일로 저장해 전달한다.")
+        set_text(tgt, "신청서는 사내 포털의 서식 자료실에서 내려받는다. 부서장 결재가 필요한 항목은 "
+                      "미리 담당자에게 확인해 두면 반려를 줄일 수 있다. 제출 후에는 수정이 어려우므로 "
+                      "보내기 전에 첨부 파일과 기간을 한 번 더 확인한다.")
     # 단계 중간 삽입 (3.1 의 1번 단계 뒤)
-    s1 = find(doc, "〈점프 서버〉에 접속한 뒤")
-    added = clone_after(s1, text="접속 후 대상 호스트 이름을 확인한다. (중간에 끼워 넣은 단계)")
+    s1 = find(doc, "〈첫 번째로 할 일을")
+    added = clone_after(s1, text="중간에 끼워 넣은 단계 — 뒤 번호가 자동으로 밀려야 한다")
     out = os.path.join(WORK, "t1_편집.docx"); doc.save(out)
     p, pages = pdf(out, "t1")
     return out, p, pages, n
@@ -101,10 +102,10 @@ def t3_paste_into_other_template():
     start = None; picked = []
     for el in items:
         txt = "".join(el.itertext())
-        if start is None and "단계 — 상세형" in txt and el.tag.endswith('}p'):
+        if start is None and "단계 — 상세" in txt and el.tag.endswith('}p'):
             start = True; continue
         if start:
-            if el.tag.endswith('}p') and "하위 단계와 조건 분기" in txt: break
+            if el.tag.endswith('}p') and "하위 단계와 분기" in txt: break
             picked.append(el)
     # (1) 원본 서식 유지 = 쓰이는 스타일 정의까지 함께 가져간다
     keep = Document(); ks = keep.sections[0]

@@ -64,7 +64,9 @@ if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     print("자리표시 이미지 생성:")
     placeholder(os.path.join(OUT, "screen_placeholder.png"), 1600, 900,
-                "화면 캡처 자리", "그림 선택 → 마우스 오른쪽 → 그림 바꾸기", chrome=True)
+                "화면 · 이미지 자리", "그림 선택 → 마우스 오른쪽 → 그림 바꾸기", chrome=True)
     placeholder(os.path.join(OUT, "diagram_placeholder.png"), 1600, 760,
-                "구성도 자리", "PPT 구성도를 복사해 여기에 붙여넣기(그림 아님)")
+                "도식 · 그림 자리", "PPT에서 복사해 붙여넣기(도형 상태로 유지)")
+    placeholder(os.path.join(OUT, "photo_placeholder.png"), 1200, 900,
+                "사진 자리", "그림 바꾸기로 교체")
     logo(os.path.join(OUT, "logo_placeholder.png"))

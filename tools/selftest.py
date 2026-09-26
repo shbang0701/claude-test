@@ -135,6 +135,8 @@ def t4_print_all():
     res = {}
     for f in sorted(os.listdir(LIB)):
         p = os.path.join(LIB, f)
+        if not os.path.isfile(p) or os.path.splitext(f)[1].lower() not in (".docx", ".pptx", ".xlsx"):
+            continue
         try:
             _, n = pdf(p, "print_" + f[:2])
             res[f] = n

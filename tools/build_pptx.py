@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """library/03_슬라이드_요소.pptx — 표현 유형별 슬라이드와 부품.
    모든 요소는 편집 가능한 도형·표·차트다(그림 아님)."""
-import os, sys
+import os, sys, copy
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 from pptx import Presentation
 from pptx.util import Cm, Pt, Emu
 from pptx.enum.shapes import MSO_SHAPE, MSO_CONNECTOR
+from pptx.oxml.ns import qn
 import design as D
 from pptx_lib import (W, H, M, CW, TOP, BOT, slide, box, rect, tbox, line_h, line_v, arrow,
                       node, zone, chip, pill, badge, dot, card, kpi, set_text, rich, rgb,
@@ -62,7 +63,8 @@ def s_intro(prs):
           "*숫자 보이기   13 지표 · 14 막대 · 15 추세와 구성비",
           "*보여주기   16 화면·사진 주석 · 17 여러 장",
           "*정리하기   18 표 · 19 부품 · 20 마무리",
-          "*부록   29 디자인 기준 · 30~31 아이콘 60종"]),
+          "*부록   29 디자인 기준 · 30~31 아이콘 60종",
+          "*IT 인프라   32~35 구성 요소 · 36 작업계획 · 37~42 완성 예"]),
         ("어떻게 쓰나",
          ["*슬라이드 통째로: 왼쪽 목록에서 오른쪽 클릭 → 복사",
           "*도형만: Shift 클릭으로 여러 개 선택 후 복사",
@@ -264,7 +266,7 @@ def s_tree(prs):
 # ══ 8. 단계 ════════════════════════════════════════════════════════════════
 def s_steps(prs):
     s = slide(prs, "〈과정 이름〉 진행 단계", "단계별로 무엇을 하고 무엇이 나오는지 보여준다.",
-              "쓰는 법: 화살표 도형을 복사해 이어 붙인다. 단계는 3~5개일 때 가장 읽기 좋다.")
+              "쓰는 법: 발표·보고에서 흐름을 요약할 때 쓴다. 실제로 수행하는 작업계획서는 36쪽을 쓴다.")
     y = TOP + 0.6
     steps = [("〈준비〉", "〈이 단계에서 하는 일〉", "〈나오는 것〉"),
              ("〈진행〉", "〈이 단계에서 하는 일〉", "〈나오는 것〉"),
@@ -291,7 +293,7 @@ def s_steps(prs):
 # ══ 9. 일정 ════════════════════════════════════════════════════════════════
 def s_timeline(prs):
     s = slide(prs, "〈일정 이름〉", "기간과 겹침, 중요한 시점을 한 장에 보여준다.",
-              "쓰는 법: 막대는 직사각형이다. 좌우 끝을 끌어 기간을 맞추고 눈금 글자만 바꾼다.")
+              "쓰는 법: 주·월 단위 일정용. 하루 안에 끝나는 작업의 시간표는 36쪽을 쓴다.")
     y = TOP + 0.9
     ticks = ["〈1월〉", "〈2월〉", "〈3월〉", "〈4월〉", "〈5월〉", "〈6월〉"]
     x0 = M + 5.4; span = CW - 6.8
@@ -1139,6 +1141,80 @@ def s_icons_light(prs):
          size=8.5, color="7C97AE", anchor="t", margins=(0, 0, 0, 0))
     return s
 
+# ════════════════════════════════════════════════════════════════════════════
+#  IT 인프라 — 외부 라이브러리에서 가져온 슬라이드
+# ════════════════════════════════════════════════════════════════════════════
+# 원본 색 → 이 라이브러리 색 (40종 전수 매핑)
+IT_MAP = {
+    # 글자 · 회색
+    "1E2A36": D.INK,        "3A4856": D.INK_SOFT,   "4E5D6C": D.INK_SOFT,
+    "677789": D.INK_FAINT,  "8C99A8": D.INK_FAINT,
+    "B4BFCB": D.LINE,       "D5DCE4": D.LINE,       "E4E9EF": D.LINE_SOFT,
+    "EEF2F6": D.SURFACE,    "F6F8FA": D.SURFACE,
+    # 파랑
+    "2F6DB5": D.PRIMARY_MID, "1F3A5F": D.PRIMARY,
+    "AFC3DA": "A8C3D8",      "DCE8F6": D.PRIMARY_TINT, "E8F0FA": D.PRIMARY_TINT,
+    "DCE6F2": D.PRIMARY_TINT,
+    # 상태
+    "C73E3A": D.ST_BAD,  "F8DCDA": D.DANGER_BG,
+    "2E8B57": D.ST_OK,   "377F3F": D.ST_OK,   "E6F3EC": D.OK_BG,
+    "D98E04": D.ST_WARN, "C98A1A": D.ST_WARN,
+    "FFF1BF": D.WARN_BG, "FDF3DE": D.WARN_BG, "FBE4D3": D.WARN_BG,
+    # 영역 색
+    "BF5B14": D.ZONE_D,  "0B7C7C": D.ZONE_B,  "D5EEEE": D.ZONE_B_BG,
+    "7A55B3": D.ZONE_C,  "EFE3F5": D.ZONE_C_BG,
+}
+
+def clone_slide(prs, src, idx, note=None):
+    """원본 pptx의 슬라이드를 도형째 가져와 이 라이브러리 색으로 바꾼다."""
+    from pptx_lib import recolor
+    s = prs.slides.add_slide(prs.slide_layouts[6])
+    title, tpos = None, (1.27, 1.07)
+    for sh in src.slides[idx - 1].shapes:
+        if sh.shape_type == 14:          # 자리 표시자는 제목만 글로 옮기고 도형은 버린다
+            if sh.has_text_frame and sh.text_frame.text.strip():
+                title = sh.text_frame.text.strip()
+                tpos = (round(sh.left / 360000, 2), round(sh.top / 360000, 2))
+            continue
+        el = copy.deepcopy(sh._element)
+        recolor(el, IT_MAP)
+        for c in el.iter(qn('p:cNvPr')):
+            _cid[0] += 1
+            c.set('id', str(_cid[0]))
+        s.shapes._spTree.append(el)
+    if title:                            # 이 라이브러리 제목 서식으로 다시 그린다
+        tx, ty = tpos
+        tbox(s, tx, ty - 0.05, W - 2 * tx, 1.1, title, size=19, bold=True, color=D.PRIMARY,
+             anchor="t", margins=(0, 0, 0, 0))
+        line_h(s, tx, ty + 1.62, W - 2 * tx, D.LINE, 1.0)
+    if note:
+        tbox(s, M, BOT + 0.35, CW, 0.6, note, size=8.5, color=D.INK_FAINT, anchor="t",
+             margins=(0, 0, 0, 0))
+    return s
+
+_cid = [3000]
+
+def it_slides(prs):
+    """IT 인프라 구성 요소와 완성 샘플."""
+    from pptx import Presentation as _P
+    src = _P(ICON_SRC)
+    plan = [
+        (9,  "쓰는 법: 장비 카드를 복사해 이름·IP·모델만 바꾼다. 색은 역할 구분용이다."),
+        (10, "쓰는 법: 랙 실장도는 Excel 장비 도면과 짝으로 쓴다. U 위치와 장비명만 맞춘다."),
+        (11, "쓰는 법: 영역 박스를 먼저 놓고 맨 뒤로 보낸 뒤 장비를 올린다. 망이 다르면 색을 달리한다."),
+        (13, "쓰는 법: VLAN · IP · 포트 라벨은 장비 안이 아니라 선 옆에 붙인다."),
+        (18, "쓰는 법: 실제 수행하는 작업계획서용. 8쪽(발표용 단계)·9쪽(주월 일정)과 역할이 다르다. "
+                  "하루 안에 끝나는 작업의 시간표·사전 점검·롤백을 한 장에 담는다."),
+        (20, "완성 예 — 시스템 구성도. 이름과 색만 바꿔 쓴다."),
+        (21, "완성 예 — 랙 실장도."),
+        (22, "완성 예 — 서버 물리 연결. 포트 단위로 그릴 때 쓴다."),
+        (24, "완성 예 — 작업 계획. 19쪽(마무리)과 함께 쓰면 보고서 한 벌이 된다."),
+        (26, "완성 예 — 장애 보고."),
+        (27, "완성 예 — 점검 결과."),
+    ]
+    for idx, note in plan:
+        clone_slide(prs, src, idx, note)
+
 SLIDES = [s_intro, s_cover, s_agenda, s_message, s_summary, s_structure, s_tree, s_steps,
           s_timeline, s_before_after, s_options, s_matrix, s_kpi, s_bar, s_trend,
           s_annotate, s_gallery, s_table, s_closing,
@@ -1151,6 +1227,7 @@ def build():
     prs.slide_width, prs.slide_height = Emu(12192000), Emu(6858000)
     set_theme_fonts(prs)
     for f in SLIDES: f(prs)
+    it_slides(prs)
     prs.core_properties.title = "슬라이드 요소와 도형 도구상자"
     prs.core_properties.author = "문서 작성 라이브러리"
     prs.save(OUT)

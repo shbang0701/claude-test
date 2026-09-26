@@ -66,6 +66,6 @@ if __name__ == "__main__":
     print("미리보기 생성:")
     for fn, title, sub, cols, tw in SPEC:
         p = os.path.join(LIB, fn)
-        if not os.path.exists(p): continue
+        if not os.path.isfile(p): continue
         pngs = render(p)
         sheet(pngs, title, sub, cols, os.path.join(OUT, os.path.splitext(fn)[0] + ".png"), tw)

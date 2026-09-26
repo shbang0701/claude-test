@@ -25,6 +25,12 @@ OK        = "1B6E4B"; OK_BG     = "EAF4EF"; OK_BDR   = "BEDCCC"   # 정상/확�
 NOTE      = "2C6E9B"; NOTE_BG   = "EFF4F8"; NOTE_BDR = "CFDCE7"   # 참고
 VAR       = "8A5000"; VAR_BG    = "FFF3E0"                         # 치환값
 
+# 영역 색 — 구성도에서 망·구역을 구분할 때만 쓴다(본문 강조에는 쓰지 않는다)
+ZONE_A = "2C6E9B"; ZONE_A_BG = "E9F0F6"    # 서비스 · 일반
+ZONE_B = "0B7C7C"; ZONE_B_BG = "E3F1F1"    # 관리 · 백본
+ZONE_C = "6B4FA0"; ZONE_C_BG = "EFEAF7"    # 외부 · 연동
+ZONE_D = "BF6A18"; ZONE_D_BG = "FBEEE1"    # 보안 · 격리
+
 # 상태 색 (PPT/Excel 공용)
 ST_OK = "2E8B57"; ST_WARN = "D19B10"; ST_BAD = "C0392B"; ST_IDLE = "9AA5B1"
 

@@ -34,6 +34,21 @@ Set-Content -LiteralPath (Join-Path $app 'datapath.txt') -Value $dataDir -Encodi
 Set-WtAppRoot $app
 
 try {
+    # ---- 코드 검사 ----
+    # PowerShell 변수는 대소문자를 가리지 않는다. 함수 안에서 $title과 [string]$Title처럼 대소문자만 다른 이름을 쓰면 같은 변수가 된다
+    $clash = foreach ($f in (Get-ChildItem $root -Recurse -Include *.psm1, *.ps1)) {
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$null)
+        foreach ($fn in $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)) {
+            $names = @($fn.Body.FindAll({ $args[0] -is [System.Management.Automation.Language.VariableExpressionAst] }, $false) |
+                    ForEach-Object { $_.VariablePath.UserPath } | Where-Object { $_ -notmatch ':' })
+            $plist = if ($fn.Parameters) { $fn.Parameters } elseif ($fn.Body.ParamBlock) { $fn.Body.ParamBlock.Parameters } else { @() }
+            $names += @($plist | ForEach-Object { $_.Name.VariablePath.UserPath })
+            $names | Group-Object { $_.ToLowerInvariant() } | Where-Object { @($_.Group | Sort-Object -Unique -CaseSensitive).Count -gt 1 } |
+                ForEach-Object { "$($f.Name) $($fn.Name): $(@($_.Group | Sort-Object -Unique -CaseSensitive) -join '/')" }
+        }
+    }
+    Assert-Wt '코드 검사: 함수 안에 대소문자만 다른 변수 이름 없음' (-not $clash) ($clash -join '; ')
+
     # ---- 저장 ----
     Assert-Wt '데이터 폴더는 datapath.txt를 따른다' ((Get-WtDataRoot) -eq (Resolve-Path $dataDir).ProviderPath)
 
@@ -118,6 +133,26 @@ try {
     Assert-Wt '메모: 여러 줄 본문 유지' ($a1.body -eq "첫 줄`n둘째 줄" -or $a1.body -eq "첫 줄`r`n둘째 줄")
     Assert-Wt '메모: 최근 고친 순서' ((@(Get-WtMemoSorted $memos)[0]).id -eq 'a2')
     Assert-Wt '메모 검색: 낱말 모두 포함' (@(Find-WtMemo $memos '장비 정리').Count -eq 1 -and @(Find-WtMemo $memos '').Count -eq 2)
+
+    # ---- 메모 쓰기 ----
+    $when = [datetime]'2026-10-22 11:20:05'
+    $nm = New-WtMemo $when
+    Assert-Wt '메모: 새 메모' ($nm.id.Length -eq 12 -and $nm.created -eq '2026-10-22 11:20:05' -and $nm.body -eq '')
+    [void](Set-WtMemoContent $nm '  ' @'
+점검 #서버 #서버
+```
+#코드안
+```
+- 할 일 #주간
+'@ $when)
+    Assert-Wt '메모: 빈 제목은 저장 시각' ($nm.title -eq '2026-10-22 11:20')
+    Assert-Wt '메모: 본문 #태그를 모은다 (코드 안 · 중복 제외)' ((@($nm.tags) -join ',') -eq '서버,주간') (@($nm.tags) -join ',')
+    $legacyMemo = $memos | Where-Object id -eq 'a2'
+    $legacyMemo.PSObject.Properties.Remove('tags')
+    [void](Set-WtMemoContent $legacyMemo '회의 메모' '고침 #회의' $when)
+    Save-WtMemoItems @($memos + $nm)
+    $re = Get-WtMemoItems
+    Assert-Wt '메모: 고친 것 저장 · 다시 읽기 (tags 없던 예전 항목 포함)' ($re.Count -eq 3 -and ($re | Where-Object id -eq 'a2').body -eq '고침 #회의' -and @(($re | Where-Object id -eq 'a2').tags)[0] -eq '회의')
 
     # ---- 일정 ----
     $s = Get-WtScheduleItems
@@ -306,6 +341,28 @@ pie
         $figs = @($view.Document.Blocks | Where-Object { $_ -is [System.Windows.Documents.BlockUIContainer] -and $_.Child -is [System.Windows.Controls.Border] })
         Assert-Wt 'WPF: Mermaid 2개는 그림, 모르는 종류는 코드 블록' ($figs.Count -eq 2 -and $view.Tag.Remeasure)
         Assert-Wt 'WPF: 제목 · 각주 자리' ($view.Tag.Anchors.ContainsKey('제목굵게') -and $view.Tag.Anchors.ContainsKey('fn1'))
+
+        # 메모 화면: 새 메모 → 입력 → 저장 → 삭제 → 실행 취소
+        $styles = Get-WtStyleDictionary
+        $memoAddon = Get-WtAddon -Id 'memo'
+        $mv = @(& $memoAddon.NewView | Where-Object { $_ -is [System.Windows.UIElement] })[-1]
+        $mv.Resources.MergedDictionaries.Add((New-WtThemeDictionary)); $mv.Resources.MergedDictionaries.Add($styles)
+        [void](& $memoAddon.Refresh $mv)
+        $mod = Get-Module Memo
+        $before = (Get-WtMemoItems).Count
+        & $mod { Add-WtMemo; $script:ui.TitleBox.Text = '새 제목'; $script:ui.BodyBox.Text = "본문 #새태그"; Save-WtMemoNow }
+        $saved = Get-WtMemoItems
+        $new = $saved | Where-Object title -eq '새 제목'
+        Assert-Wt 'WPF 메모: 새 메모를 쓰고 저장' ($saved.Count -eq $before + 1 -and $new.body -eq '본문 #새태그' -and @($new.tags)[0] -eq '새태그')
+        Assert-Wt 'WPF 메모: 저장 상태 표시 · 목록 맨 위' ((& $mod { $script:ui.Status.Visibility }) -eq 'Visible' -and (& $mod { [string]$script:ui.List.Items[0].Tag }) -eq $new.id)
+        & $mod { Remove-WtMemoCurrent }
+        Assert-Wt 'WPF 메모: 삭제' ((Get-WtMemoItems).Count -eq $before -and (& $mod { $script:ui.UndoBar.Visibility }) -eq 'Visible')
+        & $mod { Restore-WtMemoDeleted }
+        Assert-Wt 'WPF 메모: 삭제 실행 취소' ((Get-WtMemoItems).Count -eq $before + 1 -and (& $mod { $script:currentId }) -eq $new.id)
+        & $mod { $script:ui.BodyBox.Text = '고치는 중' }
+        & $memoAddon.OnExit
+        $after = Get-WtMemoItems
+        Assert-Wt 'WPF 메모: 끝내기 전에 저장' (($after | Where-Object id -eq $new.id).body -eq '고치는 중')
     } else {
         Write-Host 'SKIP WPF로 그리기 (Windows STA에서만)'
     }

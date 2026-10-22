@@ -8,6 +8,7 @@ IT 인프라 문서 템플릿 · 에셋 저장소입니다. Excel 장비 도면,
 |---|---|---|
 | `README.md` | 구성 · 사용법 · 도면 기준 · 검수 결과 · 다시 만들기 | 작업을 시작할 때 |
 | `design.md` | GUI 화면 디자인 기준 (시각 + 시각으로 인한 사용자 경험) | GUI 작업을 시작하기 전 |
+| `.claude/skills/ui-ux-pro-max/` | UI/UX 점검 스킬 (UX 지침 · 차트 · 기술 스택별 지침 검색) | GUI 작업 중 필요할 때 |
 
 `design.md`는 GUI 작업에만 필요해서 매번 불러오지 않습니다. 그래서 `@` 가져오기 대신 이름으로만 가리킵니다.
 
@@ -20,6 +21,16 @@ GUI 화면을 만들거나 고치는 작업이면 **시작하기 전에 `design.
 - `design.md`에 없는 것은 Windows 기본 컨트롤(Fluent) 동작을 따릅니다.
 - 끝내기 전에 `design.md`의 「완료 전 점검」을 확인하고, 지키지 못한 항목은 결과 보고에 적습니다.
 - Excel · PPT · 아이콘 같은 문서 산출물은 GUI가 아닙니다. 그 기준은 아래 「문서 작업」과 `README.md`에 있습니다.
+
+### ui-ux-pro-max 스킬
+
+`.claude/skills/ui-ux-pro-max/`에 들어 있고, 로컬 · 클라우드 세션 모두 자동으로 불러옵니다. `design.md`를 보완하는 점검 도구로만 씁니다.
+
+- 쓰는 것: `--domain ux`(UX 지침 · 안티패턴), `--domain chart`(차트 고르기), 정해진 기술 스택의 지침(`--stack winui` · `wpf` · `avalonia` · `uno` · `uwp` 등), `references/quick-reference.md`
+- 쓰지 않는 것: `--design-system` · `--persist`(디자인 시스템은 `design.md`입니다). `style` · `color` · `typography` · `google-fonts` · `icons` · `gsap` · `landing` · `product` 검색의 추천(색 · 글꼴 · 아이콘 · 움직임은 `design.md`가 정하고, 외부 글꼴 · 아이콘 패키지는 폐쇄망에서 쓸 수 없습니다)
+- 검색 결과의 수치가 `design.md`와 다르면 `design.md`를 따릅니다. 예: 스킬의 누르는 영역 44px · 본문 16px · 차트 색 → `design.md`의 32 · 14 · 용도 색
+- 실행: 저장소 루트에서 `python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<검색어>" --domain ux` (Python 3 표준 라이브러리만 쓰고 네트워크를 쓰지 않음)
+- 출처: [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) v2.15.0(`623a9a9`), MIT. 바꾼 점: 스크립트 경로, `SKILL.md` 맨 위 안내, `scripts/tests` 제외. 업데이트할 때는 원본의 `.claude/skills/ui-ux-pro-max/`를 다시 복사하고 이 세 가지를 다시 적용합니다.
 
 ## 문서 작업 (Excel · PPT · PDF · Word)
 

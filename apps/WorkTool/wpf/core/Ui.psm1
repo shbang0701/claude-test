@@ -1,0 +1,567 @@
+# 공통 부품. 버튼 · 입력 칸 · 카드 · 메뉴 항목 같은 모양은 여기서만 정한다.
+# 기능(애드온) 모듈은 아래 New-Wt* 함수와 스타일 이름만 쓰고, 색 값이나 글꼴 이름을 직접 쓰지 않는다.
+# 색 · 크기는 Theme.psm1의 리소스(B.* · F.* · Font.*)를 DynamicResource로 참조해서, 테마를 바꾸면 바로 반영된다.
+
+$ErrorActionPreference = 'Stop'
+
+$script:ns = 'xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"'
+
+# 스타일 모음. 색은 Style.Triggers에서 바꾼다 (템플릿 트리거로 바꾸면 BasedOn 스타일에서 덮어쓸 수 없어서).
+$script:stylesXaml = @'
+<ResourceDictionary {NS}>
+
+  <Style x:Key="T.Body" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource Font.UI}"/>
+    <Setter Property="FontSize" Value="{DynamicResource F.Body}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.Text}"/>
+    <Setter Property="TextWrapping" Value="Wrap"/>
+  </Style>
+  <Style x:Key="T.Sub" TargetType="TextBlock" BasedOn="{StaticResource T.Body}">
+    <Setter Property="FontSize" Value="{DynamicResource F.Small}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.SubText}"/>
+  </Style>
+  <Style x:Key="T.Title" TargetType="TextBlock" BasedOn="{StaticResource T.Body}">
+    <Setter Property="FontSize" Value="{DynamicResource F.Title}"/>
+    <Setter Property="FontWeight" Value="Bold"/>
+  </Style>
+  <Style x:Key="T.H2" TargetType="TextBlock" BasedOn="{StaticResource T.Body}">
+    <Setter Property="FontSize" Value="{DynamicResource F.H2}"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+  </Style>
+  <Style x:Key="T.Number" TargetType="TextBlock" BasedOn="{StaticResource T.Body}">
+    <Setter Property="FontSize" Value="{DynamicResource F.Number}"/>
+    <Setter Property="FontWeight" Value="Bold"/>
+  </Style>
+  <Style x:Key="T.Strong" TargetType="TextBlock" BasedOn="{StaticResource T.Body}">
+    <Setter Property="FontWeight" Value="SemiBold"/>
+  </Style>
+  <Style x:Key="T.Icon" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource Font.Icon}"/>
+    <Setter Property="FontSize" Value="{DynamicResource F.Icon}"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+    <Setter Property="HorizontalAlignment" Value="Center"/>
+  </Style>
+
+  <Style x:Key="Card" TargetType="Border">
+    <Setter Property="Background" Value="{DynamicResource B.Card}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource B.Border}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="12"/>
+    <Setter Property="Padding" Value="20,16"/>
+  </Style>
+  <Style x:Key="Tile" TargetType="Border">
+    <Setter Property="Background" Value="{DynamicResource B.WindowBg}"/>
+    <Setter Property="CornerRadius" Value="10"/>
+    <Setter Property="Padding" Value="14,10"/>
+  </Style>
+  <Style x:Key="Divider" TargetType="Border">
+    <Setter Property="BorderBrush" Value="{DynamicResource B.Divider}"/>
+    <Setter Property="BorderThickness" Value="0,1,0,0"/>
+  </Style>
+
+  <Style x:Key="Btn" TargetType="Button">
+    <Setter Property="FontFamily" Value="{DynamicResource Font.UI}"/>
+    <Setter Property="FontSize" Value="{DynamicResource F.Body}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.Text}"/>
+    <Setter Property="Background" Value="{DynamicResource B.Card}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource B.ButtonBorder}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="Padding" Value="16,0"/>
+    <Setter Property="MinHeight" Value="40"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="False"/>
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+    <Style.Triggers>
+      <Trigger Property="IsMouseOver" Value="True">
+        <Setter Property="Background" Value="{DynamicResource B.Hover}"/>
+      </Trigger>
+      <Trigger Property="IsKeyboardFocused" Value="True">
+        <Setter Property="BorderBrush" Value="{DynamicResource B.Accent}"/>
+      </Trigger>
+      <Trigger Property="IsEnabled" Value="False">
+        <Setter Property="Opacity" Value="0.5"/>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+  <Style x:Key="Btn.Primary" TargetType="Button" BasedOn="{StaticResource Btn}">
+    <Setter Property="Background" Value="{DynamicResource B.Accent}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource B.Accent}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.OnAccent}"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Style.Triggers>
+      <Trigger Property="IsMouseOver" Value="True">
+        <Setter Property="Background" Value="{DynamicResource B.AccentHover}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource B.AccentHover}"/>
+      </Trigger>
+      <Trigger Property="IsKeyboardFocused" Value="True">
+        <Setter Property="BorderBrush" Value="{DynamicResource B.Text}"/>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+  <Style x:Key="Btn.Danger" TargetType="Button" BasedOn="{StaticResource Btn}">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.Danger}"/>
+    <Style.Triggers>
+      <Trigger Property="IsMouseOver" Value="True">
+        <Setter Property="Background" Value="{DynamicResource B.DangerBg}"/>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+  <Style x:Key="Btn.Link" TargetType="Button" BasedOn="{StaticResource Btn}">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.AccentStrong}"/>
+    <Setter Property="FontSize" Value="{DynamicResource F.Small}"/>
+    <Setter Property="MinHeight" Value="32"/>
+    <Setter Property="Padding" Value="10,0"/>
+  </Style>
+  <Style x:Key="Btn.Icon" TargetType="Button" BasedOn="{StaticResource Btn}">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.NavText}"/>
+    <Setter Property="Width" Value="40"/>
+    <Setter Property="Height" Value="40"/>
+    <Setter Property="MinHeight" Value="0"/>
+    <Setter Property="Padding" Value="0"/>
+  </Style>
+  <Style x:Key="Btn.Chrome" TargetType="Button" BasedOn="{StaticResource Btn.Icon}">
+    <Setter Property="Width" Value="46"/>
+    <Setter Property="Height" Value="40"/>
+  </Style>
+  <Style x:Key="Btn.Close" TargetType="Button" BasedOn="{StaticResource Btn.Chrome}">
+    <Style.Triggers>
+      <Trigger Property="IsMouseOver" Value="True">
+        <Setter Property="Background" Value="{DynamicResource B.CloseHover}"/>
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
+  <Style x:Key="Nav" TargetType="RadioButton">
+    <Setter Property="FontFamily" Value="{DynamicResource Font.UI}"/>
+    <Setter Property="FontSize" Value="{DynamicResource F.Body}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.NavText}"/>
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Height" Value="40"/>
+    <Setter Property="Margin" Value="0,2"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="RadioButton">
+          <Border Background="{TemplateBinding Background}" CornerRadius="8" Padding="12,0">
+            <ContentPresenter VerticalAlignment="Center" RecognizesAccessKey="False"/>
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+    <Style.Triggers>
+      <Trigger Property="IsMouseOver" Value="True">
+        <Setter Property="Background" Value="{DynamicResource B.Hover}"/>
+      </Trigger>
+      <Trigger Property="IsChecked" Value="True">
+        <Setter Property="Background" Value="{DynamicResource B.AccentSoft}"/>
+        <Setter Property="Foreground" Value="{DynamicResource B.AccentStrong}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
+  <Style x:Key="Seg" TargetType="RadioButton">
+    <Setter Property="FontFamily" Value="{DynamicResource Font.UI}"/>
+    <Setter Property="FontSize" Value="{DynamicResource F.Body}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.ChipText}"/>
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="MinHeight" Value="34"/>
+    <Setter Property="Padding" Value="14,0"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="RadioButton">
+          <Border Background="{TemplateBinding Background}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="False"/>
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+    <Style.Triggers>
+      <Trigger Property="IsChecked" Value="True">
+        <Setter Property="Background" Value="{DynamicResource B.Card}"/>
+        <Setter Property="Foreground" Value="{DynamicResource B.Text}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
+  <Style x:Key="Swatch" TargetType="RadioButton">
+    <Setter Property="Width" Value="40"/>
+    <Setter Property="Height" Value="40"/>
+    <Setter Property="Margin" Value="0,0,6,0"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="RadioButton">
+          <Grid Background="Transparent">
+            <Ellipse x:Name="Ring" Stroke="{DynamicResource B.Text}" StrokeThickness="2" Visibility="Hidden"/>
+            <Ellipse Margin="6" Fill="{TemplateBinding Background}" Stroke="{TemplateBinding BorderBrush}" StrokeThickness="1"/>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter TargetName="Ring" Property="Visibility" Value="Visible"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="Input" TargetType="TextBox">
+    <Setter Property="FontFamily" Value="{DynamicResource Font.UI}"/>
+    <Setter Property="FontSize" Value="{DynamicResource F.Body}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.Text}"/>
+    <Setter Property="Background" Value="{DynamicResource B.Card}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource B.InputBorder}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="Padding" Value="10,8"/>
+    <Setter Property="MinHeight" Value="40"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="TextBox">
+          <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
+            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" Focusable="False"
+                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+    <Style.Triggers>
+      <Trigger Property="IsKeyboardFocused" Value="True">
+        <Setter Property="BorderBrush" Value="{DynamicResource B.Accent}"/>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+  <Style x:Key="Reader" TargetType="TextBox" BasedOn="{StaticResource Input}">
+    <Setter Property="IsReadOnly" Value="True"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="TextWrapping" Value="Wrap"/>
+    <Setter Property="AcceptsReturn" Value="True"/>
+    <Setter Property="VerticalContentAlignment" Value="Top"/>
+    <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+  </Style>
+
+  <Style x:Key="Row" TargetType="ListBoxItem">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Padding" Value="12,10"/>
+    <Setter Property="Margin" Value="0,1"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ListBoxItem">
+          <Border Background="{TemplateBinding Background}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+    <Style.Triggers>
+      <Trigger Property="IsMouseOver" Value="True">
+        <Setter Property="Background" Value="{DynamicResource B.Hover}"/>
+      </Trigger>
+      <Trigger Property="IsSelected" Value="True">
+        <Setter Property="Background" Value="{DynamicResource B.AccentSoft}"/>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+  <Style x:Key="List" TargetType="ListBox">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="ItemContainerStyle" Value="{StaticResource Row}"/>
+    <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+  </Style>
+
+  <Style x:Key="Check" TargetType="CheckBox">
+    <Setter Property="FontFamily" Value="{DynamicResource Font.UI}"/>
+    <Setter Property="FontSize" Value="{DynamicResource F.Body}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.Text}"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Margin" Value="0,4"/>
+    <Setter Property="Cursor" Value="Hand"/>
+  </Style>
+
+</ResourceDictionary>
+'@
+
+$script:styles = $null
+
+# 스타일 사전 (처음 부를 때 한 번 만든다)
+function Get-WtStyleDictionary {
+    if (-not $script:styles) {
+        $script:styles = [System.Windows.Markup.XamlReader]::Parse($script:stylesXaml.Replace('{NS}', $script:ns))
+    }
+    $script:styles
+}
+
+# XAML 문자열을 요소로 만든다. 맨 앞 태그에 {NS}를 쓰면 기본 이름공간으로 바뀐다.
+function ConvertFrom-WtXaml([string]$Xaml) {
+    [System.Windows.Markup.XamlReader]::Parse($Xaml.Replace('{NS}', $script:ns))
+}
+
+# x:Name을 붙인 요소들을 이름 → 요소 사전으로 돌려준다
+function Get-WtNamedElements($Root, [string]$Xaml) {
+    $map = @{}
+    foreach ($m in [regex]::Matches($Xaml, 'x:Name="([A-Za-z0-9_]+)"')) {
+        $name = $m.Groups[1].Value
+        $map[$name] = $Root.FindName($name)
+    }
+    $map
+}
+
+function Set-WtStyle($Element, [string]$Key) {
+    $Element.SetResourceReference([System.Windows.FrameworkElement]::StyleProperty, $Key)
+}
+
+# 의존 속성에 테마 리소스를 건다. 예: Set-WtBrush $tb 'Foreground' 'B.SubText'
+function Set-WtResource($Element, [string]$Property, [string]$Key) {
+    $field = $Element.GetType().GetField("${Property}Property",
+        [System.Reflection.BindingFlags]'Public, Static, FlattenHierarchy')
+    if (-not $field) { throw "$($Element.GetType().Name)에 $Property 속성이 없습니다." }
+    $Element.SetResourceReference($field.GetValue($null), $Key)
+}
+
+function New-WtText([string]$Text, [string]$Style = 'T.Body') {
+    $t = [System.Windows.Controls.TextBlock]::new()
+    $t.Text = $Text
+    Set-WtStyle $t $Style
+    $t
+}
+
+# 아이콘 글꼴(Segoe Fluent Icons / MDL2)의 글자 하나
+function New-WtIcon([int]$Code) {
+    $t = [System.Windows.Controls.TextBlock]::new()
+    $t.Text = [string][char]$Code
+    Set-WtStyle $t 'T.Icon'
+    $t
+}
+
+function New-WtStack([ValidateSet('Vertical', 'Horizontal')][string]$Orientation = 'Vertical', [double]$Gap = 0) {
+    $p = [System.Windows.Controls.StackPanel]::new()
+    $p.Orientation = $Orientation
+    $p.Tag = $Gap
+    $p
+}
+
+# 쌓기 패널에 요소를 넣는다. 패널 Tag의 간격만큼 앞에 여백을 둔다.
+function Add-WtChild($Panel, $Child) {
+    $gap = if ($Panel.Tag -is [double]) { [double]$Panel.Tag } else { 0 }
+    if ($Panel.Children.Count -gt 0 -and $gap -gt 0 -and $Child -is [System.Windows.FrameworkElement]) {
+        $m = $Child.Margin
+        if ($Panel.Orientation -eq 'Horizontal') {
+            $Child.Margin = [System.Windows.Thickness]::new($m.Left + $gap, $m.Top, $m.Right, $m.Bottom)
+        } else {
+            $Child.Margin = [System.Windows.Thickness]::new($m.Left, $m.Top + $gap, $m.Right, $m.Bottom)
+        }
+    }
+    [void]$Panel.Children.Add($Child)
+    $Child
+}
+
+function New-WtCard {
+    $b = [System.Windows.Controls.Border]::new()
+    Set-WtStyle $b 'Card'
+    $b
+}
+
+# 카드 머리: 제목(+ 개수) 왼쪽, 오른쪽에 링크 버튼 하나 (선택)
+function New-WtCardHeader([string]$Title, [string]$Count, [string]$LinkText, [string]$LinkPage) {
+    $g = [System.Windows.Controls.DockPanel]::new()
+    $g.LastChildFill = $true
+    $g.Margin = [System.Windows.Thickness]::new(0, 0, 0, 8)
+    if ($LinkText) {
+        $b = New-WtButton $LinkText -Kind Link
+        $b.Tag = $LinkPage
+        $b.Add_Click({ param($s, $e) Select-WtPage $s.Tag })
+        [System.Windows.Controls.DockPanel]::SetDock($b, 'Right')
+        [void]$g.Children.Add($b)
+    }
+    $title = New-WtText $Title 'T.H2'
+    if ($Count) {
+        $run = [System.Windows.Documents.Run]::new("  $Count")
+        $run.FontWeight = 'Normal'
+        $run.SetResourceReference([System.Windows.Documents.TextElement]::ForegroundProperty, 'B.SubText')
+        $title.Inlines.Add($run)
+    }
+    $title.VerticalAlignment = 'Center'
+    [void]$g.Children.Add($title)
+    $g
+}
+
+# 버튼. $Kind: Default · Primary · Danger · Icon · Link
+function New-WtButton([string]$Text, [string]$Kind = 'Default', [int]$Icon = 0, [string]$ToolTip) {
+    $b = [System.Windows.Controls.Button]::new()
+    switch ($Kind) {
+        'Primary' { Set-WtStyle $b 'Btn.Primary' }
+        'Danger' { Set-WtStyle $b 'Btn.Danger' }
+        'Icon' { Set-WtStyle $b 'Btn.Icon' }
+        'Link' { Set-WtStyle $b 'Btn.Link' }
+        default { Set-WtStyle $b 'Btn' }
+    }
+    if ($Icon -and $Text) {
+        $row = New-WtStack Horizontal 8
+        [void](Add-WtChild $row (New-WtIcon $Icon))
+        $label = [System.Windows.Controls.TextBlock]::new()
+        $label.Text = $Text
+        $label.VerticalAlignment = 'Center'
+        [void](Add-WtChild $row $label)
+        $b.Content = $row
+    } elseif ($Icon) {
+        $b.Content = New-WtIcon $Icon
+    } else {
+        $b.Content = $Text
+    }
+    if ($ToolTip) { $b.ToolTip = $ToolTip }
+    $b
+}
+
+# 작은 알약 모양 표시. $Bg/$Fg는 테마 리소스 이름 (예: 'Att.WorkBg', 'Att.Work')
+function New-WtTag([string]$Text, [string]$Bg = 'Chip', [string]$Fg = 'ChipText', [int]$Icon = 0) {
+    $b = [System.Windows.Controls.Border]::new()
+    $b.CornerRadius = [System.Windows.CornerRadius]::new(12)
+    $b.Padding = [System.Windows.Thickness]::new(9, 2, 9, 3)
+    $b.VerticalAlignment = 'Center'
+    $b.HorizontalAlignment = 'Left'
+    Set-WtResource $b 'Background' "B.$Bg"
+    $row = New-WtStack Horizontal 4
+    if ($Icon) {
+        $i = New-WtIcon $Icon
+        Set-WtResource $i 'FontSize' 'F.Small'
+        Set-WtResource $i 'Foreground' "B.$Fg"
+        [void](Add-WtChild $row $i)
+    }
+    $t = New-WtText $Text 'T.Sub'
+    Set-WtResource $t 'Foreground' "B.$Fg"
+    $t.FontWeight = 'SemiBold'
+    $t.TextWrapping = 'NoWrap'
+    [void](Add-WtChild $row $t)
+    $b.Child = $row
+    $b
+}
+
+# 숫자 칸: 이름(점 색) + 큰 숫자 + 단위
+function New-WtStatTile([string]$Label, [string]$Value, [string]$Unit, [string]$DotKey = 'Accent') {
+    $tile = [System.Windows.Controls.Border]::new()
+    Set-WtStyle $tile 'Tile'
+    $col = New-WtStack Vertical 2
+    $head = New-WtStack Horizontal 6
+    $dot = [System.Windows.Shapes.Ellipse]::new()
+    $dot.Width = 8; $dot.Height = 8
+    $dot.VerticalAlignment = 'Center'
+    Set-WtResource $dot 'Fill' "B.$DotKey"
+    [void](Add-WtChild $head $dot)
+    [void](Add-WtChild $head (New-WtText $Label 'T.Sub'))
+    [void](Add-WtChild $col $head)
+    $num = New-WtText $Value 'T.Number'
+    $run = [System.Windows.Documents.Run]::new(" $Unit")
+    $run.SetResourceReference([System.Windows.Documents.TextElement]::FontSizeProperty, 'F.Small')
+    $run.SetResourceReference([System.Windows.Documents.TextElement]::ForegroundProperty, 'B.SubText')
+    $run.FontWeight = 'Normal'
+    $num.Inlines.Add($run)
+    [void](Add-WtChild $col $num)
+    $tile.Child = $col
+    $tile
+}
+
+# 화면 맨 위: 작은 설명(선택) + 큰 제목 + 오른쪽 요소(선택)
+function New-WtPageHeader([string]$Title, [string]$Sub, $Right) {
+    $d = [System.Windows.Controls.DockPanel]::new()
+    $d.Margin = [System.Windows.Thickness]::new(0, 0, 0, 20)
+    if ($Right) {
+        [System.Windows.Controls.DockPanel]::SetDock($Right, 'Right')
+        $Right.VerticalAlignment = 'Bottom'
+        [void]$d.Children.Add($Right)
+    }
+    $col = New-WtStack Vertical 4
+    if ($Sub) { [void](Add-WtChild $col (New-WtText $Sub 'T.Sub')) }
+    [void](Add-WtChild $col (New-WtText $Title 'T.Title'))
+    [void]$d.Children.Add($col)
+    $d
+}
+
+# 화면 하나의 바깥 틀: 스크롤 + 안쪽 여백. 돌려준 패널에 내용을 넣는다.
+function New-WtPage {
+    $sv = [System.Windows.Controls.ScrollViewer]::new()
+    $sv.VerticalScrollBarVisibility = 'Auto'
+    $sv.HorizontalScrollBarVisibility = 'Disabled'
+    $sv.Focusable = $false
+    $panel = New-WtStack Vertical 16
+    $panel.Margin = [System.Windows.Thickness]::new(36, 8, 36, 32)
+    $sv.Content = $panel
+    @{ Root = $sv; Panel = $panel }
+}
+
+# 카드 안 한 줄: 구분선 위에 왼쪽부터 요소들을 차례로 놓는다. 마지막 요소가 남는 폭을 채운다.
+function New-WtListRow([object[]]$Parts, [double]$Gap = 14) {
+    $b = [System.Windows.Controls.Border]::new()
+    Set-WtStyle $b 'Divider'
+    $b.Padding = [System.Windows.Thickness]::new(0, 10, 0, 10)
+    $d = [System.Windows.Controls.DockPanel]::new()
+    $d.LastChildFill = $true
+    for ($i = 0; $i -lt $Parts.Count; $i++) {
+        $p = $Parts[$i]
+        if ($null -eq $p) { continue }
+        if ($i -lt $Parts.Count - 1) {
+            [System.Windows.Controls.DockPanel]::SetDock($p, 'Left')
+            $p.Margin = [System.Windows.Thickness]::new(0, 0, $Gap, 0)
+        }
+        $p.VerticalAlignment = 'Center'
+        [void]$d.Children.Add($p)
+    }
+    $b.Child = $d
+    $b
+}
+
+$script:ko = [System.Globalization.CultureInfo]::GetCultureInfo('ko-KR')
+
+# 날짜를 한국어로. 예: Format-WtDate (Get-Date) 'M월 d일 dddd' → 10월 22일 목요일
+function Format-WtDate([datetime]$Date, [string]$Format) { $Date.ToString($Format, $script:ko) }
+
+function Show-WtMessage([string]$Text, [string]$Title = 'WorkTool', [string]$Icon = 'Information') {
+    [void][System.Windows.MessageBox]::Show($Text, $Title, 'OK', $Icon)
+}
+
+function Confirm-WtYesNo([string]$Text, [string]$Title = 'WorkTool') {
+    [System.Windows.MessageBox]::Show($Text, $Title, 'YesNo', 'Question') -eq 'Yes'
+}
+
+# 오류를 사용자에게 보여 준다. 문구는 그대로 복사해서 알려 줄 수 있게 한다.
+function Show-WtError($ErrorRecord, [string]$Where = '') {
+    $msg = if ($ErrorRecord -is [System.Management.Automation.ErrorRecord]) {
+        $where = if ($ErrorRecord.InvocationInfo) { $ErrorRecord.InvocationInfo.PositionMessage } else { '' }
+        "$($ErrorRecord.Exception.Message)`n`n위치: $where"
+    } elseif ($ErrorRecord -is [System.Exception]) {
+        "$($ErrorRecord.Message)`n`n$($ErrorRecord.StackTrace)"
+    } else { [string]$ErrorRecord }
+    if ($Where) { $msg = "[$Where]`n$msg" }
+    try { Show-WtMessage $msg 'WorkTool 오류' 'Error' } catch { Write-Host $msg }
+}
+
+Export-ModuleMember -Function Get-WtStyleDictionary, ConvertFrom-WtXaml, Get-WtNamedElements, Set-WtStyle, Set-WtResource,
+    New-WtText, New-WtIcon, New-WtStack, Add-WtChild, New-WtCard, New-WtCardHeader, New-WtButton, New-WtTag,
+    New-WtStatTile, New-WtPageHeader, New-WtPage, New-WtListRow, Format-WtDate, Show-WtMessage, Confirm-WtYesNo, Show-WtError

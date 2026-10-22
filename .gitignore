@@ -5,3 +5,4 @@ __pycache__/
 apps/WorkTool/data/
 apps/WorkTool/config.json
 apps/WorkTool/dist/data/
+apps/WorkTool/**/datapath.txt

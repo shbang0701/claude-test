@@ -89,7 +89,7 @@ try {
     Assert-Wt '배열 설정을 다시 읽는다' (@(Get-WtSetting 'addons.disabled') -contains 'memo')
     Assert-Wt '끈 탭은 메뉴 목록에서 빠진다' (-not (@(Get-WtAddon | ForEach-Object Id) -contains 'memo') -and (@(Get-WtAddon -All | ForEach-Object Id) -contains 'memo'))
     Set-WtSetting 'addons.disabled' @()
-    Assert-Wt '메뉴 순서: 홈 · 일정 · 근태 · 메모' ((@(Get-WtAddon | ForEach-Object Id) -join ',') -eq 'home,schedule,attendance,memo')
+    Assert-Wt '메뉴 순서: 홈 · 일정 · 근태 · 메모 · 문서' ((@(Get-WtAddon | ForEach-Object Id) -join ',') -eq 'home,schedule,attendance,memo,docs')
 
     # ---- 예전 데이터 ----
     $legacy = (New-Item -ItemType Directory -Path (Join-Path $app 'data')).FullName
@@ -153,6 +153,29 @@ try {
     Save-WtMemoItems @($memos + $nm)
     $re = Get-WtMemoItems
     Assert-Wt '메모: 고친 것 저장 · 다시 읽기 (tags 없던 예전 항목 포함)' ($re.Count -eq 3 -and ($re | Where-Object id -eq 'a2').body -eq '고침 #회의' -and @(($re | Where-Object id -eq 'a2').tags)[0] -eq '회의')
+
+    # ---- 문서 ----
+    $docRoot = (New-Item -ItemType Directory -Path (Join-Path $tmp '문서 루트')).FullName
+    New-Item -ItemType Directory -Path (Join-Path $docRoot '운영\점검') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $docRoot '가나다') | Out-Null
+    Set-Content -LiteralPath (Join-Path $docRoot '계정 목록.xlsx') -Value 'x'
+    Set-Content -LiteralPath (Join-Path $docRoot 'readme.md') -Value ('a' * 3000)
+    $hid = New-Item -ItemType File -Path (Join-Path $docRoot 'secret.tmp')
+    $hid.Attributes = 'Hidden'
+    $de = Get-WtDocEntries $docRoot
+    Assert-Wt '문서: 폴더 먼저 · 이름 순 · 숨김 빼기' ((($de | ForEach-Object Name) -join ',') -eq '가나다,운영,계정 목록.xlsx,readme.md') (($de | ForEach-Object Name) -join ',')
+    Assert-Wt '문서: 종류 · 크기' (($de | Where-Object Name -eq '계정 목록.xlsx').Kind -eq 'Excel' -and (Format-WtDocSize 3002) -eq '3 KB' -and (Format-WtDocSize 5MB) -eq '5.0 MB' -and (Get-WtDocKind 'a.abc' $false) -eq 'ABC')
+    Assert-Wt '문서: 하위 폴더' ((@(Get-WtDocSubfolders $docRoot) | ForEach-Object { Split-Path $_ -Leaf }) -join ',' -eq '가나다,운영')
+    $chain = Get-WtDocChain @('D:\x', $docRoot) (Join-Path $docRoot '운영\점검')
+    Assert-Wt '문서: 맨 위 폴더부터 경로 차례' ($chain.Count -eq 3 -and $chain[0] -eq $docRoot -and $chain[2] -like '*\운영\점검') ($chain -join ' > ')
+    Assert-Wt '문서: 맨 위 폴더 밖은 빈 차례' ((Get-WtDocChain @($docRoot) 'Z:\other').Count -eq 0)
+    Assert-Wt '문서: 경로 표시' ((Format-WtDocPathLabel @($docRoot) (Join-Path $docRoot '운영\점검')) -eq '문서 루트 › 운영 › 점검' -and (Format-WtDocPathLabel @($docRoot) 'Z:\a') -eq 'Z:\a')
+    Assert-Wt '문서: 이름 거르기' (@(Find-WtDocEntry $de '계정 목록').Count -eq 1 -and @(Find-WtDocEntry $de '').Count -eq 4)
+    $xl = Join-Path $docRoot '계정 목록.xlsx'
+    Assert-Wt '문서: 즐겨찾기 넣기 · 빼기' ((Switch-WtDocPin $xl) -and (Test-WtDocPinned $xl) -and -not (Switch-WtDocPin $xl) -and -not (Test-WtDocPinned $xl))
+    [void](Switch-WtDocPin 'Z:\없는\파일.xlsx')
+    Assert-Wt '문서: 없어진 즐겨찾기도 보여 준다' (@(Get-WtDocPinEntries | Where-Object Missing).Count -eq 1)
+    Set-WtSetting 'docs.pins' @()
 
     # ---- 일정 ----
     $s = Get-WtScheduleItems
@@ -361,6 +384,21 @@ pie
         Assert-Wt 'WPF 메모: 삭제 실행 취소' ((Get-WtMemoItems).Count -eq $before + 1 -and (& $mod { $script:currentId }) -eq $new.id)
         & $mod { $script:ui.BodyBox.Text = '고치는 중' }
         & $memoAddon.OnExit
+        # 문서 화면: 맨 위 폴더 → 하위 폴더로 들어가기 → 즐겨찾기
+        Set-WtSetting 'docs.roots' @($docRoot)
+        Set-WtSetting 'docs.last' ''
+        $docAddon = Get-WtAddon -Id 'docs'
+        $dv = @(& $docAddon.NewView | Where-Object { $_ -is [System.Windows.UIElement] })[-1]
+        $dv.Resources.MergedDictionaries.Add((New-WtThemeDictionary)); $dv.Resources.MergedDictionaries.Add($styles)
+        [void](& $docAddon.Refresh $dv)
+        $dmod = Get-Module Docs
+        Assert-Wt 'WPF 문서: 맨 위 폴더를 연다' ((& $dmod { $script:current }) -eq $docRoot -and (& $dmod { $script:ui.List.Items.Count }) -eq 4) "(cur=$(& $dmod { $script:current }) err=$(& $dmod { $script:ui.Error }))"
+        & $dmod { Open-WtDocEntry ($script:entries | Where-Object Name -eq '운영') }
+        Assert-Wt 'WPF 문서: 폴더로 들어가면 트리도 따라간다' ((& $dmod { $script:current }) -like '*\운영' -and (& $dmod { $script:ui.Tree.SelectedItem.Tag.Path }) -like '*\운영' -and (& $dmod { $script:ui.PathText.Text }) -eq '문서 루트 › 운영')
+        & $dmod { $script:ui.List.SelectedIndex = 0; $script:ui.Pin.RaiseEvent([System.Windows.RoutedEventArgs]::new([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent)) }
+        Assert-Wt 'WPF 문서: 즐겨찾기 버튼' (@(Get-WtSetting 'docs.pins').Count -eq 1 -and @(Get-WtSetting 'docs.pins')[0] -like '*\운영\점검')
+        Set-WtSetting 'docs.pins' @(); Set-WtSetting 'docs.roots' @()
+
         $after = Get-WtMemoItems
         Assert-Wt 'WPF 메모: 끝내기 전에 저장' (($after | Where-Object id -eq $new.id).body -eq '고치는 중')
     } else {

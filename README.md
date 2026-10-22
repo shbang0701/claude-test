@@ -11,7 +11,7 @@
 - **[worktool.zip](worktool.zip)** — WorkTool 새 버전(WPF)을 바로 실행하는 묶음. 압축을 풀고 `Start-WorkTool.cmd`를 더블클릭 (개인 PC용, 아래 「업무 PC로 가져가기」 참고)
 - **[apps/WorkTool/](apps/WorkTool/)** — 업무 통합 GUI 앱 (메모 · 근태 · 일정·알람, 트레이 상주)
   - [design/](apps/WorkTool/design/) — 새 화면 시안 (WPF 전환 기준)
-  - [wpf/](apps/WorkTool/wpf/) — 새 버전(WPF) 1단계 뼈대 + 마크다운 보기 + 메모 쓰기. 파일 하나 버전은 `apps/WorkTool/dist/WorkTool-WPF.ps1`
+  - [wpf/](apps/WorkTool/wpf/) — 새 버전(WPF) 1단계 뼈대 + 마크다운 보기 + 메모 쓰기 + 문서 탭. 파일 하나 버전은 `apps/WorkTool/dist/WorkTool-WPF.ps1`
 - **[docs/guides/](docs/guides/)** — 읽는 가이드
   - [productivity/](docs/guides/productivity/) — 업무 효율·작업 환경
     - [갤럭시 S26 울트라 앱별 키보드 가이드](docs/guides/productivity/galaxy-s26-ultra-app-keyboard-guide.md)

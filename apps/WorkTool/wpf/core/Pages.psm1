@@ -253,7 +253,11 @@ function New-WtHelpPage {
             @('F1', '도움말'),
             @('Ctrl + N', '메모: 새 메모'),
             @('Ctrl + S', '메모: 바로 저장 (보통은 자동 저장)'),
-            @('Ctrl + E', '메모: 편집 / 미리보기'))) {
+            @('Ctrl + E', '메모: 편집 / 미리보기'),
+            @('Enter', '문서: 고른 파일 열기 · 폴더 들어가기'),
+            @('Alt + ↑', '문서: 위 폴더'),
+            @('F5', '문서: 새로 고침'),
+            @('Ctrl + F', '문서: 이름으로 거르기'))) {
         [void](Add-WtChild $col (New-WtKeyRow $r[0] $r[1]))
     }
     $keys.Child = $col

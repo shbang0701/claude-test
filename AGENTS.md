@@ -84,12 +84,12 @@
 
 - 사용자는 휴대폰으로 읽는다. 짧게 쓰고, 넓은 표 대신 목록을 쓴다.
 - **위치는 글과 링크를 같이 준다.** 사용자는 폰에서는 링크를 눌러 보고, 업무 PC에서는 글로 된 위치를 보고 GitHub를 직접 찾아 들어간다. 둘 중 하나만 주지 않는다.
-  - 파일: 브랜치 이름 + 저장소 루트 기준 경로, 그리고 링크. 예: 브랜치 `claude/zealous-darwin-z20qzg` · `apps/WorkTool/design/README.md` ([열기](https://github.com/shbang0701/claude-test/blob/claude/zealous-darwin-z20qzg/apps/WorkTool/design/README.md))
+  - 파일: 브랜치 이름 + 저장소 루트 기준 경로, 그리고 링크. 예: 브랜치 `main` · `apps/WorkTool/design/README.md` ([열기](https://github.com/shbang0701/claude-test/blob/main/apps/WorkTool/design/README.md))
   - 이슈·PR: 저장소 → 탭 이름 → 번호와 제목, 그리고 링크. 예: `shbang0701/claude-test` → Issues 탭 → #8 「WorkTool 개편 계획 · 결정할 것」 ([열기](https://github.com/shbang0701/claude-test/issues/8))
 - **커밋하고 푸시했으면** 브랜치 이름, 커밋 해시, 바뀐 파일 경로를 모두 적는다. 기본 브랜치가 아닌 곳에 올렸으면 그 사실도 알린다. GitHub 첫 화면에는 기본 브랜치만 보인다.
 
   ```
-  브랜치: claude/zealous-darwin-z20qzg
+  브랜치: main
   커밋:   e0cbe83
   경로:   AGENTS.md
           docs/guides/productivity/powershell-solarized-light-guide.md

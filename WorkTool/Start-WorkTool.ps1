@@ -19,16 +19,19 @@ Import-Module (Join-Path $root 'modules\UiHelper.psm1') -Force
 # 기능 목록. 기능을 추가할 때 modules\<Module>.psm1을 만들고 여기 한 줄 넣는다.
 # 각 모듈은 New-<Module>View 함수로 화면(Control)을 돌려준다. Icon은 Segoe 아이콘 글꼴의 글자 코드.
 $features = @(
+    @{ Module = 'Schedule'; Title = '일정'; Icon = 0xE787 }
     @{ Module = 'Attendance'; Title = '근태'; Icon = 0xE823 }
     @{ Module = 'Memo'; Title = '메모'; Icon = 0xE70B }
 )
 
 $theme = Get-UiTheme
+$appIcon = New-UiAppIcon
 
 # 메인 창. 크기는 화면 작업 영역 비율로 잡는다. F11은 전체 화면, Ctrl+B는 메뉴 접기.
 $area = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
 $form = [System.Windows.Forms.Form]::new()
 $form.Text = 'WorkTool'
+$form.Icon = $appIcon
 $form.Font = Get-UiFont 10
 $form.BackColor = $theme.Back
 $form.ForeColor = $theme.Text
@@ -169,5 +172,52 @@ $form.add_KeyDown({
     }
 })
 
+# 트레이 상주: 창의 X는 트레이로 숨기고, 완전히 끄는 건 트레이 아이콘 우클릭 → 종료.
+# 숨겨져 있는 동안에도 일정 알람은 울린다.
+$notify = [System.Windows.Forms.NotifyIcon]::new()
+$notify.Icon = $appIcon
+$notify.Text = 'WorkTool'
+$trayMenu = [System.Windows.Forms.ContextMenuStrip]::new()
+$trayMenu.Font = Get-UiFont 10
+[void]$trayMenu.Items.Add('열기', $null, { Show-MainWindow })
+[void]$trayMenu.Items.Add('종료', $null, { Exit-WorkTool })
+$notify.ContextMenuStrip = $trayMenu
+$notify.add_MouseDoubleClick({ Show-MainWindow })
+$notify.Visible = $true
+
+function Show-MainWindow {
+    $form.Show()
+    if ($form.WindowState -eq 'Minimized') { $form.WindowState = 'Normal' }
+    $form.Activate()
+}
+
+$script:exiting = $false
+function Exit-WorkTool {
+    $script:exiting = $true
+    $form.Close()
+}
+
+$script:trayTipShown = $false
+$form.add_FormClosing({
+    param($s, $e)
+    # 트레이 메뉴의 종료나 윈도우 종료·로그오프면 그대로 닫는다
+    if ($script:exiting -or $e.CloseReason -ne [System.Windows.Forms.CloseReason]::UserClosing) { return }
+    $e.Cancel = $true
+    $s.Hide()
+    if (-not $script:trayTipShown) {
+        $notify.ShowBalloonTip(3000, 'WorkTool', '트레이에서 계속 실행 중입니다. 끄려면 트레이 아이콘 우클릭 → 종료.',
+            [System.Windows.Forms.ToolTipIcon]::Info)
+        $script:trayTipShown = $true
+    }
+})
+
 Select-Page 0
-[System.Windows.Forms.Application]::Run($form)
+try {
+    [System.Windows.Forms.Application]::Run($form)
+} finally {
+    # 아이콘을 치우지 않으면 툴이 끝나도 트레이에 남아 보인다
+    $notify.Visible = $false
+    $notify.Dispose()
+    # 떠 있던 알림 창도 닫는다
+    foreach ($f in @([System.Windows.Forms.Application]::OpenForms)) { $f.Dispose() }
+}

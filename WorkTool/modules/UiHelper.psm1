@@ -142,6 +142,75 @@ function Set-UiNavSelected($Button, [bool]$Selected) {
     $Button.Invalidate()
 }
 
+# 창·트레이에 쓰는 앱 아이콘. 파일 없이 강조색 둥근 사각형에 W를 그려서 만든다.
+function New-UiAppIcon {
+    $size = 32
+    $bmp = [System.Drawing.Bitmap]::new($size, $size)
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.SmoothingMode = 'AntiAlias'
+    $g.TextRenderingHint = 'AntiAliasGridFit'
+    $path = [System.Drawing.Drawing2D.GraphicsPath]::new()
+    $d = 12
+    $path.AddArc(0, 0, $d, $d, 180, 90)
+    $path.AddArc($size - $d - 1, 0, $d, $d, 270, 90)
+    $path.AddArc($size - $d - 1, $size - $d - 1, $d, $d, 0, 90)
+    $path.AddArc(0, $size - $d - 1, $d, $d, 90, 90)
+    $path.CloseFigure()
+    $brush = [System.Drawing.SolidBrush]::new($script:theme.Accent)
+    $g.FillPath($brush, $path)
+    $font = [System.Drawing.Font]::new('Segoe UI', 20, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
+    $format = [System.Drawing.StringFormat]::new()
+    $format.Alignment = 'Center'
+    $format.LineAlignment = 'Center'
+    $g.DrawString('W', $font, [System.Drawing.Brushes]::White, [System.Drawing.RectangleF]::new(0, 1, $size, $size), $format)
+    $g.Dispose()
+    [System.Drawing.Icon]::FromHandle($bmp.GetHicon())
+}
+
+# 입력 칸 왼쪽에 붙는 이름표
+function New-UiFieldLabel([string]$Text) {
+    $l = [System.Windows.Forms.Label]::new()
+    $l.Text = $Text
+    $l.AutoSize = $true
+    $l.Anchor = 'Left'
+    $l.ForeColor = $script:theme.SubText
+    $l.Margin = New-UiPadding 0 4 10 4
+    $l
+}
+
+# 날짜·시각 입력. $Format 예: 'yyyy-MM-dd (ddd)', 'HH:mm' (시각이면 -Time)
+function New-UiDatePicker([string]$Format, [switch]$Time) {
+    $p = [System.Windows.Forms.DateTimePicker]::new()
+    $p.Format = 'Custom'
+    $p.CustomFormat = $Format
+    $p.ShowUpDown = [bool]$Time
+    $p.Dock = 'Fill'
+    $p.Margin = New-UiPadding 0 4 0 4
+    $p
+}
+
+# 표 형태 목록. $Columns는 @(@('이름', 폭), ...). 마지막 칸이 남는 폭을 채운다.
+function New-UiListView([object[]]$Columns) {
+    $list = [System.Windows.Forms.ListView]::new()
+    $list.Dock = 'Fill'
+    $list.Margin = New-UiPadding 0
+    $list.View = 'Details'
+    $list.FullRowSelect = $true
+    $list.HideSelection = $false
+    $list.MultiSelect = $false
+    $list.HeaderStyle = 'Nonclickable'
+    $list.ForeColor = $script:theme.Text
+    foreach ($c in $Columns) { [void]$list.Columns.Add($c[0], (Get-UiSize $c[1])) }
+    $list.add_Resize({
+        param($s, $e)
+        $c = $s.Columns
+        $used = 0
+        for ($i = 0; $i -lt $c.Count - 1; $i++) { $used += $c[$i].Width }
+        $c[$c.Count - 1].Width = [Math]::Max((Get-UiSize 60), $s.ClientSize.Width - $used - 2)
+    })
+    $list
+}
+
 function Show-UiMessage([string]$Text, [string]$Title = 'WorkTool') {
     [void][System.Windows.Forms.MessageBox]::Show($Text, $Title,
         [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
@@ -155,4 +224,5 @@ function Confirm-UiYesNo([string]$Text, [string]$Title = 'WorkTool') {
 }
 
 Export-ModuleMember -Function Get-UiTheme, Get-UiFontName, Get-UiFont, Get-UiSize, New-UiPadding, New-UiButton,
-    New-UiNavButton, Set-UiNavSelected, Show-UiMessage, Confirm-UiYesNo
+    New-UiNavButton, Set-UiNavSelected, New-UiAppIcon, New-UiFieldLabel, New-UiDatePicker, New-UiListView,
+    Show-UiMessage, Confirm-UiYesNo

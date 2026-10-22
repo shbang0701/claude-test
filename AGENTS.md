@@ -1,6 +1,6 @@
 # AGENTS.md
 
-IT 인프라 문서 템플릿 · 에셋 저장소입니다. Excel 장비 도면, PPT 구성요소, 아이콘 60종과 이 파일들을 다시 만드는 Python 소스(`_build/`)가 있습니다. 결과물은 폐쇄망의 Office 2016에서 매크로 없이 씁니다. GUI 앱은 계획 단계이고, 그 디자인 기준이 `design.md`입니다(앱 소스는 아직 없음).
+IT 인프라 문서 템플릿 · 에셋 저장소입니다. Excel 장비 도면, PPT 구성요소, IT 인프라 아이콘과 이 파일들을 다시 만드는 Python 소스(`_build/`)가 있습니다. 결과물은 폐쇄망의 Office 2016에서 매크로 없이 씁니다. GUI 앱은 계획 단계이고, 그 디자인 기준이 `design.md`입니다(앱 소스는 아직 없음).
 
 ## 작업별 스킬
 
@@ -11,7 +11,7 @@ IT 인프라 문서 템플릿 · 에셋 저장소입니다. Excel 장비 도면,
 | GUI 화면 만들기 · 고치기 · 검토 (화면 안 차트 포함) | `design.md` | `ui-ux-pro-max` | 스킬의 스타일 · 색 · 글꼴 · 아이콘 추천, `dataviz` · `artifact-design` · 아티팩트(대시보드 · HTML 시안), `frontend-design` · `theme-factory` · `brand-guidelines` |
 | Excel · PPT · PDF · Word 파일 | `README.md` | `xlsx` · `pptx` · `pdf` · `docx` | 슬라이드 · 문서 아티팩트, pptxgenjs, `dataviz`(차트 색도 `P`), 결과 파일만 직접 고치기 |
 | 저장소 Markdown 문서 (README · design.md · AGENTS.md · 설계 메모 · 제안서 · Markdown 가이드) | 고칠 문서 (새 문서면 `README.md`와 관련 문서) | `doc-writing` (→ doc-coauthoring 흐름) | `anthropic-skills:docs`(Claude Docs) · 아티팩트 |
-| 아이콘 SVG | `README.md` | 없음 (`_build/icons.py` · `_build/icondsl.py`) | 외부 아이콘 세트 · 이미지 생성 |
+| 아이콘 SVG | `README.md` | 없음 (`_build/icons.py` · `_build/icondsl.py`). 다시 만든 PPT · PDF 검수는 `pptx` · `pdf` | 외부 아이콘 세트 · 이미지 생성 |
 
 - 형식을 말하지 않은 문서 요청 중 이 저장소에 관한 것(제안서 · 설계 메모 · 가이드 · README 절)은 저장소 Markdown으로 씁니다(`doc-writing`). 새 설계 메모 · 제안서는 `docs/`에 둡니다.
 - 사용자가 형식이나 도구를 지정하면(예: "Word로", "Claude Docs로") 그것을 따릅니다. 저장소와 관계없는 일회성 문서인데 형식을 말하지 않았으면 형식을 묻습니다.
@@ -79,7 +79,7 @@ GUI 화면을 만들거나 고치는 작업이면 **시작하기 전에 `design.
 
 ## 문서 글쓰기 (Markdown)
 
-README · `design.md` · AGENTS.md · 설계 메모 · 제안서를 새로 쓰거나 크게 고칠 때는 `doc-writing` 스킬을 씁니다. 이 스킬이 [anthropics/skills](https://github.com/anthropics/skills)의 `doc-coauthoring` 흐름(맥락 모으기 → 구조 잡고 다듬기 → 새로 읽는 사람 테스트)을 원본에서 불러오고, 저장소 규칙을 덧붙입니다.
+README · `design.md` · AGENTS.md · 설계 메모 · 제안서를 새로 쓰거나 고칠 때는(오타 · 한두 줄 제외) `doc-writing` 스킬을 씁니다. 이 스킬이 [anthropics/skills](https://github.com/anthropics/skills)의 `doc-coauthoring` 흐름(맥락 모으기 → 구조 잡고 다듬기 → 새로 읽는 사람 테스트)을 원본에서 불러오고, 저장소 규칙을 덧붙입니다.
 
 - 결과는 저장소 안의 Markdown 파일이고, 문체는 `README.md`와 같습니다. 자세한 규칙은 `.claude/skills/doc-writing/SKILL.md`에 있습니다.
 - `doc-coauthoring`은 라이선스 표시가 없어 저장소에 복사하지 않습니다.

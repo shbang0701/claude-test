@@ -11,8 +11,8 @@
 - **[worktool.zip](worktool.zip)** — WorkTool 새 버전(WPF)을 바로 실행하는 묶음. 압축을 풀고 `Start-WorkTool.cmd`를 더블클릭 (개인 PC용, 아래 「업무 PC로 가져가기」 참고)
 - **[apps/WorkTool/](apps/WorkTool/)** — 업무 통합 GUI 앱 (메모 · 근태 · 일정·알람, 트레이 상주)
   - [design/](apps/WorkTool/design/) — 새 화면 시안 (WPF 전환 기준)
-    - [활성 작업 목업](apps/WorkTool/design/README.md#활성-작업-목업) — 프로그램별 창·브라우저 탭 표, 선택 닫기. 폰용 확대본·가짜 데이터·목업 생성 스크립트 포함 (기능 구현 전)
-  - [wpf/](apps/WorkTool/wpf/) — 새 버전(WPF) 1단계 뼈대 + 마크다운 보기 + 메모 쓰기 + 문서 탭. 파일 하나 버전은 `apps/WorkTool/dist/WorkTool-WPF.ps1`
+    - [활성 작업 목업](apps/WorkTool/design/README.md#활성-작업-목업) — 프로그램별 창·브라우저 탭 표, 선택 닫기. 폰용 확대본·자동 새로 고침 설정·가짜 데이터·목업 생성 스크립트 포함
+  - [wpf/](apps/WorkTool/wpf/) — 새 버전(WPF): 마크다운 메모 · 문서 · **활성 작업**(창·Chrome/Edge 탭 조회, 선택 닫기, 분 단위 자동 새로 고침). 코어 검사에 활성 작업 검사가 포함됩니다. 파일 하나 버전은 `apps/WorkTool/dist/WorkTool-WPF.ps1`
 - **[docs/guides/](docs/guides/)** — 읽는 가이드
   - [productivity/](docs/guides/productivity/) — 업무 효율·작업 환경
     - [갤럭시 S26 울트라 앱별 키보드 가이드](docs/guides/productivity/galaxy-s26-ultra-app-keyboard-guide.md)
@@ -29,7 +29,8 @@
 
 **스크립트·문서(텍스트): 복사해 붙여 넣기 (기본)**
 - 파일을 열고 오른쪽 위 복사 아이콘(Copy raw file) → 업무 PC에서 같은 이름으로 저장
-- WorkTool은 파일 하나로 묶은 `apps/WorkTool/dist/WorkTool.ps1`만 복사하면 됩니다.
+- 새 WorkTool의 메모·문서·활성 작업은 `apps/WorkTool/dist/WorkTool-WPF.ps1` 전체를 복사합니다.
+- 기존 WinForms의 일정 편집·알람·근태 입력을 계속 쓸 때는 `apps/WorkTool/dist/WorkTool.ps1`을 복사합니다. 두 버전의 차이는 [WPF README](apps/WorkTool/wpf/README.md)에 있습니다.
 
 **개인 PC: worktool.zip**
 - 받은 `worktool.zip` 우클릭 → 속성 → 「차단 해제」 체크 → 압축 풀기 → `Start-WorkTool.cmd` 더블클릭

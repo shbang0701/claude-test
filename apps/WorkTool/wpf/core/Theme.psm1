@@ -77,7 +77,7 @@ $script:fixed = @{
 
 $script:fontScales = @{ s = 0.93; m = 1.0; l = 1.12 }
 # MdH1~3 · Code · BodyLine(본문 줄 높이 1.5배)은 마크다운 보기용
-$script:fontSizes = @{ Title = 26; Number = 22; H2 = 16; Body = 14; Small = 12.5; Icon = 16; MdH1 = 24; MdH2 = 20; MdH3 = 17; Code = 13; BodyLine = 21 }
+$script:fontSizes = @{ Title = 26; Number = 22; H2 = 16; Dialog = 20; Body = 14; Small = 12.5; Icon = 16; MdH1 = 24; MdH2 = 20; MdH3 = 17; Code = 13; BodyLine = 21 }
 $script:fonts = @{
     # 설치된 글꼴 중 앞에서부터 쓴다. 맑은 고딕은 Windows 기본이라 항상 있다.
     UI   = 'Pretendard, Noto Sans KR, Malgun Gothic'

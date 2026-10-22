@@ -89,7 +89,7 @@ try {
     Assert-Wt '배열 설정을 다시 읽는다' (@(Get-WtSetting 'addons.disabled') -contains 'memo')
     Assert-Wt '끈 탭은 메뉴 목록에서 빠진다' (-not (@(Get-WtAddon | ForEach-Object Id) -contains 'memo') -and (@(Get-WtAddon -All | ForEach-Object Id) -contains 'memo'))
     Set-WtSetting 'addons.disabled' @()
-    Assert-Wt '메뉴 순서: 홈 · 일정 · 근태 · 메모 · 문서' ((@(Get-WtAddon | ForEach-Object Id) -join ',') -eq 'home,schedule,attendance,memo,docs')
+    Assert-Wt '메뉴 순서: 홈 · 일정 · 근태 · 메모 · 문서 · 활성 작업' ((@(Get-WtAddon | ForEach-Object Id) -join ',') -eq 'home,schedule,attendance,memo,docs,active-tasks')
 
     # ---- 예전 데이터 ----
     $legacy = (New-Item -ItemType Directory -Path (Join-Path $app 'data')).FullName
@@ -409,4 +409,5 @@ pie
 }
 
 if ($script:failed) { Write-Host "실패 $script:failed 건" -ForegroundColor Red; exit 1 }
+& (Join-Path $PSScriptRoot 'Test-ActiveTasks.ps1')
 Write-Host '모두 통과' -ForegroundColor Green

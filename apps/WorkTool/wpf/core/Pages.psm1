@@ -239,6 +239,8 @@ function New-WtHelpPage {
     [void](Add-WtChild $col (New-WtCardHeader '이 버전 (1단계 미리보기)'))
     [void](Add-WtChild $col (New-WtText '창 틀 · 메뉴 · 테마 · 설정, 그리고 예전 WorkTool 데이터를 읽어서 보여 주는 기능까지 들어 있습니다.' 'T.Body'))
     [void](Add-WtChild $col (New-WtText '메모는 쓰고 고칠 수 있습니다. 일정 · 근태 편집과 알람은 2단계에서 옮깁니다.' 'T.Body'))
+    [void](Add-WtChild $col (New-WtText '활성 작업은 열린 창·Chrome/Edge 탭을 모아 보고 선택한 항목을 닫습니다. 새로 고침 버튼을 우클릭하면 수동·자동을 고를 수 있고, 자동은 분 단위 간격을 설정합니다.' 'T.Body'))
+    [void](Add-WtChild $col (New-WtText '자동 갱신은 활성 작업 탭을 보는 동안만 동작합니다. 읽기 제한 항목은 원래 프로그램에서 확인하세요. 닫을 때 저장 확인도 원래 프로그램에서 처리합니다.' 'T.Body'))
     $about.Child = $col
     [void](Add-WtChild $page.Panel $about)
 
@@ -256,8 +258,9 @@ function New-WtHelpPage {
             @('Ctrl + E', '메모: 편집 / 미리보기'),
             @('Enter', '문서: 고른 파일 열기 · 폴더 들어가기'),
             @('Alt + ↑', '문서: 위 폴더'),
-            @('F5', '문서: 새로 고침'),
-            @('Ctrl + F', '문서: 이름으로 거르기'))) {
+            @('F5', '문서 · 활성 작업: 새로 고침'),
+            @('Ctrl + F', '문서 · 활성 작업: 이름으로 거르기'),
+            @('Shift + F10', '활성 작업: 새로 고침 버튼의 수동/자동 메뉴'))) {
         [void](Add-WtChild $col (New-WtKeyRow $r[0] $r[1]))
     }
     $keys.Child = $col

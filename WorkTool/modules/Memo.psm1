@@ -1,11 +1,10 @@
-# 메모 탭. 왼쪽은 검색과 목록, 오른쪽은 제목과 본문 편집.
+# 메모 화면. 왼쪽은 검색과 목록, 오른쪽은 제목과 본문 편집.
 # 다른 메모로 넘어가거나 새 메모를 시작하거나 창을 닫을 때, 바뀐 내용은 자동 저장한다.
 
 $ErrorActionPreference = 'Stop'
 
-$script:navy = [System.Drawing.Color]::FromArgb(31, 58, 95)
-$script:gray = [System.Drawing.Color]::FromArgb(110, 120, 132)
-$script:line = [System.Drawing.Color]::FromArgb(200, 206, 214)
+# 색·글꼴은 UiHelper에서 가져온다 (메인이 먼저 불러온다)
+$script:theme = Get-UiTheme
 
 $script:memos      = @()
 $script:currentId  = $null   # 편집 중인 메모 ID. 아직 저장 안 한 새 메모면 $null
@@ -21,24 +20,6 @@ function Show-MemoMessage([string]$Text) {
 
 function Set-MemoStatus([string]$Text) {
     $script:statusLabel.Text = $Text
-}
-
-function New-MemoButton([string]$Text, [switch]$Primary) {
-    $b = [System.Windows.Forms.Button]::new()
-    $b.Text = $Text
-    $b.AutoSize = $true
-    $b.FlatStyle = 'Flat'
-    $b.Padding = [System.Windows.Forms.Padding]::new(8, 2, 8, 2)
-    $b.Margin = [System.Windows.Forms.Padding]::new(0, 0, 6, 0)
-    if ($Primary) {
-        $b.BackColor = $script:navy
-        $b.ForeColor = [System.Drawing.Color]::White
-        $b.FlatAppearance.BorderColor = $script:navy
-    } else {
-        $b.BackColor = [System.Drawing.Color]::White
-        $b.FlatAppearance.BorderColor = $script:line
-    }
-    $b
 }
 
 # 목록을 다시 그린다. 검색어로 거르고 최근 수정 순으로 정렬한다.
@@ -160,10 +141,10 @@ function Remove-CurrentMemo {
     Set-MemoStatus '삭제됨'
 }
 
-function New-MemoTab {
-    $tab = [System.Windows.Forms.TabPage]::new('메모')
-    $tab.BackColor = [System.Drawing.Color]::White
-    $tab.Padding = [System.Windows.Forms.Padding]::new(10)
+function New-MemoView {
+    $view = [System.Windows.Forms.Panel]::new()
+    $view.BackColor = $script:theme.Card
+    $view.Padding = New-UiPadding 16
 
     # 왼쪽 32% 목록, 오른쪽 68% 편집
     $grid = [System.Windows.Forms.TableLayoutPanel]::new()
@@ -177,7 +158,7 @@ function New-MemoTab {
     # 왼쪽: 검색 + 목록
     $left = [System.Windows.Forms.TableLayoutPanel]::new()
     $left.Dock = 'Fill'
-    $left.Margin = [System.Windows.Forms.Padding]::new(0, 0, 10, 0)
+    $left.Margin = New-UiPadding 0 0 12 0
     $left.ColumnCount = 1
     $left.RowCount = 2
     [void]$left.RowStyles.Add([System.Windows.Forms.RowStyle]::new([System.Windows.Forms.SizeType]::AutoSize))
@@ -186,7 +167,7 @@ function New-MemoTab {
     $script:searchBox = [System.Windows.Forms.TextBox]::new()
     $script:searchBox.Dock = 'Fill'
     $script:searchBox.PlaceholderText = '검색 (제목·본문)'
-    $script:searchBox.Margin = [System.Windows.Forms.Padding]::new(0, 0, 0, 6)
+    $script:searchBox.Margin = New-UiPadding 0 0 0 8
 
     $script:list = [System.Windows.Forms.ListView]::new()
     $script:list.Dock = 'Fill'
@@ -196,8 +177,9 @@ function New-MemoTab {
     $script:list.HideSelection = $false
     $script:list.MultiSelect = $false
     $script:list.HeaderStyle = 'Nonclickable'
-    [void]$script:list.Columns.Add('제목', 200)
-    [void]$script:list.Columns.Add('수정', 140)
+    $script:list.ForeColor = $script:theme.Text
+    [void]$script:list.Columns.Add('제목', (Get-UiSize 200))
+    [void]$script:list.Columns.Add('수정', (Get-UiSize 130))
 
     $left.Controls.Add($script:searchBox, 0, 0)
     $left.Controls.Add($script:list, 0, 1)
@@ -216,21 +198,21 @@ function New-MemoTab {
     $bar.Dock = 'Fill'
     $bar.AutoSize = $true
     $bar.WrapContents = $false
-    $bar.Margin = [System.Windows.Forms.Padding]::new(0, 0, 0, 6)
-    $newButton = New-MemoButton '새 메모'
-    $saveButton = New-MemoButton '저장 (Ctrl+S)' -Primary
-    $deleteButton = New-MemoButton '삭제'
+    $bar.Margin = New-UiPadding 0 0 0 8
+    $newButton = New-UiButton '새 메모'
+    $saveButton = New-UiButton '저장 (Ctrl+S)' -Primary
+    $deleteButton = New-UiButton '삭제'
     $script:statusLabel = [System.Windows.Forms.Label]::new()
     $script:statusLabel.AutoSize = $true
-    $script:statusLabel.ForeColor = $script:gray
-    $script:statusLabel.Margin = [System.Windows.Forms.Padding]::new(6, 7, 0, 0)
+    $script:statusLabel.ForeColor = $script:theme.SubText
+    $script:statusLabel.Margin = New-UiPadding 6 7 0 0
     $bar.Controls.AddRange(@($newButton, $saveButton, $deleteButton, $script:statusLabel))
 
     $script:titleBox = [System.Windows.Forms.TextBox]::new()
     $script:titleBox.Dock = 'Fill'
-    $script:titleBox.Font = [System.Drawing.Font]::new('Malgun Gothic', 11, [System.Drawing.FontStyle]::Bold)
+    $script:titleBox.Font = Get-UiFont 12 -Bold
     $script:titleBox.PlaceholderText = '제목 (비우면 저장 시각)'
-    $script:titleBox.Margin = [System.Windows.Forms.Padding]::new(0, 0, 0, 6)
+    $script:titleBox.Margin = New-UiPadding 0 0 0 8
 
     $script:bodyBox = [System.Windows.Forms.TextBox]::new()
     $script:bodyBox.Dock = 'Fill'
@@ -246,7 +228,7 @@ function New-MemoTab {
 
     $grid.Controls.Add($left, 0, 0)
     $grid.Controls.Add($right, 1, 0)
-    $tab.Controls.Add($grid)
+    $view.Controls.Add($grid)
 
     # 이벤트
     $script:list.add_Resize({
@@ -302,8 +284,8 @@ function New-MemoTab {
     $saveButton.add_Click({ [void](Save-CurrentMemo) })
     $deleteButton.add_Click({ Remove-CurrentMemo })
 
-    # 창을 닫을 때 저장 안 한 내용을 저장한다. 탭이 화면에 붙은 뒤에야 창을 찾을 수 있다.
-    $tab.add_HandleCreated({
+    # 창을 닫을 때 저장 안 한 내용을 저장한다. 화면이 창에 붙은 뒤에야 창을 찾을 수 있다.
+    $view.add_HandleCreated({
         $form = $this.FindForm()
         if ($form -and -not $script:closeHooked) {
             $form.add_FormClosing({ if ($script:dirty) { [void](Save-CurrentMemo) } })
@@ -320,7 +302,7 @@ function New-MemoTab {
     }
     Update-MemoList
 
-    $tab
+    $view
 }
 
-Export-ModuleMember -Function New-MemoTab
+Export-ModuleMember -Function New-MemoView

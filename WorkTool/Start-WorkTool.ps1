@@ -1,5 +1,5 @@
 #Requires -Version 7
-# WorkTool 진입점. 저장 모듈과 기능 모듈을 불러와 탭으로 붙이고 메인 창을 띄운다.
+# WorkTool 진입점. 공통 모듈과 기능 모듈을 불러와 왼쪽 메뉴에 붙이고 메인 창을 띄운다.
 
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
@@ -10,99 +10,146 @@ Add-Type -AssemblyName System.Drawing
 # 아래 설정은 창을 만들기 전에 해야 한다. 같은 터미널에서 이미 창을 띄웠으면 실패하므로 무시한다.
 [System.Windows.Forms.Application]::EnableVisualStyles()
 try { [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false) } catch { }
-# 고해상도 화면에서 글자가 흐리지 않게 한다.
+# 고해상도 화면에서 글자가 흐리지 않게 한다. UiHelper가 배율을 읽기 전에 해야 한다.
 [void][System.Windows.Forms.Application]::SetHighDpiMode('SystemAware')
 
-# 기능 모듈 목록. 기능을 추가할 때 modules\<이름>.psm1을 만들고 여기 한 줄 넣는다.
-# 각 모듈은 New-<이름>Tab 함수로 TabPage를 돌려준다.
-$featureModules = @(
-    'Memo'
+Import-Module (Join-Path $root 'modules\Storage.psm1') -Force
+Import-Module (Join-Path $root 'modules\UiHelper.psm1') -Force
+
+# 기능 목록. 기능을 추가할 때 modules\<Module>.psm1을 만들고 여기 한 줄 넣는다.
+# 각 모듈은 New-<Module>View 함수로 화면(Control)을 돌려준다. Icon은 Segoe 아이콘 글꼴의 글자 코드.
+$features = @(
+    @{ Module = 'Memo'; Title = '메모'; Icon = 0xE70B }
 )
 
-# 색과 글꼴
-$navy      = [System.Drawing.Color]::FromArgb(31, 58, 95)
-$navyLight = [System.Drawing.Color]::FromArgb(180, 191, 203)
-$back      = [System.Drawing.Color]::FromArgb(243, 245, 248)
-$gray      = [System.Drawing.Color]::FromArgb(110, 120, 132)
-$font      = New-Object System.Drawing.Font('Malgun Gothic', 10)
-$titleFont = New-Object System.Drawing.Font('Malgun Gothic', 14, [System.Drawing.FontStyle]::Bold)
+$theme = Get-UiTheme
 
-# 메인 창. 크기는 화면 작업 영역 비율로 잡아서 배율과 상관없이 적당하게 뜨게 한다.
+# 메인 창. 크기는 화면 작업 영역 비율로 잡는다. F11은 전체 화면.
 $area = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
-$form = New-Object System.Windows.Forms.Form
+$form = [System.Windows.Forms.Form]::new()
 $form.Text = 'WorkTool'
-$form.Font = $font
-$form.BackColor = $back
+$form.Font = Get-UiFont 10
+$form.BackColor = $theme.Back
+$form.ForeColor = $theme.Text
 $form.StartPosition = 'CenterScreen'
-$form.Size = New-Object System.Drawing.Size([int]($area.Width * 0.6), [int]($area.Height * 0.75))
-$form.MinimumSize = New-Object System.Drawing.Size([int]($area.Width * 0.4), [int]($area.Height * 0.5))
+$form.Size = [System.Drawing.Size]::new([int]($area.Width * 0.65), [int]($area.Height * 0.8))
+$form.MinimumSize = [System.Drawing.Size]::new([int]($area.Width * 0.4), [int]($area.Height * 0.5))
+$form.KeyPreview = $true
 
-# 상단 머리글: 왼쪽 이름, 오른쪽 오늘 날짜
-$header = New-Object System.Windows.Forms.TableLayoutPanel
-$header.Dock = 'Top'
-$header.AutoSize = $true
-$header.BackColor = $navy
-$header.Padding = New-Object System.Windows.Forms.Padding(14, 8, 14, 8)
-$header.ColumnCount = 2
-[void]$header.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-[void]$header.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::AutoSize)))
+# 가운데: 화면이 들어가는 자리
+$content = [System.Windows.Forms.Panel]::new()
+$content.Dock = 'Fill'
+$content.Padding = New-UiPadding 16
 
-$title = New-Object System.Windows.Forms.Label
-$title.Text = 'WorkTool'
-$title.Font = $titleFont
-$title.ForeColor = [System.Drawing.Color]::White
-$title.AutoSize = $true
-$title.Anchor = 'Left'
+# 홈 화면
+$homeView = [System.Windows.Forms.Panel]::new()
+$homeView.Dock = 'Fill'
+$homeView.BackColor = $theme.Card
+$homeView.Padding = New-UiPadding 24
+$homeDate = [System.Windows.Forms.Label]::new()
+$homeDate.Text = (Get-Date).ToString('M월 d일 dddd')
+$homeDate.Font = Get-UiFont 20 -Bold
+$homeDate.AutoSize = $true
+$homeDate.Dock = 'Top'
+$homeNote = [System.Windows.Forms.Label]::new()
+$homeNote.Text = '오늘 일정과 알람이 여기 표시될 예정'
+$homeNote.ForeColor = $theme.SubText
+$homeNote.AutoSize = $true
+$homeNote.Dock = 'Top'
+$homeNote.Padding = New-UiPadding 2 8 0 0
+# Dock=Top은 나중에 넣은 것이 위로 간다
+$homeView.Controls.Add($homeNote)
+$homeView.Controls.Add($homeDate)
 
-$today = New-Object System.Windows.Forms.Label
-$today.Text = (Get-Date).ToString('yyyy-MM-dd (ddd)')
-$today.ForeColor = $navyLight
-$today.AutoSize = $true
-$today.Anchor = 'Right'
-
-$header.Controls.Add($title, 0, 0)
-$header.Controls.Add($today, 1, 0)
-
-# 가운데: 탭
-$body = New-Object System.Windows.Forms.Panel
-$body.Dock = 'Fill'
-$body.Padding = New-Object System.Windows.Forms.Padding(10)
-
-$tabs = New-Object System.Windows.Forms.TabControl
-$tabs.Dock = 'Fill'
-$tabs.Padding = New-Object System.Drawing.Point(16, 6)
-$body.Controls.Add($tabs)
-
-$homeTab = New-Object System.Windows.Forms.TabPage
-$homeTab.Text = '홈'
-$homeTab.BackColor = [System.Drawing.Color]::White
-$homeTab.Padding = New-Object System.Windows.Forms.Padding(16)
-
-$homeText = New-Object System.Windows.Forms.Label
-$homeText.Text = '기능 모듈을 붙이면 옆에 탭이 생긴다.'
-$homeText.ForeColor = $gray
-$homeText.AutoSize = $true
-$homeText.Dock = 'Top'
-$homeTab.Controls.Add($homeText)
-$tabs.TabPages.Add($homeTab)
-
-# 하단 상태 표시줄
-$status = New-Object System.Windows.Forms.StatusStrip
-$status.Font = $font
-$statusText = New-Object System.Windows.Forms.ToolStripStatusLabel
-$statusText.Text = '준비'
-[void]$status.Items.Add($statusText)
-
-$form.Controls.Add($header)
-$form.Controls.Add($status)
-$form.Controls.Add($body)
-# Fill은 맨 앞에 있어야 머리글·상태 표시줄을 가리지 않는다.
-$body.BringToFront()
-
-Import-Module (Join-Path $root 'modules\Storage.psm1') -Force
-foreach ($name in $featureModules) {
-    Import-Module (Join-Path $root "modules\$name.psm1") -Force
-    $tabs.TabPages.Add((& "New-${name}Tab"))
+$pages = [System.Collections.Generic.List[hashtable]]::new()
+$pages.Add(@{ Title = '홈'; Icon = 0xE80F; View = $homeView })
+foreach ($f in $features) {
+    Import-Module (Join-Path $root "modules\$($f.Module).psm1") -Force
+    $pages.Add(@{ Title = $f.Title; Icon = $f.Icon; View = (& "New-$($f.Module)View") })
 }
 
+# 왼쪽 메뉴
+$sidebar = [System.Windows.Forms.Panel]::new()
+$sidebar.Dock = 'Left'
+$sidebar.Width = Get-UiSize 200
+$sidebar.BackColor = $theme.Sidebar
+$sidebar.Padding = New-UiPadding 0 14 0 14
+
+$brand = [System.Windows.Forms.Label]::new()
+$brand.Text = 'WorkTool'
+$brand.Font = Get-UiFont 15 -Bold
+$brand.ForeColor = $theme.Accent
+$brand.AutoSize = $true
+$brand.Dock = 'Top'
+$brand.Padding = New-UiPadding 16 0 8 2
+
+$today = [System.Windows.Forms.Label]::new()
+$today.Text = (Get-Date).ToString('yyyy-MM-dd (ddd)')
+$today.ForeColor = $theme.SubText
+$today.AutoSize = $true
+$today.Dock = 'Top'
+$today.Padding = New-UiPadding 18 0 8 16
+
+# 위에서 아래 순서로 모은 뒤, Dock=Top은 나중에 넣은 것이 위로 가므로 거꾸로 넣는다
+$sidebarItems = [System.Collections.Generic.List[System.Windows.Forms.Control]]::new()
+$sidebarItems.Add($brand)
+$sidebarItems.Add($today)
+for ($i = 0; $i -lt $pages.Count; $i++) {
+    $p = $pages[$i]
+    $p.Button = New-UiNavButton $p.Title $p.Icon
+    $p.Button.Tag.Index = $i
+    $p.Button.add_Click({ Select-Page $this.Tag.Index })
+    $p.View.Dock = 'Fill'
+    $p.View.Visible = $false
+    $content.Controls.Add($p.View)
+    $sidebarItems.Add($p.Button)
+}
+for ($i = $sidebarItems.Count - 1; $i -ge 0; $i--) { $sidebar.Controls.Add($sidebarItems[$i]) }
+
+function Select-Page([int]$Index) {
+    for ($i = 0; $i -lt $pages.Count; $i++) {
+        $on = $i -eq $Index
+        Set-UiNavSelected $pages[$i].Button $on
+        $pages[$i].View.Visible = $on
+    }
+}
+
+# 하단 상태 표시줄
+$status = [System.Windows.Forms.StatusStrip]::new()
+$status.Font = Get-UiFont 9
+$status.BackColor = $theme.Back
+$status.SizingGrip = $false
+$statusText = [System.Windows.Forms.ToolStripStatusLabel]::new()
+$statusText.Text = "F11 전체 화면 · 글꼴 $(Get-UiFontName)"
+$statusText.ForeColor = $theme.SubText
+[void]$status.Items.Add($statusText)
+
+$form.Controls.Add($sidebar)
+$form.Controls.Add($status)
+$form.Controls.Add($content)
+# Fill은 맨 앞에 있어야 메뉴·상태 표시줄을 가리지 않는다.
+$content.BringToFront()
+
+# F11 전체 화면 전환
+$script:fullScreen = $false
+$script:prevState = 'Normal'
+$form.add_KeyDown({
+    param($s, $e)
+    if ($e.KeyCode -ne [System.Windows.Forms.Keys]::F11) { return }
+    $e.Handled = $true
+    if ($script:fullScreen) {
+        $s.FormBorderStyle = 'Sizable'
+        $s.WindowState = $script:prevState
+        $script:fullScreen = $false
+    } else {
+        $script:prevState = $s.WindowState
+        # 이미 최대화된 상태에서 테두리만 없애면 작업 표시줄을 덮지 않아서, 한 번 풀었다가 다시 최대화한다
+        $s.WindowState = 'Normal'
+        $s.FormBorderStyle = 'None'
+        $s.WindowState = 'Maximized'
+        $script:fullScreen = $true
+    }
+})
+
+Select-Page 0
 [System.Windows.Forms.Application]::Run($form)

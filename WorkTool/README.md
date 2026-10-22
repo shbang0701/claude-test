@@ -10,10 +10,11 @@ Windows에서 혼자 쓰는 업무 통합 GUI 툴. PowerShell 7 + WinForms, 외�
 
 ```
 WorkTool\
-  Start-WorkTool.ps1   진입점. 모듈을 불러와 탭으로 붙이고 메인 창을 띄운다
+  Start-WorkTool.ps1   진입점. 모듈을 불러와 왼쪽 메뉴에 붙이고 메인 창을 띄운다
   modules\
     Storage.psm1       저장 담당
-    Memo.psm1          메모 탭
+    UiHelper.psm1      화면 공통 (색, 글꼴, 배율, 버튼)
+    Memo.psm1          메모 화면
   data\                실제 데이터 (git 제외)
 ```
 
@@ -28,9 +29,28 @@ WorkTool\
 
 ## Start-WorkTool.ps1
 
-- 메인 창: 위 머리글(이름, 오늘 날짜) / 가운데 탭 / 아래 상태 표시줄.
-- 창 크기는 화면 작업 영역 비율(60% × 75%)로 잡는다.
-- 기능 추가 방법: `modules\<이름>.psm1`을 만들고 `New-<이름>Tab` 함수가 TabPage를 돌려주게 한 뒤, `$featureModules` 목록에 `'<이름>'` 한 줄을 넣는다.
+- 메인 창: 왼쪽 메뉴(이름, 날짜, 기능 버튼) / 가운데 화면 / 아래 상태 표시줄.
+- 창 크기는 화면 작업 영역 비율(65% × 80%)로 잡는다. 최대화 가능, F11은 테두리 없는 전체 화면.
+- 기능 추가 방법: `modules\<Module>.psm1`을 만들고 `New-<Module>View` 함수가 화면(Control)을 돌려주게 한 뒤, `$features` 목록에 한 줄 넣는다.
+  ```powershell
+  @{ Module = 'Memo'; Title = '메모'; Icon = 0xE70B }
+  ```
+  `Icon`은 윈도우 기본 아이콘 글꼴(Segoe Fluent Icons / Segoe MDL2 Assets)의 글자 코드. 예: 홈 `0xE80F`, 메모 `0xE70B`, 달력 `0xE787`, 폴더 `0xE8B7`, 메일 `0xE715`, 설정 `0xE713`.
+
+## UiHelper.psm1
+
+| 함수 | 하는 일 |
+|---|---|
+| `Get-UiTheme` | 색 모음 (Back, Card, Sidebar, Accent, Text, SubText, Border 등) |
+| `Get-UiFont [크기] [-Bold]` | 테마 글꼴 |
+| `Get-UiSize <픽셀>` | 화면 배율에 맞춘 크기 (100% 기준 픽셀을 넣는다) |
+| `New-UiPadding <왼> [위] [오] [아래]` | 배율 맞춘 Padding. 하나만 넣으면 사방 같은 값 |
+| `New-UiButton <글자> [-Primary]` | 일반 버튼 / 강조 버튼 |
+| `New-UiNavButton`, `Set-UiNavSelected` | 왼쪽 메뉴 버튼 (메인 전용) |
+
+- **테마**: 하늘색 파스텔. 색은 파일 맨 위 `$script:theme`에서 바꾼다.
+- **글꼴**: 후보 목록(Pretendard, SUIT, Noto Sans KR, 나눔 계열, 맑은 고딕) 중 PC에 설치된 첫 번째를 쓴다. 지금 쓰는 글꼴은 상태 표시줄에 나온다. 순서를 바꾸려면 `$fontCandidates`를 고친다. 글꼴을 새로 설치하는 건 외부 반입이라 하지 않는다.
+- **배율**: 메인이 `SetHighDpiMode`를 먼저 부르고 UiHelper를 불러와야 배율이 맞게 읽힌다.
 
 ## Storage.psm1
 

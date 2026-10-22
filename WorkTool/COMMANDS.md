@@ -57,9 +57,9 @@ Get-ChildItem .\data | Select-Object Name
 Remove-Item .\data\test.csv*
 ```
 
-### 메모 탭
+### 메모
 
-붙여넣을 파일 3개: `modules\Memo.psm1`(새 파일), `modules\Storage.psm1`(수정), `Start-WorkTool.ps1`(수정). 그다음 실행한다.
+붙여넣을 파일: `modules\Memo.psm1`, `modules\Storage.psm1`, `Start-WorkTool.ps1`. 그다음 실행한다.
 
 ```powershell
 .\Start-WorkTool.ps1
@@ -67,7 +67,7 @@ Remove-Item .\data\test.csv*
 
 확인할 것:
 
-1. "메모" 탭이 생긴다
+1. 왼쪽 메뉴에 "메모"가 있다
 2. 제목·본문 쓰고 Ctrl+S → 왼쪽 목록에 뜨고 "저장됨 시각"이 나온다
 3. 새 메모 → 하나 더 쓰고 목록에서 첫 메모 클릭 → 두 번째 메모가 자동 저장된다
 4. 제목을 비우고 저장 → 저장 시각이 제목이 된다
@@ -75,3 +75,22 @@ Remove-Item .\data\test.csv*
 6. 아무 메모나 고치고 저장 안 한 채 창 닫기 → 다시 열면 고친 내용이 남아 있다
 7. 삭제 → 확인 창 → 목록에서 사라진다
 8. `data\memo.csv`를 Excel로 열어둔 채 저장 → 경고 창이 뜬다 (Excel 닫고 다시 저장하면 된다)
+
+### 왼쪽 메뉴·테마
+
+붙여넣을 파일: `modules\UiHelper.psm1`(새 파일), `Start-WorkTool.ps1`(수정), `modules\Memo.psm1`(수정).
+
+확인할 것:
+
+1. 왼쪽에 하늘색 메뉴(WorkTool, 날짜, 홈, 메모)가 있고 아이콘이 보인다
+2. 메뉴를 누르면 화면이 바뀌고, 고른 메뉴는 진하게 + 왼쪽에 파란 막대
+3. 최대화 버튼이 되고, F11로 전체 화면 켜고 끄기가 된다
+4. 아래 상태 표시줄에 지금 쓰는 글꼴 이름이 나온다
+5. 메모 기능은 전과 똑같이 된다
+
+PC에 설치된 한글 글꼴 중 쓸 만한 것 확인 (툴이 고를 수 있는 후보):
+
+```powershell
+Add-Type -AssemblyName System.Drawing
+[System.Drawing.Text.InstalledFontCollection]::new().Families.Name | Where-Object { $_ -match 'Pretendard|SUIT|Noto|Nanum|나눔|Spoqa|맑은|Malgun|Gothic|고딕' }
+```

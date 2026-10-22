@@ -8,17 +8,25 @@
 New-Item -ItemType Directory -Force -Path "$HOME\WorkTool\modules", "$HOME\WorkTool\data" | Out-Null
 ```
 
-## 2. 설치: 파일 붙여넣기
+## 2. 설치: VS Code 설정 (처음 한 번)
 
-GitHub에서 파일을 열고 "Copy raw file" 버튼으로 내용을 복사한 뒤, 메모장으로 같은 이름의 파일을 만든다.
+ps1·psm1을 자동으로 UTF-8(BOM)으로 저장하게 한다.
 
-```powershell
-notepad "$HOME\WorkTool\Start-WorkTool.ps1"
+1. Ctrl+Shift+P → `Preferences: Open User Settings (JSON)`
+2. 맨 바깥 `{ }` 안에 아래를 추가 (앞 항목 끝에 쉼표가 있어야 한다)
+
+```json
+"[powershell]": {
+    "files.encoding": "utf8bom"
+}
 ```
 
-1. "새 파일을 만드시겠습니까?" → 예
-2. 붙여넣기
-3. **다른 이름으로 저장**(Ctrl+Shift+S) → 파일 이름 그대로, 인코딩을 **UTF-8(BOM)** 으로 고르고 저장 → 덮어쓰기 예
+## 3. 설치: 파일 붙여넣기
+
+1. VS Code에서 파일 > 폴더 열기 → `C:\Users\본인\WorkTool`
+2. 탐색기에서 새 파일 → GitHub와 같은 경로·이름 (예: `Start-WorkTool.ps1`, `modules\Storage.psm1`)
+3. GitHub 파일 화면의 "Copy raw file" 버튼으로 복사 → 붙여넣기 → 저장
+4. 오른쪽 아래 상태 표시줄에 **UTF-8 with BOM** 이 보이면 정상
 
 인코딩 확인 (`239 187 191`이 나오면 BOM 포함):
 
@@ -26,13 +34,15 @@ notepad "$HOME\WorkTool\Start-WorkTool.ps1"
 [IO.File]::ReadAllBytes("$HOME\WorkTool\Start-WorkTool.ps1")[0..2] -join ' '
 ```
 
-## 3. 실행
+## 4. 실행
+
+VS Code 터미널이나 PowerShell 창에서 실행한다. F5(디버그 실행)는 쓰지 않는다.
 
 ```powershell
 & "$HOME\WorkTool\Start-WorkTool.ps1"
 ```
 
-창을 닫으면 콘솔로 돌아온다.
+창을 닫으면 터미널로 돌아온다.
 
 ## 참고: 환경 확인 (완료)
 

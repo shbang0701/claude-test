@@ -40,6 +40,17 @@ description: IT 인프라 문서 세트(docs/templates/infra-kit)의 디자인 �
 - Excel 장비 도면, 셀 스타일, 쪽 구성: [references/excel.md](references/excel.md)
 - 아이콘 추가와 수정: [references/icons.md](references/icons.md)
 
+## 만들기 · 검수 규칙
+
+- 이 세트의 기준이 문서 스킬(`xlsx` · `pptx` · `pdf` · `docx`)보다 우선한다. 문서 스킬은 읽기 · 검수 · PDF 처리에만 쓰고, 스킬의 pptxgenjs 방식 · 색 팔레트 · 기본 글꼴(Arial 등) 제안은 쓰지 않는다. PPT는 `_build/ppt_kit.py`(python-pptx)로 만든다.
+- 산출물은 서로 이어져 있다. 하나를 바꾸면 README 「다시 만들기」 순서대로 뒤 단계까지 다시 만들고, 바뀐 산출물마다 해당 스킬로 검수한다.
+  - 아이콘(`_build/icons.py`) → `03_아이콘/`의 SVG · PNG, PPT 아이콘 슬라이드, `아이콘_목록.png`(`build_docs.py`)
+  - Excel 안내(`_build/xlguide.py`) · PPT 2~3쪽 → `00_빠른_사용_가이드.pdf`(`build_docs.py`)
+  - 아이콘은 목록 끝에 추가한다(파일 번호가 목록 순서를 따름). 개수 표기("60종")도 함께 고친다(`build_ppt.py` · `ppt_slides_a.py` · README).
+- 수식 값은 `_build/inject_cache.py`로 넣는다. 문서 스킬의 `recalc.py`는 LibreOffice로 다시 저장해 인쇄 설정이 바뀔 수 있으므로 원본에는 쓰지 않고 사본 검사에만 쓴다.
+- 파일 · 시트 이름과 경로는 오타처럼 보여도 바꾸지 않는다(예: `2_랙예시_DC1-R02.xlsx`).
+- 이 세트와 관계없는 일회성 파일(보고서 등)은 결과 파일로만 전달하고 저장소에 넣지 않는다. 기준(Office 2016 · 맑은 고딕 · RGB 색)은 같게 쓴다.
+
 ## 작업 순서
 
 1. 비슷한 기존 요소를 먼저 찾는다 (PPT: `ppt_elements.py` · `ppt_slides_b.py` · `ppt_slides_c.py`, Excel: `xlparts.py` · `xldevices.py` · `xlforms.py`). 새로 그리기보다 기존 헬퍼를 조합한다.

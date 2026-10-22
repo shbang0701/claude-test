@@ -7,6 +7,7 @@
 
 - **[scripts/](scripts/)** — 복사 한 번으로 끝나는 단독 PowerShell 스크립트
   - 아직 없음. 새로 만들 때는 [scripts/README.md](scripts/README.md)
+- **[apps/design.md](apps/design.md)** — 모든 GUI 앱의 공통 디자인 원칙 (Windows 디자인 지침 기반)
 - **[apps/WorkTool/](apps/WorkTool/)** — 업무 통합 GUI 앱 (메모 · 근태 · 일정·알람, 트레이 상주)
   - [design/](apps/WorkTool/design/) — 새 화면 시안 (WPF 전환 기준)
 - **[docs/guides/](docs/guides/)** — 읽는 가이드

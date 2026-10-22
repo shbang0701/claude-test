@@ -24,3 +24,11 @@ WinForms 동작 확인 ("test" 창이 뜨면 정상):
 Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.MessageBox]::Show("test")
 ```
+
+## 2. PowerShell 7 스레드 확인
+
+pwsh 창에서 실행한다. STA가 나와야 클립보드·파일 대화상자가 문제없이 된다.
+
+```powershell
+[Threading.Thread]::CurrentThread.ApartmentState
+```

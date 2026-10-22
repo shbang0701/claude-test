@@ -19,12 +19,13 @@ Import-Module (Join-Path $root 'modules\UiHelper.psm1') -Force
 # 기능 목록. 기능을 추가할 때 modules\<Module>.psm1을 만들고 여기 한 줄 넣는다.
 # 각 모듈은 New-<Module>View 함수로 화면(Control)을 돌려준다. Icon은 Segoe 아이콘 글꼴의 글자 코드.
 $features = @(
+    @{ Module = 'Attendance'; Title = '근태'; Icon = 0xE823 }
     @{ Module = 'Memo'; Title = '메모'; Icon = 0xE70B }
 )
 
 $theme = Get-UiTheme
 
-# 메인 창. 크기는 화면 작업 영역 비율로 잡는다. F11은 전체 화면.
+# 메인 창. 크기는 화면 작업 영역 비율로 잡는다. F11은 전체 화면, Ctrl+B는 메뉴 접기.
 $area = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
 $form = [System.Windows.Forms.Form]::new()
 $form.Text = 'WorkTool'
@@ -68,20 +69,22 @@ foreach ($f in $features) {
     $pages.Add(@{ Title = $f.Title; Icon = $f.Icon; View = (& "New-$($f.Module)View") })
 }
 
-# 왼쪽 메뉴
+# 왼쪽 메뉴. 펼치면 200, 접으면 아이콘 폭만 남는다.
+$sidebarWidth = 200
+$sidebarCollapsedWidth = 46
 $sidebar = [System.Windows.Forms.Panel]::new()
 $sidebar.Dock = 'Left'
-$sidebar.Width = Get-UiSize 200
+$sidebar.Width = Get-UiSize $sidebarWidth
 $sidebar.BackColor = $theme.Sidebar
-$sidebar.Padding = New-UiPadding 0 14 0 14
+$sidebar.Padding = New-UiPadding 0 10 0 14
+$tip = [System.Windows.Forms.ToolTip]::new()
 
-$brand = [System.Windows.Forms.Label]::new()
-$brand.Text = 'WorkTool'
-$brand.Font = Get-UiFont 15 -Bold
+# 맨 위: 이름 겸 메뉴 접기/펼치기 버튼
+$brand = New-UiNavButton 'WorkTool' 0xE700
+$brand.Font = Get-UiFont 13 -Bold
 $brand.ForeColor = $theme.Accent
-$brand.AutoSize = $true
-$brand.Dock = 'Top'
-$brand.Padding = New-UiPadding 16 0 8 2
+$brand.add_Click({ Set-SidebarCollapsed (-not $script:sidebarCollapsed) })
+$tip.SetToolTip($brand, '메뉴 접기/펼치기 (Ctrl+B)')
 
 $today = [System.Windows.Forms.Label]::new()
 $today.Text = (Get-Date).ToString('yyyy-MM-dd (ddd)')
@@ -106,6 +109,16 @@ for ($i = 0; $i -lt $pages.Count; $i++) {
 }
 for ($i = $sidebarItems.Count - 1; $i -ge 0; $i--) { $sidebar.Controls.Add($sidebarItems[$i]) }
 
+# 접으면 날짜를 숨기고, 메뉴 이름은 마우스를 올렸을 때 풍선 도움말로 보여준다
+$script:sidebarCollapsed = $false
+function Set-SidebarCollapsed([bool]$Collapsed) {
+    $script:sidebarCollapsed = $Collapsed
+    $sidebar.Width = Get-UiSize $(if ($Collapsed) { $sidebarCollapsedWidth } else { $sidebarWidth })
+    $today.Visible = -not $Collapsed
+    foreach ($p in $pages) { $tip.SetToolTip($p.Button, $(if ($Collapsed) { $p.Title } else { $null })) }
+    $sidebar.Invalidate($true)
+}
+
 function Select-Page([int]$Index) {
     for ($i = 0; $i -lt $pages.Count; $i++) {
         $on = $i -eq $Index
@@ -120,7 +133,7 @@ $status.Font = Get-UiFont 9
 $status.BackColor = $theme.Back
 $status.SizingGrip = $false
 $statusText = [System.Windows.Forms.ToolStripStatusLabel]::new()
-$statusText.Text = "F11 전체 화면 · 글꼴 $(Get-UiFontName)"
+$statusText.Text = "F11 전체 화면 · Ctrl+B 메뉴 접기 · 글꼴 $(Get-UiFontName)"
 $statusText.ForeColor = $theme.SubText
 [void]$status.Items.Add($statusText)
 
@@ -130,11 +143,16 @@ $form.Controls.Add($content)
 # Fill은 맨 앞에 있어야 메뉴·상태 표시줄을 가리지 않는다.
 $content.BringToFront()
 
-# F11 전체 화면 전환
+# 단축키: F11 전체 화면, Ctrl+B 메뉴 접기
 $script:fullScreen = $false
 $script:prevState = 'Normal'
 $form.add_KeyDown({
     param($s, $e)
+    if ($e.Control -and $e.KeyCode -eq [System.Windows.Forms.Keys]::B) {
+        $e.SuppressKeyPress = $true
+        Set-SidebarCollapsed (-not $script:sidebarCollapsed)
+        return
+    }
     if ($e.KeyCode -ne [System.Windows.Forms.Keys]::F11) { return }
     $e.Handled = $true
     if ($script:fullScreen) {

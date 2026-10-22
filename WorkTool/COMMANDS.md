@@ -94,3 +94,18 @@ PC에 설치된 한글 글꼴 중 쓸 만한 것 확인 (툴이 고를 수 있�
 Add-Type -AssemblyName System.Drawing
 [System.Drawing.Text.InstalledFontCollection]::new().Families.Name | Where-Object { $_ -match 'Pretendard|SUIT|Noto|Nanum|나눔|Spoqa|맑은|Malgun|Gothic|고딕' }
 ```
+
+### 근태·메뉴 접기
+
+붙여넣을 파일: `modules\Attendance.psm1`(새 파일), `modules\UiHelper.psm1`(수정), `Start-WorkTool.ps1`(수정).
+
+확인할 것:
+
+1. 메뉴 맨 위 `≡ WorkTool` 클릭 또는 Ctrl+B → 메뉴가 아이콘만 남게 접히고, 다시 누르면 펼쳐진다
+2. 접은 상태에서 아이콘에 마우스를 올리면 메뉴 이름이 뜬다
+3. 메뉴에 "근태"가 있고 들어가면 이번 달이 보인다
+4. "지금 출근" → 목록에 오늘 출근이 생긴다. 한 번 더 누르면 "이미 있습니다"
+5. 종류를 바꾸면 칸이 바뀐다 (출장은 종료일·장소, 업무외 근무는 끝 시각, 휴가는 종류 선택)
+6. 업무외 근무 22:00~02:30 저장 → "(다음날) · 4:30", 위 요약 시간에 더해진다
+7. ◀ ▶로 달 이동, "이번 달"로 돌아오기
+8. 목록에서 고르면 오른쪽에 뜨고, 고쳐서 저장 / 삭제가 된다

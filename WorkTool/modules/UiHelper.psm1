@@ -117,9 +117,12 @@ function New-UiNavButton([string]$Text, [int]$Icon) {
             [System.Windows.Forms.TextRenderer]::DrawText($e.Graphics, $t.Icon, $script:iconFont, $r, $s.ForeColor,
                 [System.Windows.Forms.TextFormatFlags]'HorizontalCenter, VerticalCenter, NoPrefix')
         }
+        # 메뉴를 접어서 폭이 좁으면 글자는 그리지 않는다
         $r = [System.Drawing.Rectangle]::new($iconWidth, 0, $s.Width - $iconWidth, $h)
-        [System.Windows.Forms.TextRenderer]::DrawText($e.Graphics, $t.Text, $s.Font, $r, $s.ForeColor,
-            [System.Windows.Forms.TextFormatFlags]'Left, VerticalCenter, NoPrefix, EndEllipsis')
+        if ($r.Width -gt (Get-UiSize 24)) {
+            [System.Windows.Forms.TextRenderer]::DrawText($e.Graphics, $t.Text, $s.Font, $r, $s.ForeColor,
+                [System.Windows.Forms.TextFormatFlags]'Left, VerticalCenter, NoPrefix, EndEllipsis')
+        }
     })
     $b
 }
@@ -139,4 +142,17 @@ function Set-UiNavSelected($Button, [bool]$Selected) {
     $Button.Invalidate()
 }
 
-Export-ModuleMember -Function Get-UiTheme, Get-UiFontName, Get-UiFont, Get-UiSize, New-UiPadding, New-UiButton, New-UiNavButton, Set-UiNavSelected
+function Show-UiMessage([string]$Text, [string]$Title = 'WorkTool') {
+    [void][System.Windows.Forms.MessageBox]::Show($Text, $Title,
+        [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+}
+
+# 예/아니요를 묻는다. 예면 $true.
+function Confirm-UiYesNo([string]$Text, [string]$Title = 'WorkTool') {
+    $answer = [System.Windows.Forms.MessageBox]::Show($Text, $Title,
+        [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question)
+    $answer -eq [System.Windows.Forms.DialogResult]::Yes
+}
+
+Export-ModuleMember -Function Get-UiTheme, Get-UiFontName, Get-UiFont, Get-UiSize, New-UiPadding, New-UiButton,
+    New-UiNavButton, Set-UiNavSelected, Show-UiMessage, Confirm-UiYesNo

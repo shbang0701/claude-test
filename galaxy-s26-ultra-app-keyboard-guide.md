@@ -128,6 +128,17 @@ Key Mapper
 | 앱 업데이트 후 안 되면 **다시 녹화** | 업데이트로 버튼 구조가 바뀌면 기존 기록이 무효가 됨 |
 | 실패 시 대안은 **좌표 탭** | `Tap screen` 액션. 현재 해상도 FHD+(1080×2340) 기준으로 좌표 지정 |
 
+**요소 목록 읽는 법** (Choose app element 화면)
+
+| 카드 모양 | 정체 | 쓰는 키 |
+|---|---|---|
+| `android.view.View` · **Scroll forward, Scroll backward** | 대화 목록 | `Ctrl`+`Alt`+`J`/`K` (4-5) |
+| `"보내기"` · `android.widget.Button` · Tap | 보내기 버튼 | `Ctrl`+`Enter` |
+| `android.widget.EditText` · Tap, Tap and hold | 입력창 | `Ctrl`+`Alt`+`I` (1-1) |
+| 따옴표 안에 **내가 친 글자**가 보이는 EditText | 글자가 든 채로 녹화된 입력창 → **고르지 말 것** | 입력창 비우고 **Record again** |
+
+녹화 결과는 다시 녹화하기 전까지 남아 있어서, 같은 목록에서 키맵 여러 개를 이어서 만들 수 있습니다.
+
 **누르기 말고도 되는 것** — 요소를 고른 뒤 **Possible interactions**에서 동작을 고릅니다.
 
 | 동작 | 쓰는 곳 |

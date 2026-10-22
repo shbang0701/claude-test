@@ -63,12 +63,15 @@ function New-WtThemeCard {
     $slider.VerticalAlignment = 'Center'
     $script:opacityLabel = New-WtText ('{0}%' -f [int]$slider.Value) 'T.Strong'
     $script:opacityLabel.VerticalAlignment = 'Center'
-    $script:opacityTimer = [System.Windows.Threading.DispatcherTimer]::new()
-    $script:opacityTimer.Interval = [TimeSpan]::FromMilliseconds(500)
-    $script:opacityTimer.Add_Tick({
-            $script:opacityTimer.Stop()
-            Set-WtSetting 'ui.opacity' ([int]$script:pendingOpacity)
-        })
+    if (-not $script:opacityTimer) {
+        $script:opacityTimer = [System.Windows.Threading.DispatcherTimer]::new()
+        $script:opacityTimer.Interval = [TimeSpan]::FromMilliseconds(500)
+        $script:opacityTimer.Add_Tick({
+                param($s, $e)
+                $s.Stop()
+                Set-WtSetting 'ui.opacity' ([int]$script:pendingOpacity)
+            })
+    }
     $slider.Add_ValueChanged({
             param($s, $e)
             $script:pendingOpacity = [int]$e.NewValue

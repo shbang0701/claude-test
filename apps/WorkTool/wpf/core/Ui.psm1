@@ -505,7 +505,15 @@ function New-WtPageHeader([string]$Title, [string]$Sub, $Right) {
 }
 
 # 화면 하나의 바깥 틀: 스크롤 + 안쪽 여백. 돌려준 패널에 내용을 넣는다.
-function New-WtPage {
+# -Fill: 바깥 스크롤 없이 창 높이를 채운다. 목록 · 본문처럼 스스로 스크롤하는 요소가 있는 화면에 쓴다.
+#        돌려준 DockPanel에 머리글을 Top으로 붙이고, 마지막에 넣은 요소가 남는 공간을 채운다.
+function New-WtPage([switch]$Fill) {
+    if ($Fill) {
+        $dock = [System.Windows.Controls.DockPanel]::new()
+        $dock.LastChildFill = $true
+        $dock.Margin = [System.Windows.Thickness]::new(36, 8, 36, 32)
+        return @{ Root = $dock; Panel = $dock }
+    }
     $sv = [System.Windows.Controls.ScrollViewer]::new()
     $sv.VerticalScrollBarVisibility = 'Auto'
     $sv.HorizontalScrollBarVisibility = 'Disabled'

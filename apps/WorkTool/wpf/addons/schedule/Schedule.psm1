@@ -107,7 +107,7 @@ function Update-WtScheduleView {
     $any = $false
     for ($i = 0; $i -lt 14; $i++) {
         $day = [datetime]::Today.AddDays($i)
-        $label = if ($i -eq 0) { '오늘' } elseif ($i -eq 1) { '내일' } else { Format-WtDate $day 'M/d (ddd)' }
+        $label = if ($i -eq 0) { '오늘' } elseif ($i -eq 1) { '내일' } else { Format-WtDate $day "M'/'d (ddd)" }
         foreach ($it in (Get-WtScheduleOn $day $items)) {
             [void](Add-WtChild $script:list (New-WtScheduleRow $it $label))
             $label = ''
@@ -136,7 +136,7 @@ function New-WtScheduleHomeCards {
         $day = [datetime]::Today.AddDays($i)
         foreach ($it in (Get-WtScheduleOn $day $items)) {
             if ($it.repeat -eq 'daily' -or $it.repeat -eq 'weekdays') { continue }   # 매일 반복은 오늘 카드에서만
-            [void](Add-WtChild $col (New-WtScheduleRow $it (Format-WtDate $day 'M/d (ddd)')))
+            [void](Add-WtChild $col (New-WtScheduleRow $it (Format-WtDate $day "M'/'d (ddd)")))
             $n++
         }
     }

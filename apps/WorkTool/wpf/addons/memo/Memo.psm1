@@ -34,7 +34,7 @@ function Format-WtMemoTime([string]$Stamp) {
     if (-not [datetime]::TryParse($Stamp, [ref]$t)) { return $Stamp }
     if ($t.Date -eq [datetime]::Today) { return Format-WtDate $t "'오늘' HH:mm" }
     if ($t.Date -eq [datetime]::Today.AddDays(-1)) { return '어제' }
-    Format-WtDate $t 'M/d'
+    Format-WtDate $t "M'/'d"
 }
 
 # 예전 memo.csv → memo.json. 가져온 개수를 돌려준다.
@@ -105,8 +105,10 @@ function Update-WtMemoList {
 }
 
 function New-WtMemoView {
-    $page = New-WtPage
-    [void](Add-WtChild $page.Panel (New-WtPageHeader '메모' '보기 전용 · 쓰기와 메모별 잠금은 2단계에서 옮깁니다'))
+    $page = New-WtPage -Fill
+    $header = New-WtPageHeader '메모' '보기 전용 · 쓰기와 메모별 잠금은 2단계에서 옮깁니다'
+    [System.Windows.Controls.DockPanel]::SetDock($header, 'Top')
+    [void]$page.Panel.Children.Add($header)
 
     $grid = [System.Windows.Controls.Grid]::new()
     $c1 = [System.Windows.Controls.ColumnDefinition]::new()
@@ -115,7 +117,6 @@ function New-WtMemoView {
     $c2.Width = [System.Windows.GridLength]::new(1, 'Star')
     $grid.ColumnDefinitions.Add($c1)
     $grid.ColumnDefinitions.Add($c2)
-    $grid.MinHeight = 520
 
     # 왼쪽: 검색 + 목록
     $left = New-WtCard
@@ -158,7 +159,7 @@ function New-WtMemoView {
     [System.Windows.Controls.Grid]::SetColumn($right, 1)
     [void]$grid.Children.Add($right)
 
-    [void](Add-WtChild $page.Panel $grid)
+    [void]$page.Panel.Children.Add($grid)
     $page.Root
 }
 

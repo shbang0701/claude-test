@@ -23,6 +23,9 @@ $script:trayTipShown = $false
 $script:maxed = $false
 $script:fullscreen = $false
 $script:restoreBounds = $null
+$script:fullFromMax = $false   # 최대화 상태에서 전체 화면으로 갔는지
+$script:settingBounds = $false # 코드로 창 위치 · 크기를 바꾸는 중
+$script:icon = $null
 $script:lastImport = $null
 
 $script:shellXaml = @'
@@ -123,6 +126,7 @@ function Select-WtPage([string]$Id) {
         foreach ($k in @($script:navButtons.Keys)) { $script:navButtons[$k].Button.IsChecked = ($k -eq $Id) }
         $script:current = $Id
     } catch {
+        foreach ($k in @($script:navButtons.Keys)) { $script:navButtons[$k].Button.IsChecked = ($k -eq $script:current) }
         Show-WtError $_ "화면 열기: $Id"
     } finally {
         $script:selecting = $false
@@ -205,10 +209,15 @@ function Get-WtScreenRect([switch]$Full) {
 function Get-WtBounds { [System.Windows.Rect]::new($script:window.Left, $script:window.Top, $script:window.Width, $script:window.Height) }
 
 function Set-WtBounds([System.Windows.Rect]$R) {
-    $script:window.Left = $R.Left
-    $script:window.Top = $R.Top
-    $script:window.Width = $R.Width
-    $script:window.Height = $R.Height
+    $script:settingBounds = $true
+    try {
+        $script:window.Left = $R.Left
+        $script:window.Top = $R.Top
+        $script:window.Width = $R.Width
+        $script:window.Height = $R.Height
+    } finally {
+        $script:settingBounds = $false
+    }
 }
 
 function Update-WtMaxGlyph {
@@ -233,10 +242,16 @@ function Switch-WtMaximize {
 
 function Switch-WtFullScreen {
     if ($script:fullscreen) {
-        Set-WtBounds $script:restoreBounds
         $script:fullscreen = $false
-        $script:maxed = $false
+        if ($script:fullFromMax) {
+            Set-WtBounds (Get-WtScreenRect)
+            $script:maxed = $true
+        } else {
+            Set-WtBounds $script:restoreBounds
+            $script:maxed = $false
+        }
     } else {
+        $script:fullFromMax = $script:maxed
         if (-not $script:maxed) { $script:restoreBounds = Get-WtBounds }
         Set-WtBounds (Get-WtScreenRect -Full)
         $script:fullscreen = $true
@@ -272,6 +287,16 @@ function New-WtAppIcon {
     [System.Drawing.Icon]::FromHandle($bmp.GetHicon())
 }
 
+# 창 · 트레이 아이콘을 지금 테마 색으로 (다시) 만든다
+function Update-WtAppIcon {
+    $old = $script:icon
+    $script:icon = New-WtAppIcon
+    $script:window.Icon = [System.Windows.Interop.Imaging]::CreateBitmapSourceFromHIcon($script:icon.Handle,
+        [System.Windows.Int32Rect]::Empty, [System.Windows.Media.Imaging.BitmapSizeOptions]::FromEmptyOptions())
+    if ($script:notify) { $script:notify.Icon = $script:icon }
+    if ($old) { $old.Dispose() }
+}
+
 function Show-WtMainWindow {
     $script:window.Show()
     if ($script:window.WindowState -eq 'Minimized') { $script:window.WindowState = 'Normal' }
@@ -281,6 +306,7 @@ function Show-WtMainWindow {
 function Exit-WtApp {
     $script:exiting = $true
     try { $script:notify.Visible = $false; $script:notify.Dispose() } catch { }
+    try { if ($script:icon) { $script:icon.Dispose() } } catch { }
     try { $script:window.Close() } catch { }
     if ($script:frame) { $script:frame.Continue = $false }
 }
@@ -329,6 +355,12 @@ function Get-WtLastImport { $script:lastImport }
 function Start-WtApp {
     param([Parameter(Mandatory)][string]$AppRoot)
 
+    $script:exiting = $false
+    $script:notify = $null
+    $script:views = @{}
+    $script:current = $null
+    $script:maxed = $false
+    $script:fullscreen = $false
     Set-WtAppRoot $AppRoot
     Initialize-WtSettings
     $script:themeDict = New-WtThemeDictionary
@@ -339,9 +371,7 @@ function Start-WtApp {
     $w.Resources.MergedDictionaries.Add($script:themeDict)
     $w.Resources.MergedDictionaries.Add((Get-WtStyleDictionary))
 
-    $icon = New-WtAppIcon
-    $w.Icon = [System.Windows.Interop.Imaging]::CreateBitmapSourceFromHIcon($icon.Handle,
-        [System.Windows.Int32Rect]::Empty, [System.Windows.Media.Imaging.BitmapSizeOptions]::FromEmptyOptions())
+    Update-WtAppIcon
     $script:ui.TodayText.Text = Format-WtDate (Get-Date) 'yyyy년 M월 d일 dddd'
 
     # 제목 줄 · 메뉴 아래 버튼
@@ -356,8 +386,16 @@ function Start-WtApp {
     $w.Add_StateChanged({
             if ($script:window.WindowState -eq 'Maximized') {
                 $script:window.WindowState = 'Normal'
-                if (-not $script:maxed) { Switch-WtMaximize }
+                Switch-WtMaximize
             }
+        })
+
+    # 최대화 · 전체 화면 상태에서 제목 줄을 끌어 옮기면 그 표시를 푼다 (다음 최대화 버튼이 바로 최대화하도록)
+    $w.Add_LocationChanged({
+            if ($script:settingBounds -or -not ($script:maxed -or $script:fullscreen)) { return }
+            $script:maxed = $false
+            $script:fullscreen = $false
+            Update-WtMaxGlyph
         })
 
     # X(닫기)는 트레이로 숨긴다. 완전히 끄는 건 트레이 아이콘 우클릭 → 종료
@@ -392,17 +430,21 @@ function Start-WtApp {
             } catch { Show-WtError $_ '단축키' }
         })
 
-    $w.Dispatcher.add_UnhandledException({
-            param($s, $e)
-            Show-WtError $e.Exception '처리되지 않은 오류'
-            $e.Handled = $true
-        })
+    if ($global:WorkToolUnhandledHandler) {
+        try { $w.Dispatcher.remove_UnhandledException($global:WorkToolUnhandledHandler) } catch { }
+    }
+    $global:WorkToolUnhandledHandler = [System.Windows.Threading.DispatcherUnhandledExceptionEventHandler] {
+        param($s, $e)
+        Show-WtError $e.Exception '처리되지 않은 오류'
+        $e.Handled = $true
+    }
+    $w.Dispatcher.add_UnhandledException($global:WorkToolUnhandledHandler)
 
     # 설정이 바뀌면 바로 반영한다
     Register-WtSettingHandler {
         param($key, $value)
         switch -Wildcard ($key) {
-            'theme.color' { Update-WtThemeDictionary $script:themeDict }
+            'theme.color' { Update-WtThemeDictionary $script:themeDict; Update-WtAppIcon }
             'ui.fontScale' { Update-WtThemeDictionary $script:themeDict }
             'ui.opacity' { Set-WtOpacity }
             'nav.collapsed' { Update-WtCollapsed }
@@ -415,15 +457,14 @@ function Start-WtApp {
 
     Update-WtNav
     Set-WtOpacity
-    $script:notify = New-WtTrayIcon $icon
-
-    $w.Show()
-    $first = @(Get-WtAddon)[0]
-    if ($first) { Select-WtPage $first.Id } else { Select-WtPage '_settings' }
+    $script:notify = New-WtTrayIcon $script:icon
 
     # 창이 닫힐 때까지 메시지를 돌린다. Dispatcher를 끄지 않으므로 같은 창에서 다시 실행해도 된다.
     $script:frame = [System.Windows.Threading.DispatcherFrame]::new()
-    [System.Windows.Threading.Dispatcher]::PushFrame($script:frame)
+    $w.Show()
+    $first = @(Get-WtAddon)[0]
+    if ($first) { Select-WtPage $first.Id } else { Select-WtPage '_settings' }
+    if (-not $script:exiting) { [System.Windows.Threading.Dispatcher]::PushFrame($script:frame) }
 }
 
 Export-ModuleMember -Function Get-WtWindow, Select-WtPage, Reset-WtViews, Update-WtNav, Switch-WtCollapsed, Set-WtOpacity,

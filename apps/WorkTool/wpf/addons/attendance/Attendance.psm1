@@ -101,7 +101,7 @@ function New-WtAttTiles($Summary, [int]$Columns) {
 function New-WtAttRow($Item) {
     $s = ConvertTo-AttDate $Item.startDate
     $e = if ($Item.endDate) { ConvertTo-AttDate $Item.endDate } else { $s }
-    $dateText = if ($e -gt $s) { '{0} ~ {1}' -f (Format-WtDate $s 'M/d'), (Format-WtDate $e 'M/d') } else { Format-WtDate $s 'M/d (ddd)' }
+    $dateText = if ($e -gt $s) { '{0} ~ {1}' -f (Format-WtDate $s "M'/'d"), (Format-WtDate $e "M'/'d") } else { Format-WtDate $s "M'/'d (ddd)" }
     $date = New-WtText $dateText 'T.Body'
     $date.Width = 110
     $color = $script:typeColor[[string]$Item.type]

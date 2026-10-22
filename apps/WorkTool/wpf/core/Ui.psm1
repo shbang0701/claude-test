@@ -242,7 +242,8 @@ $script:stylesXaml = @'
         <ControlTemplate TargetType="TextBox">
           <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
                   BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
-            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" Focusable="False"
+            <!-- 안쪽 여백(Padding)은 TextBox가 글자 둘레에 스스로 넣는다. 여기서 또 넣으면 두 배가 된다 -->
+            <ScrollViewer x:Name="PART_ContentHost" Focusable="False"
                           VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
           </Border>
         </ControlTemplate>
@@ -263,6 +264,36 @@ $script:stylesXaml = @'
     <Setter Property="AcceptsReturn" Value="True"/>
     <Setter Property="VerticalContentAlignment" Value="Top"/>
     <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+  </Style>
+
+  <!-- 편집 칸: 카드 안을 채우는 테두리 없는 여러 줄 입력 (메모 본문 등) -->
+  <Style x:Key="Editor" TargetType="TextBox" BasedOn="{StaticResource Input}">
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="TextWrapping" Value="Wrap"/>
+    <Setter Property="AcceptsReturn" Value="True"/>
+    <Setter Property="AcceptsTab" Value="True"/>
+    <Setter Property="VerticalContentAlignment" Value="Top"/>
+    <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+  </Style>
+  <!-- 제목 입력: 글자처럼 보이는 한 줄 입력 (포커스가 가면 아래 선이 강조색) -->
+  <Style x:Key="Input.Title" TargetType="TextBox" BasedOn="{StaticResource Input}">
+    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Padding" Value="0,2"/>
+    <Setter Property="MinHeight" Value="0"/>
+    <Setter Property="FontSize" Value="{DynamicResource F.Number}"/>
+    <Setter Property="FontWeight" Value="Bold"/>
+    <Style.Triggers>
+      <Trigger Property="IsMouseOver" Value="True">
+        <Setter Property="BorderBrush" Value="{DynamicResource B.InputBorder}"/>
+      </Trigger>
+      <Trigger Property="IsKeyboardFocused" Value="True">
+        <Setter Property="BorderBrush" Value="{DynamicResource B.Accent}"/>
+      </Trigger>
+    </Style.Triggers>
   </Style>
 
   <Style x:Key="Row" TargetType="ListBoxItem">
@@ -670,6 +701,29 @@ function New-WtSegmented([object[]]$Options, [string]$Selected, [string]$Group, 
     $box
 }
 
+# 검색 칸: 돋보기 + 비어 있을 때 안내 글. @{ Root = 화면에 넣을 요소; Box = TextBox } 를 돌려준다
+function New-WtSearchBox([string]$Hint = '검색') {
+    $g = [System.Windows.Controls.Grid]::new()
+    $box = [System.Windows.Controls.TextBox]::new()
+    Set-WtStyle $box 'Input'
+    $box.Padding = [System.Windows.Thickness]::new(36, 8, 10, 8)
+    $icon = New-WtIcon 0xE721
+    Set-WtResource $icon 'Foreground' 'B.SubText'
+    $icon.HorizontalAlignment = 'Left'
+    $icon.Margin = [System.Windows.Thickness]::new(12, 0, 0, 0)
+    $icon.IsHitTestVisible = $false
+    $hintText = New-WtText $Hint 'T.Sub'   # $hint로 쓰면 [string]$Hint와 같은 변수가 된다
+    $hintText.VerticalAlignment = 'Center'
+    $hintText.Margin = [System.Windows.Thickness]::new(38, 0, 0, 0)
+    $hintText.IsHitTestVisible = $false
+    $box.Tag = $hintText
+    $box.Add_TextChanged({ param($s, $e) $s.Tag.Visibility = if ($s.Text) { 'Collapsed' } else { 'Visible' } })
+    [void]$g.Children.Add($box)
+    [void]$g.Children.Add($icon)
+    [void]$g.Children.Add($hintText)
+    @{ Root = $g; Box = $box }
+}
+
 # 작은 알약 모양 표시. $Bg/$Fg는 테마 리소스 이름 (예: 'Att.WorkBg', 'Att.Work')
 function New-WtTag([string]$Text, [string]$Bg = 'Chip', [string]$Fg = 'ChipText', [int]$Icon = 0) {
     $b = [System.Windows.Controls.Border]::new()
@@ -801,5 +855,5 @@ function Show-WtError($ErrorRecord, [string]$Where = '') {
 }
 
 Export-ModuleMember -Function Get-WtStyleDictionary, ConvertFrom-WtXaml, Get-WtNamedElements, Set-WtStyle, Set-WtResource,
-    New-WtText, New-WtIcon, New-WtStack, Add-WtChild, New-WtCard, New-WtCardHeader, New-WtButton, New-WtButtonContent, New-WtSegmented, New-WtTag,
+    New-WtText, New-WtIcon, New-WtStack, Add-WtChild, New-WtCard, New-WtCardHeader, New-WtButton, New-WtButtonContent, New-WtSegmented, New-WtSearchBox, New-WtTag,
     New-WtStatTile, New-WtPageHeader, New-WtPage, New-WtListRow, Format-WtDate, Show-WtMessage, Confirm-WtYesNo, Show-WtError

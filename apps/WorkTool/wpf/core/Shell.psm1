@@ -344,6 +344,11 @@ function Show-WtMainWindow {
 
 # 트레이 아이콘 · 아이콘을 치우고 메시지 돌리기를 멈춘다 (창을 닫는 중에도 부를 수 있다)
 function Stop-WtApp {
+    if (-not $script:exiting) {
+        foreach ($a in @(Get-WtAddon -All)) {
+            if ($a.OnExit) { try { [void](& $a.OnExit) } catch { Show-WtError $_ "끝내기 전 저장: $($a.Title)" } }
+        }
+    }
     $script:exiting = $true
     try { $script:notify.Visible = $false; $script:notify.Dispose() } catch { }
     try { if ($script:icon) { $script:icon.Dispose() } } catch { }

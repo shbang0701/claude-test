@@ -197,7 +197,7 @@ function New-WtDataCard {
     $again = New-WtButton '다시 가져오기' -Kind Primary
     $again.IsEnabled = [bool]$legacy
     $again.Add_Click({
-            if (-not (Confirm-WtYesNo "예전 WorkTool 데이터로 새 버전의 메모 · 일정 · 근태를 다시 채웁니다.`n지금 파일은 .bak으로 하나 남습니다. 계속할까요?")) { return }
+            if (-not (Confirm-WtYesNo "예전 WorkTool 데이터로 새 버전의 메모 · 일정 · 근태를 다시 채웁니다.`n새 버전에서 쓰거나 고친 메모는 사라집니다 (지금 파일은 .bak으로 하나 남음). 계속할까요?")) { return }
             try {
                 $r = Import-WtLegacyData -Force
                 Reset-WtViews
@@ -238,7 +238,7 @@ function New-WtHelpPage {
     $col = New-WtStack Vertical 6
     [void](Add-WtChild $col (New-WtCardHeader '이 버전 (1단계 미리보기)'))
     [void](Add-WtChild $col (New-WtText '창 틀 · 메뉴 · 테마 · 설정, 그리고 예전 WorkTool 데이터를 읽어서 보여 주는 기능까지 들어 있습니다.' 'T.Body'))
-    [void](Add-WtChild $col (New-WtText '메모 · 일정 · 근태 편집과 알람은 2단계에서 옮깁니다. 그때까지는 기존 WorkTool을 계속 쓰세요.' 'T.Body'))
+    [void](Add-WtChild $col (New-WtText '메모는 쓰고 고칠 수 있습니다. 일정 · 근태 편집과 알람은 2단계에서 옮깁니다.' 'T.Body'))
     $about.Child = $col
     [void](Add-WtChild $page.Panel $about)
 
@@ -250,7 +250,10 @@ function New-WtHelpPage {
             @('Ctrl + B', '메뉴 접기 / 펼치기'),
             @('F11', '전체 화면 (Esc로 나가기)'),
             @('Ctrl + ,', '설정'),
-            @('F1', '도움말'))) {
+            @('F1', '도움말'),
+            @('Ctrl + N', '메모: 새 메모'),
+            @('Ctrl + S', '메모: 바로 저장 (보통은 자동 저장)'),
+            @('Ctrl + E', '메모: 편집 / 미리보기'))) {
         [void](Add-WtChild $col (New-WtKeyRow $r[0] $r[1]))
     }
     $keys.Child = $col

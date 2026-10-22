@@ -15,7 +15,7 @@ param()
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
-foreach ($n in 'Storage', 'Settings', 'Theme', 'Ui', 'Addons', 'Pages', 'Shell') {
+foreach ($n in 'Storage', 'Settings', 'Theme', 'Ui', 'Highlight', 'Markdown', 'Mermaid', 'Addons', 'Pages', 'Shell') {
     Import-Module (Join-Path $root "core/$n.psm1") -Force -DisableNameChecking
 }
 foreach ($f in (Get-ChildItem (Join-Path $root 'addons') -Filter '*.psm1' -Recurse | Sort-Object FullName)) {
@@ -158,6 +158,156 @@ try {
     foreach ($k in 'Work', 'Over', 'Trip', 'Leave') {
         $c = Get-WtThemeColors 'sky'
         Assert-Wt "근태 표시 '$k' 색 대비" ((Get-WtContrast $c["Att.$k"] $c["Att.${k}Bg"]) -ge 4.5)
+    }
+    $c = Get-WtThemeColors 'sky'
+    $bad = foreach ($k in 'Blue', 'Teal', 'Green', 'Orange', 'Red', 'Purple', 'Gray') {
+        foreach ($fg in "Callout.$k", 'Text') {
+            $ratio = Get-WtContrast $c[$fg] $c["Callout.${k}Bg"]
+            if ($ratio -lt 4.5) { '{0}/{1} {2:N2}' -f $fg, $k, $ratio }
+        }
+    }
+    Assert-Wt '콜아웃 색 대비' (-not $bad) ($bad -join ', ')
+    $bad = foreach ($k in 'Comment', 'String', 'Keyword', 'Number', 'Command', 'Variable', 'Type', 'Attr', 'Inserted', 'Deleted', 'Text') {
+        $fg = if ($k -eq 'Text') { 'Text' } else { "Code.$k" }
+        $ratio = Get-WtContrast $c[$fg] $c['Code.Bg']
+        if ($ratio -lt 4.5) { '{0} {1:N2}' -f $fg, $ratio }
+    }
+    Assert-Wt '코드 색 대비 (코드 바탕 위)' (-not $bad) ($bad -join ', ')
+    Assert-Wt '마크다운 · 다이어그램 색 대비' ((Get-WtContrast $c.Text $c['Md.Mark']) -ge 4.5 -and (Get-WtContrast $c.Text $c['Dia.NodeBg']) -ge 4.5 -and
+        (Get-WtContrast $c.Text $c['Dia.NoteBg']) -ge 4.5 -and (Get-WtContrast $c.SubText $c['Dia.GroupBg']) -ge 4.5 -and
+        (Get-WtContrast $c['Dia.Line'] $c.Card) -ge 3 -and (Get-WtContrast $c['Dia.NodeLine'] $c.Card) -ge 3)
+
+    # ---- 마크다운 ----
+    $md = @'
+---
+tags: [a, b]
+---
+# 제목 **굵게**
+
+본문 [[다른 메모|별칭]] #태그 #123 %%숨김%% [링크](https://example.com) [파일](docs/a%20b.md)
+둘째 줄
+
+> [!warning]- 조심 **해**
+> 본문
+
+> [!NOTE]
+> 깃허브 알림
+
+> 그냥 인용
+
+- [x] 끝남
+- [ ] 할 일
+
+| a | b |
+|:--|--:|
+| 1 | 2 |
+
+```ps1
+Get-Item C:\
+```
+
+각주[^1]
+
+[^1]: 내용
+'@
+    $mm = ConvertTo-WtMarkdownModel $md
+    $types = (@($mm.Blocks) | ForEach-Object T) -join ','
+    Assert-Wt '마크다운: 블록 종류' ($types -eq 'props,heading,para,callout,callout,quote,list,table,code,para,footnotes') $types
+    Assert-Wt '마크다운: 속성(--- 사이)' ($mm.Blocks[0].Items[0].Key -eq 'tags' -and $mm.Blocks[0].Items[0].Value -eq 'a, b')
+    $p = $mm.Blocks[2].Inl
+    $wiki = $p | Where-Object { $_.T -eq 'link' -and $_.Kind -eq 'wiki' }
+    Assert-Wt '마크다운: 위키 링크' ($wiki.Target -eq '다른 메모' -and $wiki.Inl[0].Text -eq '별칭')
+    Assert-Wt '마크다운: 태그 (숫자만은 태그 아님)' (@($p | Where-Object T -eq 'tag').Count -eq 1 -and ($p | Where-Object T -eq 'tag').Text -eq '태그')
+    Assert-Wt '마크다운: %%주석%%은 빠진다' (-not ((Get-WtMarkdownSnippet '가 %%숨김%% 나') -match '숨김') -and -not (@($p | Where-Object { $_.T -eq 'text' -and $_.Text -match '숨김' }).Count))
+    $links = @($p | Where-Object { $_.T -eq 'link' -and $_.Kind -ne 'wiki' })
+    Assert-Wt '마크다운: 링크 종류 (주소 · 파일)' ($links[0].Kind -eq 'url' -and $links[1].Kind -eq 'file' -and $links[1].Target -eq 'docs/a b.md')
+    Assert-Wt '마크다운: 줄바꿈 한 번' (@($p | Where-Object T -eq 'soft').Count -eq 1)
+    $co = $mm.Blocks[3]
+    Assert-Wt '마크다운: 콜아웃 종류 · 접기 · 제목' ($co.Kind -eq 'warning' -and $co.Fold -eq '-' -and (@($co.Title | ForEach-Object { if ($_.Inl) { $_.Inl[0].Text } else { $_.Text } }) -join '') -eq '조심 해' -and $co.Blocks.Count -eq 1)
+    Assert-Wt '마크다운: 제목 없는 콜아웃은 종류 이름' ($mm.Blocks[4].Kind -eq 'note' -and $mm.Blocks[4].Title[0].Text -eq 'Note')
+    Assert-Wt '마크다운: 할 일 목록' ($mm.Blocks[6].Items[0].Task -eq $true -and $mm.Blocks[6].Items[1].Task -eq $false -and $mm.Blocks[6].Items[0].Blocks[0].Inl[0].Text -eq '끝남')
+    Assert-Wt '마크다운: 표 정렬' (($mm.Blocks[7].Align -join ',') -eq 'left,right' -and $mm.Blocks[7].Rows[0].Header)
+    Assert-Wt '마크다운: 코드 블록' ($mm.Blocks[8].Lang -eq 'ps1' -and $mm.Blocks[8].Text -eq 'Get-Item C:\')
+    Assert-Wt '마크다운: 각주' ($mm.Blocks[9].Inl[1].T -eq 'fn' -and $mm.Blocks[10].Items[0].Order -eq 1)
+    Assert-Wt '마크다운: 제목 목록' ($mm.Headings.Count -eq 1 -and $mm.Headings[0].Text -eq '제목 굵게')
+    $snip = Get-WtMarkdownSnippet "# 점검`n- [ ] 디스크`n- **로그** 확인`n| a | b |`n|--|--|`n[[메모|별칭]]"
+    Assert-Wt '마크다운: 목록용 한 줄 요약' ($snip -eq '점검 · 디스크 · 로그 확인 · a  b · 별칭') $snip
+    Assert-Wt '마크다운: 빈 글' ((ConvertTo-WtMarkdownModel '').Blocks.Count -eq 0 -and (Get-WtMarkdownSnippet '') -eq '')
+
+    # ---- 코드 색칠 ----
+    $tok = Get-WtCodeTokens 'Get-ChildItem -Path $env:TEMP | Where-Object { $_.Length -gt 1KB } # 주석' 'powershell'
+    $kinds = (@($tok) | Where-Object Kind | ForEach-Object { "$($_.Kind):$($_.Text)" }) -join ' '
+    Assert-Wt '코드 색칠: PowerShell' ($kinds -eq 'Command:Get-ChildItem Attr:-Path Variable:$env:TEMP Command:Where-Object Variable:$_ Keyword:-gt Number:1KB Comment:# 주석') $kinds
+    Assert-Wt '코드 색칠: 조각을 이으면 원래 글' ((@($tok) | ForEach-Object Text) -join '' -eq 'Get-ChildItem -Path $env:TEMP | Where-Object { $_.Length -gt 1KB } # 주석')
+    Assert-Wt '코드 색칠: 별칭 · 모르는 언어' ((Get-WtCodeLanguage 'PS1') -eq 'powershell' -and (Get-WtCodeLanguage 'sh') -eq 'bash' -and $null -eq (Get-WtCodeLanguage 'nope') -and @(Get-WtCodeTokens 'x' 'nope')[0].Kind -eq '')
+    $str = @(Get-WtCodeTokens 'echo "a # b" # c' 'bash') | Where-Object Kind
+    Assert-Wt '코드 색칠: 문자열 안의 #은 주석이 아님' (($str | ForEach-Object Kind) -join ',' -eq 'Command,String,Comment')
+
+    # ---- Mermaid ----
+    $fc = ConvertFrom-WtMermaid @'
+flowchart LR
+    A[시작] --> B{확인?}
+    B -->|예| C[(DB)]
+    B -- 아니오 --> D([끝])
+    C -.-> D & A
+    subgraph g1 [묶음]
+      C
+    end
+'@
+    Assert-Wt 'Mermaid: flowchart 노드 · 모양' ($fc.Dir -eq 'LR' -and (($fc.Nodes.Values | ForEach-Object Shape) -join ',') -eq 'rect,diamond,cylinder,stadium' -and $fc.Nodes['C'].Group -eq 'g1')
+    $el = ($fc.Edges | ForEach-Object { "$($_.From)$($_.To):$($_.Style):$($_.Text)" }) -join ' '
+    Assert-Wt 'Mermaid: flowchart 선 · 라벨 · & 묶음' ($el -eq 'AB:normal: BC:normal:예 BD:normal:아니오 CD:dotted: CA:dotted:') $el
+    $lay = Get-WtMermaidLayout $fc
+    $nodes = @($lay.Items | Where-Object K -eq 'node')
+    $overlap = $false
+    for ($i = 0; $i -lt $nodes.Count; $i++) {
+        for ($j = $i + 1; $j -lt $nodes.Count; $j++) {
+            $a = $nodes[$i]; $b = $nodes[$j]
+            if ($a.X -lt $b.X + $b.W -and $b.X -lt $a.X + $a.W -and $a.Y -lt $b.Y + $b.H -and $b.Y -lt $a.Y + $a.H) { $overlap = $true }
+        }
+    }
+    Assert-Wt 'Mermaid: 배치 (노드 4개, 겹치지 않음, 그림 안)' ($nodes.Count -eq 4 -and -not $overlap -and -not @($nodes | Where-Object { $_.X -lt 0 -or $_.Y -lt 0 -or $_.X + $_.W -gt $lay.Width -or $_.Y + $_.H -gt $lay.Height }).Count)
+    $ax = ($nodes | Where-Object Text -eq '시작').X; $bx = ($nodes | Where-Object Text -eq '확인?').X
+    Assert-Wt 'Mermaid: LR은 왼쪽에서 오른쪽' ($ax -lt $bx)
+    $sq = ConvertFrom-WtMermaid "sequenceDiagram`n participant A as 서버`n actor U`n U->>A: 요청`n A-->>U: 응답`n loop 매일`n A->>A: 점검`n end`n Note right of A: 메모"
+    Assert-Wt 'Mermaid: sequence' ((($sq.Participants.Values | ForEach-Object Label) -join ',') -eq '서버,U' -and $sq.Participants['U'].Actor -and
+        (($sq.Items | ForEach-Object K) -join ',') -eq 'msg,msg,start,msg,end,note' -and $sq.Items[1].Line -eq 'dashed')
+    Assert-Wt 'Mermaid: sequence 배치' (@((Get-WtMermaidLayout $sq).Items | Where-Object K -eq 'line').Count -ge 5)
+    $stm = ConvertFrom-WtMermaid "stateDiagram-v2`n [*] --> 대기`n 대기 --> 실행 : 시작`n 실행 --> [*]"
+    Assert-Wt 'Mermaid: state ([*] · 라벨)' ($stm.Nodes.Count -eq 4 -and (($stm.Edges | ForEach-Object Text) -join ',') -eq ',시작,')
+    $threw = $null
+    try { [void](ConvertFrom-WtMermaid "gantt`n title x") } catch { $threw = $_.Exception }
+    Assert-Wt 'Mermaid: 모르는 종류는 NotSupported' ($threw -is [System.NotSupportedException])
+
+    # ---- WPF로 그리기 (Windows · STA에서만) ----
+    if ($IsWindows -and [System.Threading.Thread]::CurrentThread.GetApartmentState() -eq 'STA') {
+        Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Xaml
+        $sample = $md + @'
+
+
+```mermaid
+flowchart TD
+    A --> B{x}
+    B -->|y| C
+```
+
+```mermaid
+sequenceDiagram
+    A->>B: hi
+```
+
+```mermaid
+pie
+```
+'@
+        $view = New-WtMarkdownView -Scroll -OnLink { param($l) $true }
+        Set-WtMarkdownText $view $sample
+        Assert-Wt 'WPF: 마크다운을 오류 없이 그린다' (-not $view.Tag.Error -and $view.Document.Blocks.Count -ge 12) "$($view.Tag.Error)"
+        $figs = @($view.Document.Blocks | Where-Object { $_ -is [System.Windows.Documents.BlockUIContainer] -and $_.Child -is [System.Windows.Controls.Border] })
+        Assert-Wt 'WPF: Mermaid 2개는 그림, 모르는 종류는 코드 블록' ($figs.Count -eq 2 -and $view.Tag.Remeasure)
+        Assert-Wt 'WPF: 제목 · 각주 자리' ($view.Tag.Anchors.ContainsKey('제목굵게') -and $view.Tag.Anchors.ContainsKey('fn1'))
+    } else {
+        Write-Host 'SKIP WPF로 그리기 (Windows STA에서만)'
     }
 } finally {
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue

@@ -29,7 +29,7 @@ Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, Sys
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 
 #region 모듈 불러오기 (묶음 파일에서는 이 구역이 모듈 소스로 바뀐다)
-$coreModules = 'Storage', 'Settings', 'Theme', 'Ui', 'Addons', 'Pages', 'Shell'
+$coreModules = 'Storage', 'Settings', 'Theme', 'Ui', 'Highlight', 'Markdown', 'Mermaid', 'Addons', 'Pages', 'Shell'
 foreach ($name in $coreModules) {
     Import-Module (Join-Path $PSScriptRoot "core\$name.psm1") -Force -DisableNameChecking
 }

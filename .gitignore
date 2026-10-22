@@ -4,3 +4,4 @@ __pycache__/
 .~lock.*#
 apps/WorkTool/data/
 apps/WorkTool/config.json
+apps/WorkTool/dist/data/

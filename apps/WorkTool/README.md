@@ -6,6 +6,17 @@ Windows에서 혼자 쓰는 업무 통합 GUI 툴. PowerShell 7 + WinForms, 외�
 - 요구사항과 진행 순서: [ROADMAP.md](ROADMAP.md)
 - 이 문서: 구조와 각 부분이 하는 일
 
+## 파일 하나로 쓰기 (복사 한 번)
+
+`dist/WorkTool.ps1`은 아래 파일들을 하나로 묶은 자동 생성 파일입니다. 기능은 같습니다.
+
+1. GitHub에서 `apps/WorkTool/dist/WorkTool.ps1`을 열고 복사 아이콘(Copy raw file)을 누릅니다.
+2. 업무 PC의 WorkTool 폴더에 `WorkTool.ps1`로 저장합니다. 기존 폴더에 두면 `data` 폴더의 기존 데이터를 그대로 씁니다.
+3. `pwsh`에서 `.\WorkTool.ps1`로 실행합니다.
+
+- 묶음 파일은 직접 고치지 않습니다. 원본을 고친 뒤 `pwsh build/Build-Bundle.ps1`로 다시 만듭니다.
+- 모듈 코드는 문자열로 실행하지 않고 그대로 들어가 있습니다(`New-Module` 블록). 데이터 폴더만 "묶음 파일 옆 `data`"로 바뀝니다.
+
 ## 구조
 
 ```

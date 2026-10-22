@@ -3,6 +3,7 @@
 #
 # 창은 투명도를 바꿀 수 있게 WindowStyle=None + AllowsTransparency로 만들고, 제목 줄은 직접 그린다.
 # 그래서 이 창 안에는 WindowsFormsHost · WebBrowser를 넣지 않는다 (투명 창에서는 그려지지 않는다).
+# 투명 창은 ClearType을 못 쓰고 회색조로 글자를 그린다. 이때 Display 모드는 획이 픽셀에 맞춰 꺾여 각져 보이므로 Ideal로 그린다.
 #
 # 이벤트 처리기는 나중에 디스패처가 부르므로, 만든 함수의 지역 변수를 볼 수 없다.
 # 처리기 안에서는 $script: 변수와 $s(보낸 요소)의 Tag만 쓴다.
@@ -33,7 +34,7 @@ $script:shellXaml = @'
     Title="WorkTool" Width="1200" Height="780" MinWidth="760" MinHeight="520"
     WindowStartupLocation="CenterScreen" WindowStyle="None" AllowsTransparency="True" ResizeMode="CanResize"
     Background="Transparent" UseLayoutRounding="True" SnapsToDevicePixels="True"
-    TextOptions.TextFormattingMode="Display"
+    TextOptions.TextFormattingMode="Ideal"
     FontFamily="{DynamicResource Font.UI}" FontSize="{DynamicResource F.Body}" Foreground="{DynamicResource B.Text}">
   <WindowChrome.WindowChrome>
     <WindowChrome CaptionHeight="40" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/>

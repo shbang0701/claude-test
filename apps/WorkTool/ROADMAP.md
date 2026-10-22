@@ -29,8 +29,8 @@
 ### 마크다운 미리보기
 
 - 메모 본문을 편집 / 미리보기로 전환해서 볼 수 있게 한다.
-- 구현 방향: PowerShell 7 내장 `ConvertFrom-Markdown`으로 HTML을 만들고 WinForms `WebBrowser` 컨트롤로 보여준다. 외부 반입 없음.
-- 미리보기는 공통 모듈로 만들어 메모 탭과 문서 탭이 같이 쓴다.
+- WPF 버전에 공통 모듈로 만들었다 (`wpf/core/Markdown.psm1` · `Highlight.psm1` · `Mermaid.psm1`, 설명은 `wpf/README.md` 「마크다운 보기」). 메모 탭은 지금 미리보기 | 원문이고, 2단계에서 편집 | 미리보기가 된다. 문서 탭도 이 모듈을 쓴다.
+- 구현: PowerShell 7에 들어 있는 Markdig로 읽어 WPF 문서로 그린다. 투명 창이라 `WebBrowser`는 쓸 수 없어서, Mermaid도 직접 배치해서 그린다. 외부 반입 없음.
 
 ### 문서 탭 (폴더 트리)
 

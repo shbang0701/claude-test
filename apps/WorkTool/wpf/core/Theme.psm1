@@ -41,10 +41,49 @@ $script:fixed = @{
     'Att.Over'   = '#5A42AE'; 'Att.OverBg'  = '#EEEAFB'
     'Att.Trip'   = '#0B6E6D'; 'Att.TripBg'  = '#DDF2F1'
     'Att.Leave'  = '#9C4E0F'; 'Att.LeaveBg' = '#FCEBDC'
+
+    # 마크다운 보기 (Markdown.psm1)
+    'Md.QuoteBar' = '#C4CEDA'   # 인용 왼쪽 막대 (장식)
+    'Md.Mark'     = '#FFF0A8'   # ==형광펜== 바탕
+    # 콜아웃 (> [!note] …): 제목 · 막대 글자색 / 바탕
+    'Callout.Blue'   = '#1C5A9B'; 'Callout.BlueBg'   = '#E0EBF7'
+    'Callout.Teal'   = '#0B6E6D'; 'Callout.TealBg'   = '#DDF2F1'
+    'Callout.Green'  = '#1A6E44'; 'Callout.GreenBg'  = '#E3F4EB'
+    'Callout.Orange' = '#8A5A08'; 'Callout.OrangeBg' = '#FDF1DC'
+    'Callout.Red'    = '#B83227'; 'Callout.RedBg'    = '#FBE7E4'
+    'Callout.Purple' = '#5A42AE'; 'Callout.PurpleBg' = '#EEEAFB'
+    'Callout.Gray'   = '#4A5A6C'; 'Callout.GrayBg'   = '#EEF2F7'
+    # 코드 블록 바탕과 색칠 (Highlight.psm1의 Kind 이름). 모두 Code.Bg 위에서 4.5:1 이상
+    'Code.Bg'       = '#F3F6F9'
+    'Code.Comment'  = '#56667A'
+    'Code.String'   = '#0A3069'
+    'Code.Keyword'  = '#C4243B'
+    'Code.Number'   = '#0550AE'
+    'Code.Command'  = '#6639BA'
+    'Code.Variable' = '#953800'
+    'Code.Type'     = '#116329'
+    'Code.Attr'     = '#0B6E6D'
+    'Code.Inserted' = '#1A6E44'
+    'Code.Deleted'  = '#B83227'
+    # 다이어그램 (Mermaid.psm1)
+    'Dia.NodeBg'    = '#EEF2F7'
+    'Dia.NodeLine'  = '#7F8C9C'   # 흰 바탕과 3:1 이상
+    'Dia.Line'      = '#56667A'   # 연결선 · 화살표
+    'Dia.GroupBg'   = '#F7F9FB'
+    'Dia.GroupLine' = '#C4CEDA'
+    'Dia.NoteBg'    = '#FDF1DC'
+    'Dia.NoteLine'  = '#D9B66A'
 }
 
 $script:fontScales = @{ s = 0.93; m = 1.0; l = 1.12 }
-$script:fontSizes = @{ Title = 26; Number = 22; H2 = 16; Body = 14; Small = 12.5; Icon = 16 }
+# MdH1~3 · Code · BodyLine(본문 줄 높이 1.5배)은 마크다운 보기용
+$script:fontSizes = @{ Title = 26; Number = 22; H2 = 16; Body = 14; Small = 12.5; Icon = 16; MdH1 = 24; MdH2 = 20; MdH3 = 17; Code = 13; BodyLine = 21 }
+$script:fonts = @{
+    # 설치된 글꼴 중 앞에서부터 쓴다. 맑은 고딕은 Windows 기본이라 항상 있다.
+    UI   = 'Pretendard, Noto Sans KR, Malgun Gothic'
+    Icon = 'Segoe Fluent Icons, Segoe MDL2 Assets'
+    Mono = 'Consolas, D2Coding, Malgun Gothic'
+}
 
 # ---- 색 계산 (WPF 없이도 동작: 테스트용) ------------------------------------------------------
 
@@ -105,16 +144,19 @@ function Update-WtThemeDictionary([System.Windows.ResourceDictionary]$Dictionary
         $brush.Freeze()
         $Dictionary["B.$k"] = $brush
     }
+    foreach ($k in $script:fontSizes.Keys) { $Dictionary["F.$k"] = Get-WtFontSize $k }
+    foreach ($k in $script:fonts.Keys) { $Dictionary["Font.$k"] = [System.Windows.Media.FontFamily]::new($script:fonts[$k]) }
+}
+
+# 지금 설정의 글자 크기 (F.* 리소스와 같은 값). 화면에 붙기 전에 크기를 재야 할 때 쓴다 (다이어그램 배치 등).
+function Get-WtFontSize([string]$Name) {
     $scale = $script:fontScales[[string](Get-WtSetting 'ui.fontScale')]
     if (-not $scale) { $scale = 1.0 }
-    foreach ($k in $script:fontSizes.Keys) {
-        $Dictionary["F.$k"] = [double][Math]::Round($script:fontSizes[$k] * $scale, 1)
-    }
-    # 설치된 글꼴 중 앞에서부터 쓴다. 맑은 고딕은 Windows 기본이라 항상 있다.
-    $Dictionary['Font.UI'] = [System.Windows.Media.FontFamily]::new('Pretendard, Noto Sans KR, Malgun Gothic')
-    $Dictionary['Font.Icon'] = [System.Windows.Media.FontFamily]::new('Segoe Fluent Icons, Segoe MDL2 Assets')
-    $Dictionary['Font.Mono'] = [System.Windows.Media.FontFamily]::new('Consolas, D2Coding, Malgun Gothic')
+    [double][Math]::Round($script:fontSizes[$Name] * $scale, 1)
 }
+
+# 글꼴 이름 목록 (Font.* 리소스와 같은 값). $Name: UI · Icon · Mono
+function Get-WtFontName([string]$Name) { $script:fonts[$Name] }
 
 function New-WtThemeDictionary {
     $d = [System.Windows.ResourceDictionary]::new()
@@ -123,4 +165,4 @@ function New-WtThemeDictionary {
 }
 
 Export-ModuleMember -Function ConvertFrom-WtHex, Get-WtMixedColor, Get-WtLuminance, Get-WtContrast, Get-WtPalette,
-    Get-WtThemeColors, Update-WtThemeDictionary, New-WtThemeDictionary
+    Get-WtThemeColors, Update-WtThemeDictionary, New-WtThemeDictionary, Get-WtFontSize, Get-WtFontName

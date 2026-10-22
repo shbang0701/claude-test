@@ -306,6 +306,209 @@ $script:stylesXaml = @'
     <Setter Property="Cursor" Value="Hand"/>
   </Style>
 
+  <!-- 마크다운 보기 (Markdown.psm1). 문서 요소(Paragraph · Section · Run …)의 모양 -->
+  <!-- RichTextBox는 배치할 때 문서 좌우에 5씩 여백을 넣는다(PagePadding 5,0). 안쪽 여백 -5로 없애서 옆 글과 줄을 맞춘다 -->
+  <Style x:Key="Md.View" TargetType="RichTextBox">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Padding" Value="-5,0,-5,0"/>
+    <Setter Property="AcceptsTab" Value="False"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.Text}"/>
+    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+    <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
+  </Style>
+  <Style x:Key="Md.Doc" TargetType="FlowDocument">
+    <Setter Property="FontFamily" Value="{DynamicResource Font.UI}"/>
+    <Setter Property="FontSize" Value="{DynamicResource F.Body}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.Text}"/>
+    <Setter Property="LineHeight" Value="{DynamicResource F.BodyLine}"/>
+    <Setter Property="PagePadding" Value="0"/>
+    <Setter Property="TextAlignment" Value="Left"/>
+  </Style>
+  <Style x:Key="Md.P" TargetType="Paragraph">
+    <Setter Property="Margin" Value="0,0,0,12"/>
+  </Style>
+  <Style x:Key="Md.PTight" TargetType="Paragraph">
+    <Setter Property="Margin" Value="0"/>
+  </Style>
+  <Style x:Key="Md.H1" TargetType="Paragraph">
+    <Setter Property="FontSize" Value="{DynamicResource F.MdH1}"/>
+    <Setter Property="FontWeight" Value="Bold"/>
+    <Setter Property="LineHeight" Value="Auto"/>
+    <Setter Property="Margin" Value="0,24,0,12"/>
+  </Style>
+  <Style x:Key="Md.H2" TargetType="Paragraph" BasedOn="{StaticResource Md.H1}">
+    <Setter Property="FontSize" Value="{DynamicResource F.MdH2}"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Margin" Value="0,24,0,8"/>
+  </Style>
+  <Style x:Key="Md.H3" TargetType="Paragraph" BasedOn="{StaticResource Md.H2}">
+    <Setter Property="FontSize" Value="{DynamicResource F.MdH3}"/>
+    <Setter Property="Margin" Value="0,16,0,8"/>
+  </Style>
+  <Style x:Key="Md.H4" TargetType="Paragraph" BasedOn="{StaticResource Md.H2}">
+    <Setter Property="FontSize" Value="{DynamicResource F.H2}"/>
+    <Setter Property="Margin" Value="0,16,0,4"/>
+  </Style>
+  <Style x:Key="Md.H5" TargetType="Paragraph" BasedOn="{StaticResource Md.H4}">
+    <Setter Property="FontSize" Value="{DynamicResource F.Body}"/>
+  </Style>
+  <Style x:Key="Md.H6" TargetType="Paragraph" BasedOn="{StaticResource Md.H5}">
+    <Setter Property="Foreground" Value="{DynamicResource B.SubText}"/>
+  </Style>
+  <Style x:Key="Md.List" TargetType="List">
+    <Setter Property="Margin" Value="0,0,0,12"/>
+    <Setter Property="Padding" Value="24,0,0,0"/>
+  </Style>
+  <Style x:Key="Md.ListNested" TargetType="List" BasedOn="{StaticResource Md.List}">
+    <Setter Property="Margin" Value="0,4,0,0"/>
+  </Style>
+  <Style x:Key="Md.ListItem" TargetType="ListItem">
+    <Setter Property="Margin" Value="0,0,0,4"/>
+  </Style>
+  <Style x:Key="Md.Quote" TargetType="Section">
+    <Setter Property="BorderBrush" Value="{DynamicResource B.Md.QuoteBar}"/>
+    <Setter Property="BorderThickness" Value="3,0,0,0"/>
+    <Setter Property="Padding" Value="16,4,0,4"/>
+    <Setter Property="Margin" Value="0,0,0,12"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.SubText}"/>
+  </Style>
+  <Style x:Key="Md.Callout" TargetType="Section">
+    <Setter Property="BorderThickness" Value="3,0,0,0"/>
+    <Setter Property="Padding" Value="16,12,16,12"/>
+    <Setter Property="Margin" Value="0,0,0,12"/>
+  </Style>
+  <Style x:Key="Md.CalloutTitle" TargetType="Paragraph">
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Margin" Value="0,0,0,8"/>
+  </Style>
+  <Style x:Key="Md.FoldLink" TargetType="Hyperlink">
+    <Setter Property="TextDecorations" Value="{x:Null}"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Style.Triggers>
+      <Trigger Property="IsMouseOver" Value="True">
+        <Setter Property="TextDecorations" Value="Underline"/>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+  <Style x:Key="Md.CodeBlock" TargetType="Section">
+    <Setter Property="Background" Value="{DynamicResource B.Code.Bg}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource B.Border}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="Padding" Value="12,0,8,12"/>
+    <Setter Property="Margin" Value="0,0,0,12"/>
+  </Style>
+  <Style x:Key="Md.CodeHead" TargetType="BlockUIContainer">
+    <Setter Property="Margin" Value="0"/>
+  </Style>
+  <Style x:Key="Md.CodeText" TargetType="Paragraph">
+    <Setter Property="FontFamily" Value="{DynamicResource Font.Mono}"/>
+    <Setter Property="FontSize" Value="{DynamicResource F.Code}"/>
+    <Setter Property="LineHeight" Value="Auto"/>
+    <Setter Property="Margin" Value="0"/>
+  </Style>
+  <Style x:Key="Md.CodeNote" TargetType="Paragraph">
+    <Setter Property="FontSize" Value="{DynamicResource F.Small}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.Warn}"/>
+    <Setter Property="Margin" Value="0,0,0,8"/>
+  </Style>
+  <Style x:Key="Md.InlineCode" TargetType="Run">
+    <Setter Property="FontFamily" Value="{DynamicResource Font.Mono}"/>
+    <Setter Property="FontSize" Value="{DynamicResource F.Code}"/>
+    <Setter Property="Background" Value="{DynamicResource B.Code.Bg}"/>
+  </Style>
+  <Style x:Key="Md.Math" TargetType="Paragraph">
+    <Setter Property="FontFamily" Value="{DynamicResource Font.Mono}"/>
+    <Setter Property="Background" Value="{DynamicResource B.Code.Bg}"/>
+    <Setter Property="Padding" Value="12,8"/>
+    <Setter Property="Margin" Value="0,0,0,12"/>
+    <Setter Property="TextAlignment" Value="Center"/>
+  </Style>
+  <Style x:Key="Md.Mark" TargetType="Span">
+    <Setter Property="Background" Value="{DynamicResource B.Md.Mark}"/>
+  </Style>
+  <Style x:Key="Md.Sup" TargetType="Span">
+    <Setter Property="BaselineAlignment" Value="Superscript"/>
+    <Setter Property="FontSize" Value="{DynamicResource F.Small}"/>
+  </Style>
+  <Style x:Key="Md.Sub" TargetType="Span">
+    <Setter Property="BaselineAlignment" Value="Subscript"/>
+    <Setter Property="FontSize" Value="{DynamicResource F.Small}"/>
+  </Style>
+  <Style x:Key="Md.Tag" TargetType="Span">
+    <Setter Property="Background" Value="{DynamicResource B.Chip}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.ChipText}"/>
+  </Style>
+  <Style x:Key="Md.Link" TargetType="Hyperlink">
+    <Setter Property="Foreground" Value="{DynamicResource B.AccentStrong}"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Style.Triggers>
+      <Trigger Property="IsMouseOver" Value="True">
+        <Setter Property="Foreground" Value="{DynamicResource B.AccentHover}"/>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+  <Style x:Key="Md.TagLink" TargetType="Hyperlink" BasedOn="{StaticResource Md.Link}">
+    <Setter Property="Background" Value="{DynamicResource B.AccentSoft}"/>
+    <Setter Property="TextDecorations" Value="{x:Null}"/>
+  </Style>
+  <Style x:Key="Md.FnRef" TargetType="Hyperlink" BasedOn="{StaticResource Md.Link}">
+    <Setter Property="BaselineAlignment" Value="Superscript"/>
+    <Setter Property="FontSize" Value="{DynamicResource F.Small}"/>
+    <Setter Property="TextDecorations" Value="{x:Null}"/>
+  </Style>
+  <Style x:Key="Md.Hr" TargetType="BlockUIContainer">
+    <Setter Property="Margin" Value="0,8,0,20"/>
+  </Style>
+  <Style x:Key="Md.Figure" TargetType="BlockUIContainer">
+    <Setter Property="Margin" Value="0,0,0,12"/>
+  </Style>
+  <Style x:Key="Md.FigureTight" TargetType="BlockUIContainer">
+    <Setter Property="Margin" Value="0"/>
+  </Style>
+  <Style x:Key="Md.FigureBox" TargetType="Border">
+    <Setter Property="Background" Value="{DynamicResource B.Card}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource B.Border}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="8"/>
+    <Setter Property="Padding" Value="12,0,8,16"/>
+  </Style>
+  <Style x:Key="Md.Table" TargetType="Table">
+    <Setter Property="CellSpacing" Value="0"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource B.Border}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="Margin" Value="0,0,0,12"/>
+  </Style>
+  <Style x:Key="Md.Td" TargetType="TableCell">
+    <Setter Property="Padding" Value="12,6"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource B.Border}"/>
+    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+  </Style>
+  <Style x:Key="Md.Th" TargetType="TableCell" BasedOn="{StaticResource Md.Td}">
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Background" Value="{DynamicResource B.Code.Bg}"/>
+  </Style>
+  <Style x:Key="Md.Props" TargetType="Table" BasedOn="{StaticResource Md.Table}">
+    <Setter Property="Background" Value="{DynamicResource B.Code.Bg}"/>
+    <Setter Property="Margin" Value="0,0,0,16"/>
+  </Style>
+  <Style x:Key="Md.PropKey" TargetType="TableCell">
+    <Setter Property="Padding" Value="12,4"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.SubText}"/>
+  </Style>
+  <Style x:Key="Md.PropValue" TargetType="TableCell">
+    <Setter Property="Padding" Value="12,4"/>
+  </Style>
+  <Style x:Key="Md.Footnotes" TargetType="Section">
+    <Setter Property="BorderBrush" Value="{DynamicResource B.Border}"/>
+    <Setter Property="BorderThickness" Value="0,1,0,0"/>
+    <Setter Property="Padding" Value="0,12,0,0"/>
+    <Setter Property="Margin" Value="0,12,0,0"/>
+    <Setter Property="FontSize" Value="{DynamicResource F.Small}"/>
+    <Setter Property="LineHeight" Value="Auto"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.SubText}"/>
+  </Style>
+
 </ResourceDictionary>
 '@
 
@@ -401,15 +604,16 @@ function New-WtCardHeader([string]$Title, [string]$Count, [string]$LinkText, [st
         [System.Windows.Controls.DockPanel]::SetDock($b, 'Right')
         [void]$g.Children.Add($b)
     }
-    $title = New-WtText $Title 'T.H2'
+    # PowerShell 변수는 대소문자를 가리지 않는다: $title로 쓰면 [string]$Title에 들어가 글자로 바뀐다
+    $head = New-WtText $Title 'T.H2'
     if ($Count) {
         $run = [System.Windows.Documents.Run]::new("  $Count")
         $run.FontWeight = 'Normal'
         $run.SetResourceReference([System.Windows.Documents.TextElement]::ForegroundProperty, 'B.SubText')
-        $title.Inlines.Add($run)
+        $head.Inlines.Add($run)
     }
-    $title.VerticalAlignment = 'Center'
-    [void]$g.Children.Add($title)
+    $head.VerticalAlignment = 'Center'
+    [void]$g.Children.Add($head)
     $g
 }
 
@@ -423,6 +627,13 @@ function New-WtButton([string]$Text, [string]$Kind = 'Default', [int]$Icon = 0, 
         'Link' { Set-WtStyle $b 'Btn.Link' }
         default { Set-WtStyle $b 'Btn' }
     }
+    $b.Content = New-WtButtonContent $Text $Icon
+    if ($ToolTip) { $b.ToolTip = $ToolTip }
+    $b
+}
+
+# 버튼 안 내용: 아이콘 + 글자 (둘 중 하나만 있어도 됨). 누른 뒤 글자를 바꿀 때도 쓴다 (예: 복사 → 복사됨)
+function New-WtButtonContent([string]$Text, [int]$Icon = 0) {
     if ($Icon -and $Text) {
         $row = New-WtStack Horizontal 8
         [void](Add-WtChild $row (New-WtIcon $Icon))
@@ -430,14 +641,33 @@ function New-WtButton([string]$Text, [string]$Kind = 'Default', [int]$Icon = 0, 
         $label.Text = $Text
         $label.VerticalAlignment = 'Center'
         [void](Add-WtChild $row $label)
-        $b.Content = $row
-    } elseif ($Icon) {
-        $b.Content = New-WtIcon $Icon
-    } else {
-        $b.Content = $Text
+        return $row
     }
-    if ($ToolTip) { $b.ToolTip = $ToolTip }
-    $b
+    if ($Icon) { return New-WtIcon $Icon }
+    $Text
+}
+
+# 나눔 버튼: 여러 개 중 하나를 고르는 버튼 묶음 (예: 미리보기 | 원문, 작게 | 보통 | 크게)
+# $Options: @(@('값', '글'), ...). 고르면 & $OnChange '값'. $Group은 화면 안에서 겹치지 않는 이름
+function New-WtSegmented([object[]]$Options, [string]$Selected, [string]$Group, [scriptblock]$OnChange) {
+    $box = [System.Windows.Controls.Border]::new()
+    Set-WtResource $box 'Background' 'B.Chip'
+    $box.CornerRadius = [System.Windows.CornerRadius]::new(10)
+    $box.Padding = [System.Windows.Thickness]::new(4)
+    $box.HorizontalAlignment = 'Left'
+    $row = New-WtStack Horizontal 4
+    foreach ($o in $Options) {
+        $rb = [System.Windows.Controls.RadioButton]::new()
+        Set-WtStyle $rb 'Seg'
+        $rb.GroupName = $Group
+        $rb.Content = $o[1]
+        $rb.Tag = @{ Value = $o[0]; OnChange = $OnChange }
+        $rb.IsChecked = ($o[0] -eq $Selected)
+        $rb.Add_Checked({ param($s, $e) & $s.Tag.OnChange $s.Tag.Value })
+        [void](Add-WtChild $row $rb)
+    }
+    $box.Child = $row
+    $box
 }
 
 # 작은 알약 모양 표시. $Bg/$Fg는 테마 리소스 이름 (예: 'Att.WorkBg', 'Att.Work')
@@ -561,8 +791,8 @@ function Confirm-WtYesNo([string]$Text, [string]$Title = 'WorkTool') {
 # 오류를 사용자에게 보여 준다. 문구는 그대로 복사해서 알려 줄 수 있게 한다.
 function Show-WtError($ErrorRecord, [string]$Where = '') {
     $msg = if ($ErrorRecord -is [System.Management.Automation.ErrorRecord]) {
-        $where = if ($ErrorRecord.InvocationInfo) { $ErrorRecord.InvocationInfo.PositionMessage } else { '' }
-        "$($ErrorRecord.Exception.Message)`n`n위치: $where"
+        $pos = if ($ErrorRecord.InvocationInfo) { $ErrorRecord.InvocationInfo.PositionMessage } else { '' }
+        "$($ErrorRecord.Exception.Message)`n`n위치: $pos"
     } elseif ($ErrorRecord -is [System.Exception]) {
         "$($ErrorRecord.Message)`n`n$($ErrorRecord.StackTrace)"
     } else { [string]$ErrorRecord }
@@ -571,5 +801,5 @@ function Show-WtError($ErrorRecord, [string]$Where = '') {
 }
 
 Export-ModuleMember -Function Get-WtStyleDictionary, ConvertFrom-WtXaml, Get-WtNamedElements, Set-WtStyle, Set-WtResource,
-    New-WtText, New-WtIcon, New-WtStack, Add-WtChild, New-WtCard, New-WtCardHeader, New-WtButton, New-WtTag,
+    New-WtText, New-WtIcon, New-WtStack, Add-WtChild, New-WtCard, New-WtCardHeader, New-WtButton, New-WtButtonContent, New-WtSegmented, New-WtTag,
     New-WtStatTile, New-WtPageHeader, New-WtPage, New-WtListRow, Format-WtDate, Show-WtMessage, Confirm-WtYesNo, Show-WtError

@@ -1,5 +1,5 @@
-# WorkTool 진입점. 기능 모듈을 불러와 탭으로 붙이고 메인 창을 띄운다.
-# Windows PowerShell 5.1과 PowerShell 7 양쪽에서 돌게 작성한다.
+#Requires -Version 7
+# WorkTool 진입점. 저장 모듈과 기능 모듈을 불러와 탭으로 붙이고 메인 창을 띄운다.
 
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
@@ -7,18 +7,16 @@ $root = $PSScriptRoot
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-# 아래 설정은 창을 만들기 전에 해야 한다. 같은 창에서 이미 창을 띄웠으면 실패하므로 무시한다.
+# 아래 설정은 창을 만들기 전에 해야 한다. 같은 터미널에서 이미 창을 띄웠으면 실패하므로 무시한다.
 [System.Windows.Forms.Application]::EnableVisualStyles()
 try { [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false) } catch { }
-# 고해상도 화면에서 글자가 흐리지 않게 한다. PowerShell 7에만 있는 기능이다.
-if ([System.Windows.Forms.Application].GetMethod('SetHighDpiMode')) {
-    [void][System.Windows.Forms.Application]::SetHighDpiMode('SystemAware')
-}
+# 고해상도 화면에서 글자가 흐리지 않게 한다.
+[void][System.Windows.Forms.Application]::SetHighDpiMode('SystemAware')
 
 # 기능 모듈 목록. 기능을 추가할 때 modules\<이름>.psm1을 만들고 여기 한 줄 넣는다.
 # 각 모듈은 New-<이름>Tab 함수로 TabPage를 돌려준다.
 $featureModules = @(
-    # 'Memo'
+    'Memo'
 )
 
 # 색과 글꼴
@@ -101,6 +99,7 @@ $form.Controls.Add($body)
 # Fill은 맨 앞에 있어야 머리글·상태 표시줄을 가리지 않는다.
 $body.BringToFront()
 
+Import-Module (Join-Path $root 'modules\Storage.psm1') -Force
 foreach ($name in $featureModules) {
     Import-Module (Join-Path $root "modules\$name.psm1") -Force
     $tabs.TabPages.Add((& "New-${name}Tab"))

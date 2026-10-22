@@ -56,3 +56,22 @@ Get-ChildItem .\data | Select-Object Name
 ```powershell
 Remove-Item .\data\test.csv*
 ```
+
+### 메모 탭
+
+붙여넣을 파일 3개: `modules\Memo.psm1`(새 파일), `modules\Storage.psm1`(수정), `Start-WorkTool.ps1`(수정). 그다음 실행한다.
+
+```powershell
+.\Start-WorkTool.ps1
+```
+
+확인할 것:
+
+1. "메모" 탭이 생긴다
+2. 제목·본문 쓰고 Ctrl+S → 왼쪽 목록에 뜨고 "저장됨 시각"이 나온다
+3. 새 메모 → 하나 더 쓰고 목록에서 첫 메모 클릭 → 두 번째 메모가 자동 저장된다
+4. 제목을 비우고 저장 → 본문 첫 줄이 목록 제목이 된다
+5. 검색칸에 글자 입력 → 목록이 걸러진다
+6. 아무 메모나 고치고 저장 안 한 채 창 닫기 → 다시 열면 고친 내용이 남아 있다
+7. 삭제 → 확인 창 → 목록에서 사라진다
+8. `data\memo.csv`를 Excel로 열어둔 채 저장 → 경고 창이 뜬다 (Excel 닫고 다시 저장하면 된다)

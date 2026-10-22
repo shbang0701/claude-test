@@ -1,6 +1,8 @@
 # 저장 담당. 다른 모듈은 파일을 직접 읽고 쓰지 않고 이 모듈만 거친다.
 # 지금은 data\<이름>.csv에 저장한다. 나중에 저장 방식을 바꿀 때는 이 파일만 고친다.
 
+# 읽기 실패를 빈 결과로 넘기면 다음 저장에서 기존 데이터를 덮어쓰므로, 실패는 항상 예외로 올린다.
+$ErrorActionPreference = 'Stop'
 $dataDir = Join-Path (Split-Path $PSScriptRoot -Parent) 'data'
 # Excel에서 열어도 한글이 깨지지 않게 BOM을 붙인다.
 $encoding = [System.Text.UTF8Encoding]::new($true)

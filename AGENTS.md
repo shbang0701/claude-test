@@ -47,3 +47,13 @@ GUI 화면을 만들거나 고치는 작업이면 **시작하기 전에 `design.
 - 색은 `_build/ppt_kit.py` · `_build/xlkit.py`의 `P`를 RGB로 직접 지정하고, 글꼴은 맑은 고딕(케이블 라벨만 Consolas)입니다. 테마 색 · 그림자 효과는 쓰지 않습니다. 스킬의 기본 글꼴(Arial 등)은 따르지 않습니다.
 - 수식 값은 `_build/inject_cache.py`로 넣습니다. 스킬의 `recalc.py`는 LibreOffice로 파일을 다시 저장해 인쇄 설정이 바뀔 수 있으므로, 원본에는 쓰지 않고 사본 검사에만 씁니다.
 - 대상은 Office 2016 영구 라이선스입니다. Excel 함수는 2016에 있는 것만 씁니다(`TEXTJOIN` · `CONCAT` · `IFS` · `SWITCH` · `MAXIFS` · `MINIFS` · `XLOOKUP` · 동적 배열 함수 금지). 매크로 · 외부 서비스는 쓰지 않습니다. PPT에는 SVG 대신 도형 아이콘을 넣습니다.
+
+## 문서 글쓰기 (README · design.md · AGENTS.md · 설계 메모 · 제안서)
+
+Markdown 문서를 새로 쓰거나 크게 고칠 때는 [anthropics/skills](https://github.com/anthropics/skills)의 `doc-coauthoring` 흐름을 따릅니다: 맥락 모으기 → 구조 잡고 다듬기 → 새로 읽는 사람 테스트(서브에이전트). 오타나 한두 줄 같은 작은 수정에는 쓰지 않습니다.
+
+- **Claude Code (로컬)**: 저장소의 `.claude-plugin/marketplace.json`(마켓플레이스 `repo-skills`)이 이 스킬 하나만 원본 저장소에서 가져옵니다. 처음 한 번 `claude plugin install doc-coauthoring@repo-skills --scope project`를 실행합니다.
+- **스킬이 없는 환경 (클라우드 세션 등)**: 원본 [`skills/doc-coauthoring/SKILL.md`](https://github.com/anthropics/skills/blob/main/skills/doc-coauthoring/SKILL.md)를 읽고 그 흐름을 따릅니다.
+- 이 스킬은 라이선스 표시가 없어 저장소에 복사하지 않습니다.
+- 저장소 문서는 저장소 안의 Markdown 파일로 씁니다. 아티팩트나 외부 문서로 만들지 않습니다.
+- 문체는 `README.md`와 같게 씁니다: 짧은 문장, 표, `-습니다` · `-하세요`.

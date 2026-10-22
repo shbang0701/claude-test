@@ -1,0 +1,20 @@
+{
+  "name": "repo-skills",
+  "description": "이 저장소에서 쓰는 외부 스킬 (원본 저장소에서 바로 설치)",
+  "owner": {
+    "name": "shbang0701"
+  },
+  "plugins": [
+    {
+      "name": "doc-coauthoring",
+      "description": "문서 공동 작성 흐름: 맥락 모으기 → 구조 · 다듬기 → 새로 읽는 사람 테스트 (anthropics/skills)",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/skills",
+        "path": "skills"
+      },
+      "strict": false,
+      "skills": ["./doc-coauthoring"]
+    }
+  ]
+}

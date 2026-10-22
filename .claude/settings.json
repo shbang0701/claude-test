@@ -5,9 +5,16 @@
         "source": "github",
         "repo": "anthropics/skills"
       }
+    },
+    "repo-skills": {
+      "source": {
+        "source": "directory",
+        "path": "."
+      }
     }
   },
   "enabledPlugins": {
-    "document-skills@anthropic-agent-skills": true
+    "document-skills@anthropic-agent-skills": true,
+    "doc-coauthoring@repo-skills": true
   }
 }

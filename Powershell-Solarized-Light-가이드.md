@@ -33,7 +33,7 @@
 | 5 | `$PSStyle` 누락 항목 | 기본이 밝은 노랑·청록인 `Verbose`, `Debug`, `ErrorAccent`, `Progress.Style` 추가 |
 | 6 | `$PROFILE` 위치 | `$PROFILE`은 **현재 호스트 전용**이라 VS Code 내장 터미널에는 적용 안 됨 → 둘 다 쓰면 `$PROFILE.CurrentUserAllHosts` 사용 |
 | 7 | "git 색은 안 바뀐다" | 맞음. Windows Terminal `foreground`는 기본 글자색만 바꿈 → git 등 외부 프로그램 색까지 다듬는 **선택 사항: 전용 색 구성표**(3-2) 추가 |
-| 8 | 터미널 미리보기 | 원문에 있던 HTML 미리보기 잔재는 삭제하고 색상표로 대체 |
+| 8 | 터미널 미리보기 | 원문의 HTML 미리보기를 **원본 vs Refined 비교 목업**(SVG)으로 다시 만들어 2장에 넣음 |
 
 ---
 
@@ -48,6 +48,10 @@
 ## 2. 추천 색상 조합
 
 **Solarized Light — Refined**: 배경은 유지하고, 본문은 진한 블루그레이, 포인트 컬러는 절제합니다.
+
+![원본 Solarized Light와 Refined 비교 목업](mockups/powershell-solarized-light-preview.svg)
+
+> 목업 파일: `mockups/powershell-solarized-light-preview.svg` (브라우저나 VS Code에서 바로 열림). 왼쪽은 원본 + PowerShell 기본 색을 근사한 것으로, 폴더 이름 `src`가 파란 배경에 묻히고 자동 완성 예측 글자(`mmit -m "docs"`)가 진하게 표시돼 직접 입력한 글자와 구분되지 않는 문제가 보입니다.
 
 | 요소 | 색 | 배경 대비 | 의도 |
 |---|---|---|---|

@@ -1,6 +1,6 @@
 ---
 name: ui-ux-pro-max
-description: "UI/UX design intelligence for web, mobile, and desktop. This skill should be used when designing, building, reviewing, or fixing interfaces, including pages, components, design systems, accessibility, interaction, responsive layout, typography, color, charts, and stack-specific UI implementation. Searchable local data: 79 searchable styles (50 active), 192 product palettes and reasoning profiles, 74 font pairings, 119 UX guidelines, 105 icons, 17 GSAP presets, 25 chart types, and 22 stacks."
+description: "이 저장소 GUI 앱 화면(Windows 데스크톱)을 만들거나 고치거나 검토할 때 design.md를 보완하는 UI/UX 점검 도구: UX 지침 · 안티패턴(ux), 차트 고르기(chart), 기술 스택별 지침(WinUI · WPF · Avalonia · Uno · UWP 등). 색 · 글꼴 · 간격 · 아이콘 값은 design.md가 정합니다. Excel · PPT · PDF 문서, 아이콘 SVG, Markdown 문서에는 쓰지 않습니다. (GUI screens, UX review, accessibility, charts, desktop UI stacks)"
 ---
 
 # UI/UX Pro Max - Design Intelligence

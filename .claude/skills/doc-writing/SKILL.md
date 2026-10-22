@@ -1,6 +1,6 @@
 ---
 name: doc-writing
-description: "이 저장소의 Markdown 문서(README.md · design.md · AGENTS.md · 설계 메모 · 제안서 · 가이드)를 새로 쓰거나 구조를 크게 고칠 때 사용합니다. anthropics/skills의 doc-coauthoring 흐름(맥락 모으기 → 구조 잡고 다듬기 → 새로 읽는 사람 테스트)을 불러와 이 저장소 규칙과 함께 따릅니다. 오타 · 한두 줄 수정, Excel · PPT · PDF 파일, GUI 화면에는 쓰지 않습니다."
+description: "이 저장소의 Markdown 문서(README.md · design.md · AGENTS.md · 설계 메모 · 제안서 · Markdown 가이드)를 새로 쓰거나 고칠 때 사용합니다. 형식을 말하지 않은 저장소 관련 문서 요청은 Claude Docs · 아티팩트 대신 이 스킬로 씁니다. anthropics/skills의 doc-coauthoring 흐름(맥락 모으기 → 구조 잡고 다듬기 → 새로 읽는 사람 테스트)을 불러와 이 저장소 규칙과 함께 따릅니다. 오타 · 한두 줄 수정, Excel · PPT · PDF 파일, GUI 화면 구현에는 쓰지 않습니다. (repo Markdown docs: README, design.md, AGENTS.md, design memo, proposal, guide — use instead of anthropic-skills:docs or artifacts)"
 ---
 
 # 문서 글쓰기 — doc-coauthoring 연결
@@ -9,7 +9,7 @@ description: "이 저장소의 Markdown 문서(README.md · design.md · AGENTS.
 
 ## 1. 흐름 불러오기
 
-아래 순서로 시도하고, 처음 성공한 것을 따릅니다.
+절 하나를 더하는 정도의 작은 추가는 이 단계를 건너뛰고 「3. 짧은 흐름」으로 합니다. 그 밖에는 아래 순서로 시도하고, 처음 성공한 것을 따릅니다.
 
 1. 세션의 스킬 목록에 `doc-coauthoring`이 있으면(앞에 `플러그인이름:`이 붙을 수 있음) 그 스킬을 실행합니다.
 2. 없으면 원본을 읽어 이번 작업의 지침으로 따릅니다. 읽은 내용은 파일로 저장하지 않습니다.
@@ -21,14 +21,14 @@ description: "이 저장소의 Markdown 문서(README.md · design.md · AGENTS.
 
 ## 2. 이 저장소 규칙 (원본 흐름보다 우선)
 
-- 결과물은 저장소 안의 Markdown 파일입니다. Claude Docs · 아티팩트 · 외부 문서로 만들지 않습니다. 원본 흐름의 아티팩트 · 외부 연동 단계는 파일 편집으로 대신합니다.
+- 결과물은 저장소 안의 Markdown 파일입니다. 새 설계 메모 · 제안서는 `docs/`에 둡니다. Claude Docs · 아티팩트 · 외부 문서로 만들지 않습니다. 원본 흐름의 아티팩트 · 외부 연동 단계는 파일 편집으로 대신합니다.
 - 문체는 `README.md`와 같게 씁니다: 한국어, 짧은 문장, 표, `-습니다` · `-하세요`.
 - 질문은 저장소에서 답을 찾을 수 없는 것만, 한 번에 모아 짧게 묻습니다.
 - 새로 읽는 사람 테스트는 서브에이전트에게 문서 경로와 예상 질문만 주고 합니다.
 - 다른 문서에 이미 있는 내용은 옮겨 적지 않고 파일 이름으로 가리킵니다.
 - `design.md` · `AGENTS.md`를 고치면 서로, 그리고 `.claude/skills/`의 스킬 안내와 어긋나지 않는지 확인합니다.
 
-## 3. 짧은 흐름 (원본을 불러오지 못했을 때만)
+## 3. 짧은 흐름 (작은 추가, 또는 원본을 불러오지 못했을 때)
 
 1. 맥락: 목적 · 읽는 사람 · 관련 문서를 확인하고, 모르는 것만 묻습니다.
 2. 구조: 제목 목록을 먼저 만들어 확인받습니다.

@@ -6,10 +6,12 @@
 ## 저장소 구조
 
 - `scripts/<분류>/` — 단독 스크립트. 분류는 `office/` · `files/` · `system/` · `network/` · `text/`. 새 스크립트는 `scripts/_template.ps1`에서 시작한다.
-- `apps/<이름>/` — 여러 파일로 된 앱. 지금은 `apps/WorkTool/`(WinForms GUI)뿐이다.
+- `apps/<이름>/` — 여러 파일로 된 앱. 지금은 `apps/WorkTool/`(WinForms → WPF로 옮기는 중)뿐이다.
+  - `apps/design.md`: 모든 GUI 앱의 공통 디자인 원칙. 구체적인 값은 앱별 디자인 문서(`apps/<이름>/design/README.md`)가 우선한다.
 - `docs/guides/<분류>/` — 읽는 문서(.md).
   - `productivity/`: 업무 효율·작업 환경
   - `ops/`: 운영 노하우·장애 대응
+- `docs/plans/` — 설계 메모 · 제안서(.md).
 - `docs/templates/<이름>/` — 받아서 쓰는 Office 양식.
   - `infra-kit/`: 장비 도면·PPT·아이콘. `_build/`로 생성한다.
   - `rhel-config/`: RHEL 구성표
@@ -20,8 +22,8 @@
 
 - Windows + **PowerShell 7.6.6** (`pwsh`). Windows PowerShell 5.1 기준으로 쓰지 않는다.
 - **Office 2016** (Excel · Word · PowerPoint). Microsoft 365 / 2019 이후 기능은 쓰지 않는다.
-  - 쓰지 않는 함수: XLOOKUP, FILTER, UNIQUE, SORT, LET, TEXTJOIN, CONCAT, IFS, MAXIFS
-  - 쓰지 않는 기능: SVG 삽입, 동적 배열
+  - 쓰지 않는 함수: XLOOKUP, FILTER, UNIQUE, SORT, LET, TEXTJOIN, CONCAT, IFS, SWITCH, MAXIFS, MINIFS
+  - 쓰지 않는 기능: SVG 삽입(PPT에는 도형 아이콘), 동적 배열
 - 회사 Office 파일에는 **DRM**이 걸려 있다. 암호화되어 있어서 Office 프로그램으로만 열린다.
 - 보안 검사가 엄격하다. 문제가 생기면 해명할 게 많아진다. 인터넷(GitHub 열람)은 되지만 프로그램 설치나 외부 패키지는 쓰지 않는다.
 
@@ -52,6 +54,21 @@
 - **업무 PC에서 이 저장소로는 아무것도 올리지 않는다.** 흐름은 GitHub → PC 한 방향뿐이다. PC는 로그인하지 않으므로 push도 원래 되지 않는다.
 - **업무 PC로 가져가는 방법:** 텍스트(스크립트·문서)는 복사해 붙여 넣기가 기본이고, Excel·PPT 양식은 파일 하나씩 내려받는다. ZIP 통째 다운로드는 쓰지 않고, `git clone`은 회사에서 이미 git을 쓰는 경우에만 쓴다. 그래서 경로는 항상 `$PSScriptRoot` 기준 상대 경로로 쓰고, 설치 위치를 가정하지 않는다.
 - `docs/templates/infra-kit/`의 결과 파일(xlsx, pptx, pdf, 아이콘)은 직접 고치지 않고 `_build/` 소스를 고친 뒤 다시 만든다. `_build/`의 Python은 클라우드에서만 돌리고, 업무 PC에서는 쓰지 않는다.
+
+## 작업별로 먼저 읽을 것 · 쓰는 스킬
+
+작업 주제에 맞는 항목의 문서와 스킬만 쓴다. 세션에 다른 스킬이 보여도 아래 주제에는 쓰지 않는다. 필요한 스킬이 세션에 없으면 흉내 내지 말고 작업 전에 알린다.
+
+- **업무 PC용 스크립트**: `scripts/_template.ps1`, 위 「코드 규칙」
+- **GUI 화면** (만들기 · 고치기 · 검토): `apps/design.md`를 끝까지 읽고, 앱 디자인 문서(WorkTool: `apps/WorkTool/design/README.md`)의 값만 쓴다. 새 값이 필요하면 앱 디자인 문서에 먼저 추가한다. 문서에 없는 것은 Windows 기본 컨트롤(Fluent) 동작을 따르고, 끝내기 전에 `apps/design.md` 「완료 전 점검」을 확인한다.
+  - 스킬: `ui-ux-pro-max`(점검 도구로만, 쓰는 범위는 스킬 안 「이 저장소에서 쓸 때」)
+  - 쓰지 않음: `dataviz` · `artifact-design` · `frontend-design` · `theme-factory` · `brand-guidelines`, 아티팩트로 만든 시안. 시안은 「목업 · 미리보기」대로 git에 올린다.
+- **Excel · PPT · PDF · Word** (`docs/templates/infra-kit/`): 그 폴더의 `README.md`
+  - 스킬: `infra-design`(디자인 기준 · 만들기 규칙), `xlsx` · `pptx` · `pdf` · `docx`(읽기 · 검수)
+  - 쓰지 않음: 슬라이드 · 문서 아티팩트, pptxgenjs, `dataviz`(차트 색도 `P`), 결과 파일만 직접 고치기
+- **아이콘 SVG**: 스킬 없이 `docs/templates/infra-kit/_build/icons.py` · `icondsl.py`. 외부 아이콘 세트 · 이미지 생성은 쓰지 않는다.
+- **저장소 Markdown 문서** (README · `apps/design.md` · AGENTS.md · 설계 메모 · 제안서 · 가이드): 오타 · 한두 줄이 아니면 `doc-writing`. Claude Docs(`anthropic-skills:docs`) · 아티팩트로 만들지 않는다. 형식을 말하지 않은 저장소 관련 문서 요청도 저장소 Markdown으로 쓴다.
+- **스킬 위치**: `infra-design` · `ui-ux-pro-max` · `doc-writing`은 저장소 `.claude/skills/`(로컬 · 클라우드 모두 자동). `xlsx` · `pptx` · `pdf` · `docx`는 로컬이면 `.claude/settings.json`의 `document-skills` 플러그인, 클라우드면 계정의 `anthropic-skills:*`.
 
 ## 앱(GUI) 원칙
 

@@ -11,6 +11,7 @@
 - **[worktool.zip](worktool.zip)** — WorkTool 새 버전(WPF)을 바로 실행하는 묶음. 압축을 풀고 `Start-WorkTool.cmd`를 더블클릭 (개인 PC용, 아래 「업무 PC로 가져가기」 참고)
 - **[apps/WorkTool/](apps/WorkTool/)** — 업무 통합 GUI 앱 (메모 · 근태 · 일정·알람, 트레이 상주)
   - [design/](apps/WorkTool/design/) — 새 화면 시안 (WPF 전환 기준)
+    - [활성 작업 목업](apps/WorkTool/design/README.md#활성-작업-목업) — 프로그램별 창·브라우저 탭 표, 선택 닫기. 폰용 확대본·가짜 데이터·목업 생성 스크립트 포함 (기능 구현 전)
   - [wpf/](apps/WorkTool/wpf/) — 새 버전(WPF) 1단계 뼈대 + 마크다운 보기 + 메모 쓰기 + 문서 탭. 파일 하나 버전은 `apps/WorkTool/dist/WorkTool-WPF.ps1`
 - **[docs/guides/](docs/guides/)** — 읽는 가이드
   - [productivity/](docs/guides/productivity/) — 업무 효율·작업 환경

@@ -1,0 +1,23 @@
+{
+  "isMock": true,
+  "description": "활성 작업 화면 검토용 가짜 데이터. 실제 창이나 브라우저에서 수집한 정보가 아닙니다.",
+  "capturedAt": "2026-10-23T14:30:00+09:00",
+  "groups": [
+    { "id": "chrome", "name": "Google Chrome", "expanded": true },
+    { "id": "edge", "name": "Microsoft Edge", "expanded": true },
+    { "id": "excel", "name": "Microsoft Excel", "expanded": true },
+    { "id": "powerpoint", "name": "Microsoft PowerPoint", "expanded": false }
+  ],
+  "items": [
+    { "id": "chrome-w1-t1", "app": "chrome", "window": 1, "kind": "tab", "title": "PowerShell 설명서", "status": "현재 탭", "checked": false, "canClose": true },
+    { "id": "chrome-w1-t2", "app": "chrome", "window": 1, "kind": "tab", "title": "설치 없이 쓰는 업무 도구", "status": "", "checked": true, "canClose": true },
+    { "id": "chrome-w2-t1", "app": "chrome", "window": 2, "kind": "tab", "title": "PowerShell 설명서", "status": "현재 탭 · 최소화된 창", "checked": true, "canClose": true },
+    { "id": "chrome-w2-t2", "app": "chrome", "window": 2, "kind": "tab", "title": "표 만들기 예제", "status": "최소화된 창", "checked": false, "canClose": true },
+    { "id": "edge-w1-t1", "app": "edge", "window": 1, "kind": "tab", "title": "Windows 도움말", "status": "현재 탭", "checked": false, "canClose": true },
+    { "id": "edge-w1-t2", "app": "edge", "window": 1, "kind": "tab", "title": "회의 준비 체크리스트", "status": "", "checked": true, "canClose": true },
+    { "id": "edge-w2-unavailable", "app": "edge", "window": 2, "kind": "unavailable", "title": "제품 안내 — Microsoft Edge", "status": "탭 확인 불가", "checked": false, "canClose": false },
+    { "id": "excel-w1", "app": "excel", "window": 1, "kind": "window", "title": "월간 점검표.xlsx", "status": "", "checked": true, "canClose": true },
+    { "id": "excel-w2", "app": "excel", "window": 2, "kind": "window", "title": "장비 목록.xlsx", "status": "최소화", "checked": true, "canClose": true },
+    { "id": "powerpoint-w1", "app": "powerpoint", "window": 1, "kind": "window", "title": "주간 공유자료.pptx", "status": "", "checked": false, "canClose": true }
+  ]
+}

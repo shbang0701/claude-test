@@ -8,6 +8,7 @@ $script:defaults = @{
     'ui.opacity'      = 100      # 창 불투명도(%) 60~100
     'ui.fontScale'    = 'm'      # 글자 크기 s · m · l
     'nav.collapsed'   = $false   # 왼쪽 메뉴 접힘
+    'window.closeToTray' = $false   # 창의 X를 누르면 끝내지 않고 트레이로 숨김
     'addons.disabled' = @()      # 메뉴에서 숨긴 애드온 ID
     'legacy.path'     = ''       # 예전 WorkTool data 폴더 (비우면 자동으로 찾음)
 }

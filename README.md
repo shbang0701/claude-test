@@ -8,6 +8,7 @@
 - **[scripts/](scripts/)** — 복사 한 번으로 끝나는 단독 PowerShell 스크립트
   - 아직 없음. 새로 만들 때는 [scripts/README.md](scripts/README.md)
 - **[apps/design.md](apps/design.md)** — 모든 GUI 앱의 공통 디자인 원칙 (Windows 디자인 지침 기반)
+- **[worktool.zip](worktool.zip)** — WorkTool 새 버전(WPF)을 바로 실행하는 묶음. 압축을 풀고 `Start-WorkTool.cmd`를 더블클릭 (개인 PC용, 아래 「업무 PC로 가져가기」 참고)
 - **[apps/WorkTool/](apps/WorkTool/)** — 업무 통합 GUI 앱 (메모 · 근태 · 일정·알람, 트레이 상주)
   - [design/](apps/WorkTool/design/) — 새 화면 시안 (WPF 전환 기준)
   - [wpf/](apps/WorkTool/wpf/) — 새 버전(WPF) 1단계 뼈대 + 마크다운 보기. 파일 하나 버전은 `apps/WorkTool/dist/WorkTool-WPF.ps1`
@@ -28,6 +29,11 @@
 **스크립트·문서(텍스트): 복사해 붙여 넣기 (기본)**
 - 파일을 열고 오른쪽 위 복사 아이콘(Copy raw file) → 업무 PC에서 같은 이름으로 저장
 - WorkTool은 파일 하나로 묶은 `apps/WorkTool/dist/WorkTool.ps1`만 복사하면 됩니다.
+
+**개인 PC: worktool.zip**
+- 받은 `worktool.zip` 우클릭 → 속성 → 「차단 해제」 체크 → 압축 풀기 → `Start-WorkTool.cmd` 더블클릭
+- 차단 해제를 안 하면 인터넷에서 받은 스크립트라 실행 정책(RemoteSigned)에 막힙니다. 실행 파일이 이 경우를 알려 줍니다.
+- 업무 PC에는 쓰지 않습니다. 스크립트가 든 zip은 보안 장비가 가장 민감하게 봅니다 (아래 「쓰지 않는 것」). 업무 PC는 `WorkTool-WPF.ps1`을 복사해 붙여 넣습니다.
 
 **Excel·PPT 양식: 파일 하나씩 다운로드**
 - 파일을 열고 오른쪽 위 다운로드 아이콘(Download raw file)

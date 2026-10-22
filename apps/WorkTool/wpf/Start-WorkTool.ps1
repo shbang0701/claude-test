@@ -10,7 +10,7 @@
 
 .EXAMPLE
     .\Start-WorkTool.ps1
-    새 버전을 띄운다. 창의 X는 트레이로 숨기고, 완전히 끄려면 트레이 아이콘 우클릭 → 종료.
+    새 버전을 띄운다. 창의 X를 누르면 끝난다 (설정에서 트레이로 숨기기를 고를 수 있다).
 #>
 #Requires -Version 7.0
 [CmdletBinding()]

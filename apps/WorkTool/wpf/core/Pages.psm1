@@ -128,6 +128,12 @@ function New-WtThemeCard {
     }
     [void](Add-WtChild $col (New-WtSettingRow '글자 크기' $seg))
 
+    # 닫기 버튼(X)
+    $close = New-WtSegmented @(@('exit', '끝내기'), @('tray', '트레이로 숨기기')) $(if (Get-WtSetting 'window.closeToTray') { 'tray' } else { 'exit' }) 'WtClose' {
+        param($value) Set-WtSetting 'window.closeToTray' ($value -eq 'tray')
+    }
+    [void](Add-WtChild $col (New-WtSettingRow '닫기 버튼 (X)' $close '숨기면 트레이 아이콘 우클릭 → 종료로 끕니다'))
+
     $card.Child = $col
     $card
 }
@@ -254,7 +260,7 @@ function New-WtHelpPage {
     $win = New-WtCard
     $col = New-WtStack Vertical 6
     [void](Add-WtChild $col (New-WtCardHeader '창 · 데이터'))
-    [void](Add-WtChild $col (New-WtText '창의 X는 트레이로 숨깁니다. 완전히 끄려면 트레이 아이콘을 우클릭 → 종료.' 'T.Body'))
+    [void](Add-WtChild $col (New-WtText '창의 X는 앱을 끝냅니다. 설정 → 닫기 버튼에서 트레이로 숨기기를 고르면, 끌 때 트레이 아이콘을 우클릭 → 종료.' 'T.Body'))
     [void](Add-WtChild $col (New-WtText "데이터 위치: $(Get-WtDataRoot)" 'T.Body'))
     $last = Get-WtLastImport
     if ($last) {

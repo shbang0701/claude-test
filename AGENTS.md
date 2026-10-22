@@ -80,7 +80,7 @@
 - 사용자 데이터와 로컬 설정(`data/`, `config.json`)은 커밋하지 않는다.
 - **여러 파일로 된 앱은 복사 한 번으로 가져가도록 파일 하나로 묶은 버전도 둔다.** 원본을 고친 뒤 묶음을 다시 만들어 같은 커밋에 넣는다. 묶음 파일은 직접 고치지 않는다.
   - WorkTool(WinForms): `pwsh apps/WorkTool/build/Build-Bundle.ps1` → `apps/WorkTool/dist/WorkTool.ps1`
-  - WorkTool 새 버전(WPF): `pwsh apps/WorkTool/wpf/tests/Test-Core.ps1`이 모두 통과한 뒤 `pwsh apps/WorkTool/wpf/build/Build-Bundle.ps1` → `apps/WorkTool/dist/WorkTool-WPF.ps1`
+  - WorkTool 새 버전(WPF): `pwsh apps/WorkTool/wpf/tests/Test-Core.ps1`이 모두 통과한 뒤 `pwsh apps/WorkTool/wpf/build/Build-Bundle.ps1` → `apps/WorkTool/dist/WorkTool-WPF.ps1` · 맨 위 `worktool.zip`(개인 PC 실행용)
 
 ## 답변 방식
 

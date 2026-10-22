@@ -10,7 +10,7 @@
 
 .EXAMPLE
     .\Start-WorkTool.ps1
-    새 버전을 띄운다. 창의 X는 트레이로 숨기고, 완전히 끄려면 트레이 아이콘 우클릭 → 종료.
+    새 버전을 띄운다. 창의 X를 누르면 끝난다 (설정에서 트레이로 숨기기를 고를 수 있다).
 #>
 # WorkTool 새 버전(WPF) — 파일 하나로 묶은 버전 (자동 생성)
 # 이 파일은 직접 고치지 않는다. apps/WorkTool/wpf의 원본을 고친 뒤 wpf/build/Build-Bundle.ps1로 다시 만든다.
@@ -197,6 +197,7 @@ $script:defaults = @{
     'ui.opacity'      = 100      # 창 불투명도(%) 60~100
     'ui.fontScale'    = 'm'      # 글자 크기 s · m · l
     'nav.collapsed'   = $false   # 왼쪽 메뉴 접힘
+    'window.closeToTray' = $false   # 창의 X를 누르면 끝내지 않고 트레이로 숨김
     'addons.disabled' = @()      # 메뉴에서 숨긴 애드온 ID
     'legacy.path'     = ''       # 예전 WorkTool data 폴더 (비우면 자동으로 찾음)
 }
@@ -4015,6 +4016,12 @@ function New-WtThemeCard {
     }
     [void](Add-WtChild $col (New-WtSettingRow '글자 크기' $seg))
 
+    # 닫기 버튼(X)
+    $close = New-WtSegmented @(@('exit', '끝내기'), @('tray', '트레이로 숨기기')) $(if (Get-WtSetting 'window.closeToTray') { 'tray' } else { 'exit' }) 'WtClose' {
+        param($value) Set-WtSetting 'window.closeToTray' ($value -eq 'tray')
+    }
+    [void](Add-WtChild $col (New-WtSettingRow '닫기 버튼 (X)' $close '숨기면 트레이 아이콘 우클릭 → 종료로 끕니다'))
+
     $card.Child = $col
     $card
 }
@@ -4141,7 +4148,7 @@ function New-WtHelpPage {
     $win = New-WtCard
     $col = New-WtStack Vertical 6
     [void](Add-WtChild $col (New-WtCardHeader '창 · 데이터'))
-    [void](Add-WtChild $col (New-WtText '창의 X는 트레이로 숨깁니다. 완전히 끄려면 트레이 아이콘을 우클릭 → 종료.' 'T.Body'))
+    [void](Add-WtChild $col (New-WtText '창의 X는 앱을 끝냅니다. 설정 → 닫기 버튼에서 트레이로 숨기기를 고르면, 끌 때 트레이 아이콘을 우클릭 → 종료.' 'T.Body'))
     [void](Add-WtChild $col (New-WtText "데이터 위치: $(Get-WtDataRoot)" 'T.Body'))
     $last = Get-WtLastImport
     if ($last) {
@@ -4248,7 +4255,12 @@ $script:shellXaml = @'
                       WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="메뉴 접기/펼치기 (Ctrl+B)">
                 <TextBlock Text="&#xE700;" Style="{DynamicResource T.Icon}"/>
               </Button>
-              <TextBlock x:Name="BrandText" Text="WorkTool" Margin="6,0,0,0" FontWeight="Bold"
+              <Border x:Name="BrandLogo" DockPanel.Dock="Left" Width="22" Height="22" CornerRadius="5" Margin="6,0,0,0"
+                      Background="{DynamicResource B.Accent}" VerticalAlignment="Center">
+                <TextBlock Text="W" FontFamily="Segoe UI" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource B.OnAccent}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+              </Border>
+              <TextBlock x:Name="BrandText" Text="WorkTool" Margin="8,0,0,0" FontWeight="Bold"
                          FontSize="{DynamicResource F.H2}" VerticalAlignment="Center"/>
             </DockPanel>
             <TextBlock x:Name="TodayText" Style="{DynamicResource T.Sub}" Margin="12,6,0,14"/>
@@ -4275,7 +4287,7 @@ $script:shellXaml = @'
           <Button x:Name="MaxButton" Style="{DynamicResource Btn.Chrome}" WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="최대화">
             <TextBlock x:Name="MaxGlyph" Text="&#xE922;" Style="{DynamicResource T.Icon}" FontSize="10"/>
           </Button>
-          <Button x:Name="CloseButton" Style="{DynamicResource Btn.Close}" WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="닫기 (트레이에서 계속 실행)">
+          <Button x:Name="CloseButton" Style="{DynamicResource Btn.Close}" WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="닫기">
             <TextBlock Text="&#xE8BB;" Style="{DynamicResource T.Icon}" FontSize="10"/>
           </Button>
         </StackPanel>
@@ -4376,6 +4388,7 @@ function Update-WtCollapsed {
     $script:ui.NavColumn.Width = [System.Windows.GridLength]::new($(if ($c) { 68 } else { 232 }))
     $vis = if ($c) { 'Collapsed' } else { 'Visible' }
     $script:ui.BrandText.Visibility = $vis
+    $script:ui.BrandLogo.Visibility = $vis
     $script:ui.TodayText.Visibility = $vis
     foreach ($n in $script:navButtons.Values) { $n.Label.Visibility = $vis }
     $script:ui.FooterPanel.Orientation = if ($c) { 'Vertical' } else { 'Horizontal' }
@@ -4456,38 +4469,70 @@ function Switch-WtFullScreen {
 
 # ---- 트레이 · 종료 ----------------------------------------------------------------------------
 
-# 앱 아이콘: 파일 없이 강조색 둥근 사각형에 W를 그린다
-function New-WtAppIcon {
+# 앱 아이콘 그림 하나(PNG): 강조색 둥근 사각형에 흰 W. 파일 없이 그린다
+function New-WtAppIconPng([int]$Size, [string]$Hex) {
+    $dv = [System.Windows.Media.DrawingVisual]::new()
+    $dc = $dv.RenderOpen()
+    $bg = [System.Windows.Media.SolidColorBrush]::new([System.Windows.Media.ColorConverter]::ConvertFromString($Hex))
+    $r = [Math]::Max(2, $Size * 0.22)
+    $dc.DrawRoundedRectangle($bg, $null, [System.Windows.Rect]::new(0, 0, $Size, $Size), $r, $r)
+    $tf = [System.Windows.Media.Typeface]::new([System.Windows.Media.FontFamily]::new('Segoe UI'), [System.Windows.FontStyles]::Normal,
+        [System.Windows.FontWeights]::Bold, [System.Windows.FontStretches]::Normal)
+    $ft = [System.Windows.Media.FormattedText]::new('W', [System.Globalization.CultureInfo]::InvariantCulture,
+        [System.Windows.FlowDirection]::LeftToRight, $tf, $Size * 0.62, [System.Windows.Media.Brushes]::White, 1.0)
+    $geo = $ft.BuildGeometry([System.Windows.Point]::new(0, 0))
+    $b = $geo.Bounds
+    # 글자 모양(잉크)의 가운데를 그림 가운데에 맞춘다. 작은 크기에서 흐리지 않게 정수 위치로
+    $dc.PushTransform([System.Windows.Media.TranslateTransform]::new([Math]::Round(($Size - $b.Width) / 2 - $b.X), [Math]::Round(($Size - $b.Height) / 2 - $b.Y)))
+    $dc.DrawGeometry([System.Windows.Media.Brushes]::White, $null, $geo)
+    $dc.Pop()
+    $dc.Close()
+    $rtb = [System.Windows.Media.Imaging.RenderTargetBitmap]::new($Size, $Size, 96, 96, [System.Windows.Media.PixelFormats]::Pbgra32)
+    $rtb.Render($dv)
+    $enc = [System.Windows.Media.Imaging.PngBitmapEncoder]::new()
+    $enc.Frames.Add([System.Windows.Media.Imaging.BitmapFrame]::Create($rtb))
+    $ms = [System.IO.MemoryStream]::new()
+    $enc.Save($ms)
+    , $ms.ToArray()
+}
+
+# 앱 아이콘(.ico 내용): 크기별 그림을 하나로 묶는다. 트레이(16~24) · 제목 줄 · 작업 표시줄(24~48) · 큰 아이콘(256)에서
+# Windows가 화면 배율에 맞는 크기를 고르므로 늘리거나 줄여서 흐려지지 않는다.
+function New-WtAppIconBytes {
     $hex = (Get-WtThemeColors ([string](Get-WtSetting 'theme.color'))).Accent
-    $size = 32
-    $bmp = [System.Drawing.Bitmap]::new($size, $size)
-    $g = [System.Drawing.Graphics]::FromImage($bmp)
-    $g.SmoothingMode = 'AntiAlias'
-    $g.TextRenderingHint = 'AntiAliasGridFit'
-    $path = [System.Drawing.Drawing2D.GraphicsPath]::new()
-    $d = 12
-    $path.AddArc(0, 0, $d, $d, 180, 90)
-    $path.AddArc($size - $d - 1, 0, $d, $d, 270, 90)
-    $path.AddArc($size - $d - 1, $size - $d - 1, $d, $d, 0, 90)
-    $path.AddArc(0, $size - $d - 1, $d, $d, 90, 90)
-    $path.CloseFigure()
-    $brush = [System.Drawing.SolidBrush]::new([System.Drawing.ColorTranslator]::FromHtml($hex))
-    $g.FillPath($brush, $path)
-    $font = [System.Drawing.Font]::new('Segoe UI', 20, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
-    $format = [System.Drawing.StringFormat]::new()
-    $format.Alignment = 'Center'
-    $format.LineAlignment = 'Center'
-    $g.DrawString('W', $font, [System.Drawing.Brushes]::White, [System.Drawing.RectangleF]::new(0, 1, $size, $size), $format)
-    $g.Dispose()
-    [System.Drawing.Icon]::FromHandle($bmp.GetHicon())
+    $sizes = @(16, 20, 24, 32, 40, 48, 64, 256)
+    $pngs = @(foreach ($s in $sizes) { , (New-WtAppIconPng $s $hex) })
+    $ms = [System.IO.MemoryStream]::new()
+    $w = [System.IO.BinaryWriter]::new($ms)
+    $w.Write([uint16]0); $w.Write([uint16]1); $w.Write([uint16]$sizes.Count)   # ICO 머리: 예약 · 종류(1=아이콘) · 개수
+    $offset = 6 + 16 * $sizes.Count
+    for ($i = 0; $i -lt $sizes.Count; $i++) {
+        $s = $sizes[$i]
+        $w.Write([byte]($s % 256)); $w.Write([byte]($s % 256))   # 너비 · 높이 (256은 0)
+        $w.Write([byte]0); $w.Write([byte]0)                     # 색 수 · 예약
+        $w.Write([uint16]1); $w.Write([uint16]32)                # 면 · 색 깊이
+        $w.Write([uint32]$pngs[$i].Length); $w.Write([uint32]$offset)
+        $offset += $pngs[$i].Length
+    }
+    foreach ($p in $pngs) { $w.Write([byte[]]$p) }
+    $w.Flush()
+    , $ms.ToArray()
 }
 
 # 창 · 트레이 아이콘을 지금 테마 색으로 (다시) 만든다
 function Update-WtAppIcon {
+    $bytes = New-WtAppIconBytes
     $old = $script:icon
-    $script:icon = New-WtAppIcon
-    $script:window.Icon = [System.Windows.Interop.Imaging]::CreateBitmapSourceFromHIcon($script:icon.Handle,
-        [System.Windows.Int32Rect]::Empty, [System.Windows.Media.Imaging.BitmapSizeOptions]::FromEmptyOptions())
+    $script:icon = [System.Drawing.Icon]::new([System.IO.MemoryStream]::new($bytes), [System.Windows.Forms.SystemInformation]::SmallIconSize)
+    # 아이콘 해석기로 읽은 그림을 주면 WPF가 그 안에서 제목 줄 · 작업 표시줄에 맞는 크기를 고른다
+    $dec = [System.Windows.Media.Imaging.IconBitmapDecoder]::new([System.IO.MemoryStream]::new($bytes),
+        [System.Windows.Media.Imaging.BitmapCreateOptions]::None, [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad)
+    $script:window.Icon = $dec.Frames[0]
+    # 작업 표시줄 단추는 pwsh 아이콘으로 묶인다 (창마다 아이콘을 따로 주려면 P/Invoke가 필요해서 쓰지 않는다).
+    # 대신 그 단추 위에 작은 W 배지를 얹고, 마우스를 올리면 WorkTool이라고 보이게 한다
+    if (-not $script:window.TaskbarItemInfo) { $script:window.TaskbarItemInfo = [System.Windows.Shell.TaskbarItemInfo]::new() }
+    $script:window.TaskbarItemInfo.Description = 'WorkTool'
+    $script:window.TaskbarItemInfo.Overlay = ($dec.Frames | Where-Object { $_.PixelWidth -eq 16 } | Select-Object -First 1)
     if ($script:notify) { $script:notify.Icon = $script:icon }
     if ($old) { $old.Dispose() }
 }
@@ -4498,12 +4543,21 @@ function Show-WtMainWindow {
     [void]$script:window.Activate()
 }
 
-function Exit-WtApp {
+# 트레이 아이콘 · 아이콘을 치우고 메시지 돌리기를 멈춘다 (창을 닫는 중에도 부를 수 있다)
+function Stop-WtApp {
     $script:exiting = $true
     try { $script:notify.Visible = $false; $script:notify.Dispose() } catch { }
     try { if ($script:icon) { $script:icon.Dispose() } } catch { }
-    try { $script:window.Close() } catch { }
     if ($script:frame) { $script:frame.Continue = $false }
+}
+
+function Exit-WtApp {
+    Stop-WtApp
+    try { $script:window.Close() } catch { }
+}
+
+function Update-WtCloseTip {
+    $script:ui.CloseButton.ToolTip = if ([bool](Get-WtSetting 'window.closeToTray')) { '닫기 (트레이에서 계속 실행)' } else { '닫기' }
 }
 
 function New-WtTrayIcon([System.Drawing.Icon]$Icon) {
@@ -4593,10 +4647,11 @@ function Start-WtApp {
             Update-WtMaxGlyph
         })
 
-    # X(닫기)는 트레이로 숨긴다. 완전히 끄는 건 트레이 아이콘 우클릭 → 종료
+    # X(닫기)는 앱을 끝낸다. 설정에서 '트레이로 숨기기'를 켜면 트레이로 숨기고, 끄는 건 트레이 아이콘 우클릭 → 종료
     $w.Add_Closing({
             param($s, $e)
             if ($script:exiting) { return }
+            if (-not [bool](Get-WtSetting 'window.closeToTray')) { Stop-WtApp; return }
             $e.Cancel = $true
             $s.Hide()
             if (-not $script:trayTipShown) {
@@ -4643,6 +4698,7 @@ function Start-WtApp {
             'ui.fontScale' { Update-WtThemeDictionary $script:themeDict }
             'ui.opacity' { Set-WtOpacity }
             'nav.collapsed' { Update-WtCollapsed }
+            'window.closeToTray' { Update-WtCloseTip }
             'addons.disabled' { $script:views = @{}; Update-WtNav }
         }
     }
@@ -4651,12 +4707,16 @@ function Start-WtApp {
     try { [void](Import-WtLegacyData) } catch { Show-WtError $_ '예전 데이터 가져오기' }
 
     Update-WtNav
+    Update-WtCloseTip
     Set-WtOpacity
     $script:notify = New-WtTrayIcon $script:icon
 
     # 창이 닫힐 때까지 메시지를 돌린다. Dispatcher를 끄지 않으므로 같은 창에서 다시 실행해도 된다.
     $script:frame = [System.Windows.Threading.DispatcherFrame]::new()
     $w.Show()
+    # 실행 파일이 콘솔을 최소화해서 띄우면(start /min) 첫 창도 최소화돼서 뜬다 → 원래 크기로 앞에 띄운다
+    if ($w.WindowState -eq 'Minimized') { $w.WindowState = 'Normal' }
+    [void]$w.Activate()
     $first = @(Get-WtAddon)[0]
     if ($first) { Select-WtPage $first.Id } else { Select-WtPage '_settings' }
     if (-not $script:exiting) { [System.Windows.Threading.Dispatcher]::PushFrame($script:frame) }

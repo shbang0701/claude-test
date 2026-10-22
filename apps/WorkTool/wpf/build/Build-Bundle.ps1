@@ -7,6 +7,7 @@
       모듈 코드는 문자열로 실행하지 않고 스크립트 블록 안에 그대로 들어간다 (Invoke-Expression 없음).
     - core 순서는 Start-WorkTool.ps1의 $coreModules를 따르고, addons는 Start-WorkTool.ps1과 같은 순서(전체 경로 순)로 넣는다.
     - 결과는 원본이 같으면 항상 같다 (날짜 · 커밋을 넣지 않음). 다시 만들어서 차이가 없으면 최신이다.
+    - 저장소 맨 위에 worktool.zip(묶음 파일 + 더블클릭 실행 파일 Start-WorkTool.cmd)도 같이 만든다.
 
 .EXAMPLE
     pwsh ./apps/WorkTool/wpf/build/Build-Bundle.ps1
@@ -65,3 +66,31 @@ $text = $text.Substring(0, $end) + "`n" + $note + $text.Substring($end)
 New-Item -ItemType Directory -Path (Split-Path $outPath) -Force | Out-Null
 [System.IO.File]::WriteAllText($outPath, $text + "`n", [System.Text.UTF8Encoding]::new($false))
 Write-Host "만듦: $outPath (core $($core.Count)개 · addons $($blocks.Count - $core.Count)개)"
+
+# 저장소 맨 위 worktool.zip: 묶음 파일 + 더블클릭 실행 파일. 날짜를 고정해서 원본이 같으면 zip도 같다
+$launcher = @(
+    '@echo off'
+    'chcp 65001 >nul'
+    'rem WorkTool 실행: PowerShell 7(pwsh)로 WorkTool-WPF.ps1을 띄운다. 콘솔 창은 최소화해 두고, 앱을 끄면 같이 닫힌다.'
+    'where pwsh >nul 2>nul || (echo PowerShell 7(pwsh^)이 필요합니다. & pause & exit /b 1)'
+    'rem 인터넷에서 받은 zip을 그대로 풀면 스크립트가 막힌다 (실행 정책). 그때는 zip 속성에서 차단 해제 후 다시 푼다'
+    'pwsh -NoProfile -Command "if (Get-Item -LiteralPath ''%~dp0WorkTool-WPF.ps1'' -Stream Zone.Identifier -ErrorAction SilentlyContinue) { exit 9 }"'
+    'if errorlevel 9 (echo 인터넷에서 받은 파일이라 막혀 있습니다. 받은 worktool.zip 우클릭 - 속성 - 차단 해제에 체크하고 다시 압축을 푸세요. & pause & exit /b 1)'
+    'rem start /min은 쓰지 않는다: 앱 창까지 최소화된 채 떠서, 복원하면 Windows 기본 크기가 된다'
+    'start "WorkTool" pwsh -NoProfile -STA -WindowStyle Minimized -File "%~dp0WorkTool-WPF.ps1"'
+) -join "`r`n"
+$zipPath = Join-Path (Split-Path (Split-Path (Split-Path $src -Parent) -Parent) -Parent) 'worktool.zip'
+$stamp = [DateTimeOffset]::new(2026, 1, 1, 0, 0, 0, [TimeSpan]::Zero)
+$fs = [System.IO.File]::Create($zipPath)
+try {
+    $zip = [System.IO.Compression.ZipArchive]::new($fs, [System.IO.Compression.ZipArchiveMode]::Create)
+    foreach ($item in @(@('WorkTool-WPF.ps1', [System.IO.File]::ReadAllBytes($outPath)), @('Start-WorkTool.cmd', [System.Text.UTF8Encoding]::new($false).GetBytes($launcher + "`r`n")))) {
+        $entry = $zip.CreateEntry($item[0], [System.IO.Compression.CompressionLevel]::Optimal)
+        $entry.LastWriteTime = $stamp
+        $es = $entry.Open()
+        $es.Write($item[1], 0, $item[1].Length)
+        $es.Dispose()
+    }
+    $zip.Dispose()
+} finally { $fs.Dispose() }
+Write-Host "만듦: $zipPath"

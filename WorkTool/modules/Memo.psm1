@@ -100,13 +100,10 @@ function Save-CurrentMemo {
         $script:dirty = $false
         return $true
     }
-    # 제목이 비어 있으면 본문 첫 줄을 제목으로 쓴다
-    if (-not $title) {
-        $title = ($body.Trim() -split "`r?`n")[0]
-        if ($title.Length -gt 30) { $title = $title.Substring(0, 30) }
-    }
-
     $now = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+    # 제목이 비어 있으면 저장 시각을 제목으로 쓴다
+    if (-not $title) { $title = $now }
+
     $id = if ($script:currentId) { $script:currentId } else { New-RecordId }
     $old = $script:memos | Where-Object Id -eq $id | Select-Object -First 1
     $memo = [pscustomobject]@{
@@ -126,6 +123,11 @@ function Save-CurrentMemo {
     }
     $script:memos = $all
     $script:currentId = $id
+    if ($script:titleBox.Text.Trim() -ne $title) {
+        $script:busy = $true
+        $script:titleBox.Text = $title
+        $script:busy = $false
+    }
     $script:dirty = $false
     Set-MemoStatus "저장됨 $((Get-Date).ToString('HH:mm:ss'))"
     Update-MemoList
@@ -227,7 +229,7 @@ function New-MemoTab {
     $script:titleBox = [System.Windows.Forms.TextBox]::new()
     $script:titleBox.Dock = 'Fill'
     $script:titleBox.Font = [System.Drawing.Font]::new('Malgun Gothic', 11, [System.Drawing.FontStyle]::Bold)
-    $script:titleBox.PlaceholderText = '제목 (비우면 본문 첫 줄)'
+    $script:titleBox.PlaceholderText = '제목 (비우면 저장 시각)'
     $script:titleBox.Margin = [System.Windows.Forms.Padding]::new(0, 0, 0, 6)
 
     $script:bodyBox = [System.Windows.Forms.TextBox]::new()

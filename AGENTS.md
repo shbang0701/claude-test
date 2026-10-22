@@ -3,6 +3,19 @@
 회사 업무 PC에서 쓸 스크립트와 운영 문서를 모아 두는 개인 작업 공간이다.
 사용자는 LLM과 **휴대폰으로** 대화하고, 코드는 업무 PC 브라우저에서 GitHub 화면을 열어 **복사해 붙여 넣어** 쓴다.
 
+## 저장소 구조
+
+- `scripts/<분류>/` — 단독 스크립트. 분류는 `office/` · `files/` · `system/` · `network/` · `text/`. 새 스크립트는 `scripts/_template.ps1`에서 시작한다.
+- `apps/<이름>/` — 여러 파일로 된 앱. 지금은 `apps/WorkTool/`(WinForms GUI)뿐이다.
+- `docs/guides/<분류>/` — 읽는 문서(.md).
+  - `productivity/`: 업무 효율·작업 환경
+  - `ops/`: 운영 노하우·장애 대응
+- `docs/templates/<이름>/` — 받아서 쓰는 Office 양식.
+  - `infra-kit/`: 장비 도면·PPT·아이콘. `_build/`로 생성한다.
+  - `rhel-config/`: RHEL 구성표
+- 폴더·파일 이름은 영문 소문자와 하이픈으로 짓는다. 스크립트는 `동사-명사.ps1`. 양식 세트 안의 기존 한글 파일 이름은 그대로 둔다.
+- 파일을 추가하거나 옮기면 루트 `README.md`의 구성 목록도 같이 고친다.
+
 ## 업무 PC 환경
 
 - Windows + **PowerShell 7.6.6** (`pwsh`). Windows PowerShell 5.1 기준으로 쓰지 않는다.
@@ -16,7 +29,7 @@
 
 1. **기본 기능만 쓴다.** PowerShell 내장 명령 + .NET + Office COM만 쓴다. PSGallery 모듈, NuGet, Python 패키지, exe를 내려받지 않는다.
 2. **스크립트 하나 = 파일 하나.** 다른 파일을 불러오지 않고, 한 번 복사로 끝나게 만든다. 여러 파일로 된 앱은 예외로 둔다.
-3. **맨 위 구성:** 주석 도움말(`.SYNOPSIS`, `.EXAMPLE`)을 두고, 그 아래 **설정 블록**에 경로, 시트 이름, 열 위치를 모은다. 사용자가 고칠 곳은 설정 블록뿐이어야 한다. LLM은 실제 문서를 볼 수 없으므로, 문서 구조는 설정 값으로 빼 둔다.
+3. **맨 위 구성:** 주석 도움말(`.SYNOPSIS`, `.EXAMPLE`)을 두고, 그 아래 **설정 블록**에 경로, 시트 이름, 열 위치를 모은다. 사용자가 고칠 곳은 설정 블록뿐이어야 한다. LLM은 실제 문서를 볼 수 없으므로, 문서 구조는 설정 값으로 빼 둔다. `#Requires`는 도움말 블록 아래에 둔다. 위에 두면 `Get-Help`가 도움말을 못 읽는다. 새 스크립트는 `scripts/_template.ps1`을 복사해서 시작한다.
 4. **해명하기 어려운 동작은 쓰지 않는다.**
    - 내려받아 바로 실행(`iwr | iex`), `Invoke-Expression`, `-EncodedCommand`, Base64로 감춘 코드
    - 실행 정책 변경이나 우회(`-ExecutionPolicy Bypass`), 백신·방화벽·UAC 설정 변경, 관리자 권한이 필요한 작업
@@ -38,7 +51,7 @@
   - 제품명과 일반 용어(RHEL, AD, Exchange, VMware, NAS, DMZ 등)는 회사 정보가 아니므로 그대로 쓴다.
 - **업무 PC에서 이 저장소로는 아무것도 올리지 않는다.** 흐름은 GitHub → PC 한 방향뿐이다. PC는 로그인하지 않으므로 push도 원래 되지 않는다.
 - **업무 PC로 가져가는 방법:** `git clone`/`git pull`, ZIP 다운로드, 파일 하나 복사 중 하나다. 그래서 경로는 항상 `$PSScriptRoot` 기준 상대 경로로 쓰고, 설치 위치를 가정하지 않는다.
-- `_build/`로 만드는 결과 파일(xlsx, pptx, pdf, 아이콘)은 직접 고치지 않고 소스를 고친 뒤 다시 만든다. `_build/`의 Python은 클라우드에서만 돌리고, 업무 PC에서는 쓰지 않는다.
+- `docs/templates/infra-kit/`의 결과 파일(xlsx, pptx, pdf, 아이콘)은 직접 고치지 않고 `_build/` 소스를 고친 뒤 다시 만든다. `_build/`의 Python은 클라우드에서만 돌리고, 업무 PC에서는 쓰지 않는다.
 
 ## 앱(GUI) 원칙
 

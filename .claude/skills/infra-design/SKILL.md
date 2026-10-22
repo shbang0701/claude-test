@@ -1,9 +1,11 @@
 ---
 name: infra-design
-description: 이 저장소(IT 인프라 문서 템플릿)의 디자인 기준 — 색 팔레트, 맑은 고딕 글꼴 크기, 선·모서리·간격, PPT 슬라이드 레이아웃, Excel 격자 도면 규칙, 아이콘 규칙. PPT 슬라이드·구성도·요소, Excel 장비 도면·양식·부품, 아이콘, PDF 가이드를 새로 만들거나 고칠 때, 또는 색·글꼴·배치·"디자인"·"예쁘게"·"깔끔하게"를 다룰 때 먼저 읽는다.
+description: IT 인프라 문서 세트(docs/templates/infra-kit)의 디자인 기준 — 색 팔레트, 맑은 고딕 글꼴 크기, 선·모서리·간격, PPT 슬라이드 레이아웃, Excel 격자 도면 규칙, 아이콘 규칙. 이 세트의 PPT 슬라이드·구성도·요소, Excel 장비 도면·양식·부품, 아이콘, PDF 가이드를 새로 만들거나 고칠 때, 또는 그 색·글꼴·배치를 다룰 때 먼저 읽는다. 다른 Office 문서를 같은 스타일로 만들 때도 쓴다. WorkTool 앱 화면에는 쓰지 않는다.
 ---
 
 # IT 인프라 문서 디자인 기준
+
+이 문서의 경로는 모두 `docs/templates/infra-kit/` 기준이다.
 
 목표는 **어느 회사 양식에 붙여도, 어느 장비를 그려도 같은 모양**이 나오는 것이다. 새 요소를 만들 때는 아래 기준 안에서만 고르고, 기준에 없는 값(새 색, 새 글꼴, 임의 크기)을 만들지 않는다.
 
@@ -45,7 +47,7 @@ description: 이 저장소(IT 인프라 문서 템플릿)의 디자인 기준 �
 3. 다시 만들고 눈으로 확인한다. 렌더링해서 PNG로 직접 본 뒤에만 "됐다"고 말한다.
 
    ```bash
-   cd _build
+   cd docs/templates/infra-kit/_build
    python3 build_ppt.py        # 또는 build_excel.py / build_icons.py / build_docs.py
    python3 -c "import lo; print(lo.convert('../02_PPT_구성요소/IT인프라_PPT_구성요소_라이브러리.pptx', 'pdf', '/tmp/render'))"
    pdftoppm -png -r 60 -f <쪽> -l <쪽> /tmp/render/*.pdf /tmp/render/p   # 바뀐 쪽만 이미지로 확인

@@ -6,7 +6,7 @@
 ## 저장소 구조
 
 - `scripts/<분류>/` — 단독 스크립트. 분류는 `office/` · `files/` · `system/` · `network/` · `text/`. 새 스크립트는 `scripts/_template.ps1`에서 시작한다.
-- `apps/<이름>/` — 여러 파일로 된 앱. 지금은 `apps/WorkTool/`(WinForms → WPF로 옮기는 중)뿐이다.
+- `apps/<이름>/` — 여러 파일로 된 앱. 지금은 `apps/WorkTool/`뿐이다. WinForms 버전(지금 쓰는 것)은 그 폴더 바로 아래, WPF 새 버전은 `apps/WorkTool/wpf/`에서 만드는 중이다(구조 · 탭 더하는 법은 `apps/WorkTool/wpf/README.md`).
   - `apps/design.md`: 모든 GUI 앱의 공통 디자인 원칙. 구체적인 값은 앱별 디자인 문서(`apps/<이름>/design/README.md`)가 우선한다.
 - `docs/guides/<분류>/` — 읽는 문서(.md).
   - `productivity/`: 업무 효율·작업 환경
@@ -78,7 +78,9 @@
 - **모양은 공통 UI 모듈에서만 정한다.** 색, 글꼴, 크기, 간격, 컨트롤 모양이 해당한다. 기능 모듈에 색 값이나 글꼴 이름을 직접 쓰지 않는다.
 - **저장은 저장 모듈만 거친다.** 기능 모듈은 파일을 직접 읽고 쓰지 않는다.
 - 사용자 데이터와 로컬 설정(`data/`, `config.json`)은 커밋하지 않는다.
-- **여러 파일로 된 앱은 복사 한 번으로 가져가도록 파일 하나로 묶은 버전도 둔다.** WorkTool은 원본을 고친 뒤 `pwsh apps/WorkTool/build/Build-Bundle.ps1`로 `apps/WorkTool/dist/WorkTool.ps1`을 다시 만들어 같은 커밋에 넣는다. 묶음 파일은 직접 고치지 않는다.
+- **여러 파일로 된 앱은 복사 한 번으로 가져가도록 파일 하나로 묶은 버전도 둔다.** 원본을 고친 뒤 묶음을 다시 만들어 같은 커밋에 넣는다. 묶음 파일은 직접 고치지 않는다.
+  - WorkTool(WinForms): `pwsh apps/WorkTool/build/Build-Bundle.ps1` → `apps/WorkTool/dist/WorkTool.ps1`
+  - WorkTool 새 버전(WPF): `pwsh apps/WorkTool/wpf/tests/Test-Core.ps1`이 모두 통과한 뒤 `pwsh apps/WorkTool/wpf/build/Build-Bundle.ps1` → `apps/WorkTool/dist/WorkTool-WPF.ps1`
 
 ## 답변 방식
 

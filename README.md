@@ -12,6 +12,7 @@
 - **[docs/guides/](docs/guides/)** — 읽는 가이드
   - [productivity/](docs/guides/productivity/) — 업무 효율·작업 환경
     - [갤럭시 S26 울트라 앱별 키보드 가이드](docs/guides/productivity/galaxy-s26-ultra-app-keyboard-guide.md)
+    - [PowerShell 7 · Solarized Light 다듬기 가이드](docs/guides/productivity/powershell-solarized-light-guide.md)
   - ops/ — 운영 노하우·장애 대응 (아직 없음)
 - **[docs/templates/](docs/templates/)** — 받아서 쓰는 Office 양식
   - [infra-kit/](docs/templates/infra-kit/) — IT 인프라 문서 세트: 장비 도면(Excel), PPT 구성 요소, 아이콘 60종
@@ -19,20 +20,19 @@
 
 ## 업무 PC로 가져가기
 
-**git이 있으면** (`git --version`으로 확인)
+흔적이 남지 않는 방법은 없습니다. 복붙해도 실행한 코드는 PowerShell 기록에 남을 수 있습니다.
+그래서 **가져오는 방법보다 코드 내용이 설명되는지가 중요**하고, 그중에서 보안 장비가 덜 민감하게 보는 방법을 씁니다.
 
-```powershell
-git clone https://github.com/shbang0701/claude-test.git
-```
+**스크립트·문서(텍스트): 복사해 붙여 넣기 (기본)**
+- 파일을 열고 오른쪽 위 복사 아이콘(Copy raw file) → 업무 PC에서 같은 이름으로 저장
+- WorkTool은 파일 하나로 묶은 `apps/WorkTool/dist/WorkTool.ps1`만 복사하면 됩니다.
 
-그다음부터는 그 폴더에서 `git pull`만 하면 최신으로 바뀝니다.
+**Excel·PPT 양식: 파일 하나씩 다운로드**
+- 파일을 열고 오른쪽 위 다운로드 아이콘(Download raw file)
 
-**git이 없으면** 저장소 첫 화면의 초록색 **Code** 버튼 → **Download ZIP**을 받습니다.
-ZIP에서 푼 파일에는 "인터넷에서 받은 파일" 표시가 붙어, 회사 실행 정책에 따라 `.ps1` 실행이 막힐 수 있습니다. 그때는 아래처럼 복사해 붙여 넣으세요.
-
-**파일 하나만 필요하면**
-- 스크립트: 파일을 열고 오른쪽 위 복사 아이콘(Copy raw file) → 업무 PC에서 같은 이름으로 저장
-- Excel·PPT: 파일을 열고 오른쪽 위 다운로드 아이콘(Download raw file)
+**쓰지 않는 것**
+- ZIP 통째 다운로드: 스크립트가 든 압축 파일은 보안 장비가 가장 민감하게 보고, 풀어도 실행이 막힐 수 있습니다.
+- git 새로 설치: 승인되지 않은 프로그램 설치가 됩니다. 회사에서 이미 git을 업무에 쓰고 있을 때만 `git clone` / `git pull`을 씁니다.
 
 ## 이름 규칙
 

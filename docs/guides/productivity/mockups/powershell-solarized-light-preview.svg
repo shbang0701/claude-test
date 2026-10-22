@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700" viewBox="0 0 1000 700">
+<rect width="1000" height="700" fill="#F4F1EA"/>
+<text x="24" y="40" font-family="'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif" font-size="20" font-weight="700" fill="#2B3A40">PowerShell 7 · Solarized Light — 원본 vs Refined</text>
+<text x="24" y="64" font-family="'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif" font-size="13" fill="#5E6E73">배경(#FDF6E3)은 그대로, 본문은 진한 블루그레이, 포인트 컬러는 절제 · 가이드 3-1·3-2·4장 적용 기준 목업</text>
+<rect x="24" y="84" width="464" height="390" rx="8" fill="#FDF6E3" stroke="#D9D2BF"/>
+<path d="M24 92 a8 8 0 0 1 8 -8 h448 a8 8 0 0 1 8 8 v24 h-464 z" fill="#E9E2CF"/>
+<rect x="34" y="90" width="130" height="26" rx="5" fill="#FDF6E3"/>
+<text x="46" y="108" font-family="'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif" font-size="12" fill="#344B55">&gt;_  PowerShell</text>
+<text x="40.0" y="144" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="132.6" lengthAdjust="spacingAndGlyphs" fill="#657B83">PS C:\Users\Dev&gt; </text>
+<text x="172.6" y="144" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="101.4" lengthAdjust="spacingAndGlyphs" fill="#657B83">Get-ChildItem</text>
+<text x="274.0" y="144" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="7.8" lengthAdjust="spacingAndGlyphs" fill="#657B83"> </text>
+<text x="281.8" y="144" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="39.0" lengthAdjust="spacingAndGlyphs" fill="#073642">-Path</text>
+<text x="320.8" y="144" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="85.8" lengthAdjust="spacingAndGlyphs" fill="#657B83"> .\Projects</text>
+<text x="40.0" y="182" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="280.8" lengthAdjust="spacingAndGlyphs" fill="#586E75" font-weight="700">    Directory: C:\Users\Dev\Projects</text>
+<text x="40.0" y="220" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="280.8" lengthAdjust="spacingAndGlyphs" fill="#586E75" font-weight="700">Mode   LastWriteTime     Length Name</text>
+<text x="40.0" y="239" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="280.8" lengthAdjust="spacingAndGlyphs" fill="#586E75" font-weight="700">----   -------------     ------ ----</text>
+<text x="40.0" y="258" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="241.8" lengthAdjust="spacingAndGlyphs" fill="#657B83">d----  2026-10-22 09:12        </text>
+<rect x="281.8" y="245" width="23.4" height="17" fill="#268BD2"/>
+<text x="281.8" y="258" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="23.4" lengthAdjust="spacingAndGlyphs" fill="#657B83" font-weight="700">src</text>
+<text x="40.0" y="277" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="335.4" lengthAdjust="spacingAndGlyphs" fill="#657B83">-a---  2026-10-22 09:10   1024 package.json</text>
+<text x="40.0" y="296" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="312.0" lengthAdjust="spacingAndGlyphs" fill="#657B83">-a---  2026-10-22 09:08   2048 README.md</text>
+<text x="40.0" y="334" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="132.6" lengthAdjust="spacingAndGlyphs" fill="#657B83">PS C:\Users\Dev&gt; </text>
+<text x="172.6" y="334" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="23.4" lengthAdjust="spacingAndGlyphs" fill="#657B83">git</text>
+<text x="196.0" y="334" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="54.6" lengthAdjust="spacingAndGlyphs" fill="#657B83"> status</text>
+<text x="40.0" y="353" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="109.2" lengthAdjust="spacingAndGlyphs" fill="#657B83">On branch main</text>
+<text x="40.0" y="372" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="234.0" lengthAdjust="spacingAndGlyphs" fill="#657B83">Changes not staged for commit:</text>
+<text x="40.0" y="391" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="226.2" lengthAdjust="spacingAndGlyphs" fill="#DC322F">        modified:   README.md</text>
+<text x="40.0" y="429" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="132.6" lengthAdjust="spacingAndGlyphs" fill="#657B83">PS C:\Users\Dev&gt; </text>
+<text x="172.6" y="429" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="23.4" lengthAdjust="spacingAndGlyphs" fill="#657B83">git</text>
+<text x="196.0" y="429" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="23.4" lengthAdjust="spacingAndGlyphs" fill="#657B83"> co</text>
+<rect x="219.4" y="416" width="2" height="16" fill="#657B83"/>
+<text x="219.4" y="429" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="109.2" lengthAdjust="spacingAndGlyphs" fill="#444444">mmit -m "docs"</text>
+<text x="24" y="498" font-family="'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif" font-size="13" fill="#5E6E73">원본 Solarized Light + PowerShell 기본 색 (근사치)</text>
+<rect x="512" y="84" width="464" height="390" rx="8" fill="#FDF6E3" stroke="#D9D2BF"/>
+<path d="M512 92 a8 8 0 0 1 8 -8 h448 a8 8 0 0 1 8 8 v24 h-464 z" fill="#E9E2CF"/>
+<rect x="522" y="90" width="130" height="26" rx="5" fill="#FDF6E3"/>
+<text x="534" y="108" font-family="'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif" font-size="12" fill="#344B55">&gt;_  PowerShell</text>
+<text x="528.0" y="144" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="132.6" lengthAdjust="spacingAndGlyphs" fill="#344B55">PS C:\Users\Dev&gt; </text>
+<text x="660.6" y="144" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="101.4" lengthAdjust="spacingAndGlyphs" fill="#236A9B">Get-ChildItem</text>
+<text x="762.0" y="144" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="7.8" lengthAdjust="spacingAndGlyphs" fill="#344B55"> </text>
+<text x="769.8" y="144" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="39.0" lengthAdjust="spacingAndGlyphs" fill="#6B527C">-Path</text>
+<text x="808.8" y="144" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="85.8" lengthAdjust="spacingAndGlyphs" fill="#344B55"> .\Projects</text>
+<text x="528.0" y="182" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="280.8" lengthAdjust="spacingAndGlyphs" fill="#376D59" font-weight="700">    Directory: C:\Users\Dev\Projects</text>
+<text x="528.0" y="220" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="280.8" lengthAdjust="spacingAndGlyphs" fill="#344B55" font-weight="700">Mode   LastWriteTime     Length Name</text>
+<text x="528.0" y="239" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="280.8" lengthAdjust="spacingAndGlyphs" fill="#344B55" font-weight="700">----   -------------     ------ ----</text>
+<text x="528.0" y="258" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="241.8" lengthAdjust="spacingAndGlyphs" fill="#344B55">d----  2026-10-22 09:12        </text>
+<text x="769.8" y="258" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="23.4" lengthAdjust="spacingAndGlyphs" fill="#236A9B" font-weight="700">src</text>
+<text x="528.0" y="277" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="335.4" lengthAdjust="spacingAndGlyphs" fill="#344B55">-a---  2026-10-22 09:10   1024 package.json</text>
+<text x="528.0" y="296" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="312.0" lengthAdjust="spacingAndGlyphs" fill="#344B55">-a---  2026-10-22 09:08   2048 README.md</text>
+<text x="528.0" y="334" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="132.6" lengthAdjust="spacingAndGlyphs" fill="#344B55">PS C:\Users\Dev&gt; </text>
+<text x="660.6" y="334" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="23.4" lengthAdjust="spacingAndGlyphs" fill="#236A9B">git</text>
+<text x="684.0" y="334" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="54.6" lengthAdjust="spacingAndGlyphs" fill="#344B55"> status</text>
+<text x="528.0" y="353" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="109.2" lengthAdjust="spacingAndGlyphs" fill="#344B55">On branch main</text>
+<text x="528.0" y="372" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="234.0" lengthAdjust="spacingAndGlyphs" fill="#344B55">Changes not staged for commit:</text>
+<text x="528.0" y="391" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="226.2" lengthAdjust="spacingAndGlyphs" fill="#B5453D">        modified:   README.md</text>
+<text x="528.0" y="429" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="132.6" lengthAdjust="spacingAndGlyphs" fill="#344B55">PS C:\Users\Dev&gt; </text>
+<text x="660.6" y="429" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="23.4" lengthAdjust="spacingAndGlyphs" fill="#236A9B">git</text>
+<text x="684.0" y="429" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="23.4" lengthAdjust="spacingAndGlyphs" fill="#344B55"> co</text>
+<rect x="707.4" y="416" width="2" height="16" fill="#236A9B"/>
+<text x="707.4" y="429" xml:space="preserve" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="13" textLength="109.2" lengthAdjust="spacingAndGlyphs" fill="#7B8790">mmit -m "docs"</text>
+<text x="512" y="498" font-family="'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif" font-size="13" fill="#5E6E73">Refined — 본문 8.5:1, 포인트 색 4.7:1 이상</text>
+<text x="24" y="540" font-family="'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif" font-size="14" font-weight="700" fill="#2B3A40">팔레트 · 배경 대비</text>
+<rect x="24.0" y="554" width="108.5" height="110" rx="6" fill="#FDF6E3" stroke="#D9D2BF"/>
+<rect x="34.0" y="564" width="88.5" height="34" rx="4" fill="#344B55"/>
+<text x="34.0" y="618" font-family="'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif" font-size="13" font-weight="700" fill="#344B55">기본 글자</text>
+<text x="34.0" y="637" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="12" fill="#344B55">#344B55</text>
+<text x="34.0" y="655" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="12" fill="#5E6E73">8.5 : 1</text>
+<rect x="144.5" y="554" width="108.5" height="110" rx="6" fill="#FDF6E3" stroke="#D9D2BF"/>
+<rect x="154.5" y="564" width="88.5" height="34" rx="4" fill="#236A9B"/>
+<text x="154.5" y="618" font-family="'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif" font-size="13" font-weight="700" fill="#236A9B">명령어</text>
+<text x="154.5" y="637" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="12" fill="#344B55">#236A9B</text>
+<text x="154.5" y="655" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="12" fill="#5E6E73">5.4 : 1</text>
+<rect x="265.0" y="554" width="108.5" height="110" rx="6" fill="#FDF6E3" stroke="#D9D2BF"/>
+<rect x="275.0" y="564" width="88.5" height="34" rx="4" fill="#99621C"/>
+<text x="275.0" y="618" font-family="'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif" font-size="13" font-weight="700" fill="#99621C">문자열</text>
+<text x="275.0" y="637" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="12" fill="#344B55">#99621C</text>
+<text x="275.0" y="655" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="12" fill="#5E6E73">4.7 : 1</text>
+<rect x="385.5" y="554" width="108.5" height="110" rx="6" fill="#FDF6E3" stroke="#D9D2BF"/>
+<rect x="395.5" y="564" width="88.5" height="34" rx="4" fill="#376D59"/>
+<text x="395.5" y="618" font-family="'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif" font-size="13" font-weight="700" fill="#376D59">경로·변수</text>
+<text x="395.5" y="637" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="12" fill="#344B55">#376D59</text>
+<text x="395.5" y="655" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="12" fill="#5E6E73">5.6 : 1</text>
+<rect x="506.0" y="554" width="108.5" height="110" rx="6" fill="#FDF6E3" stroke="#D9D2BF"/>
+<rect x="516.0" y="564" width="88.5" height="34" rx="4" fill="#6B527C"/>
+<text x="516.0" y="618" font-family="'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif" font-size="13" font-weight="700" fill="#6B527C">매개변수</text>
+<text x="516.0" y="637" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="12" fill="#344B55">#6B527C</text>
+<text x="516.0" y="655" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="12" fill="#5E6E73">6.2 : 1</text>
+<rect x="626.5" y="554" width="108.5" height="110" rx="6" fill="#FDF6E3" stroke="#D9D2BF"/>
+<rect x="636.5" y="564" width="88.5" height="34" rx="4" fill="#B5453D"/>
+<text x="636.5" y="618" font-family="'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif" font-size="13" font-weight="700" fill="#B5453D">오류</text>
+<text x="636.5" y="637" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="12" fill="#344B55">#B5453D</text>
+<text x="636.5" y="655" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="12" fill="#5E6E73">5.0 : 1</text>
+<rect x="747.0" y="554" width="108.5" height="110" rx="6" fill="#FDF6E3" stroke="#D9D2BF"/>
+<rect x="757.0" y="564" width="88.5" height="34" rx="4" fill="#6C807B"/>
+<text x="757.0" y="618" font-family="'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif" font-size="13" font-weight="700" fill="#6C807B">주석</text>
+<text x="757.0" y="637" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="12" fill="#344B55">#6C807B</text>
+<text x="757.0" y="655" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="12" fill="#5E6E73">3.9 : 1</text>
+<rect x="867.5" y="554" width="108.5" height="110" rx="6" fill="#FDF6E3" stroke="#D9D2BF"/>
+<rect x="877.5" y="564" width="88.5" height="34" rx="4" fill="#7B8790"/>
+<text x="877.5" y="618" font-family="'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif" font-size="13" font-weight="700" fill="#7B8790">보조·예측</text>
+<text x="877.5" y="637" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="12" fill="#344B55">#7B8790</text>
+<text x="877.5" y="655" font-family="Cascadia Mono, D2Coding, Consolas, 'Courier New', monospace" font-size="12" fill="#5E6E73">3.4 : 1</text>
+</svg>

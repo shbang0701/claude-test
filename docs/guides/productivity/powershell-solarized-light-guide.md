@@ -51,7 +51,7 @@
 
 ![원본 Solarized Light와 Refined 비교 목업](mockups/powershell-solarized-light-preview.svg)
 
-> 목업 파일: `mockups/powershell-solarized-light-preview.svg` (브라우저나 VS Code에서 바로 열림). 왼쪽은 원본 + PowerShell 기본 색을 근사한 것으로, 폴더 이름 `src`가 파란 배경에 묻히고 자동 완성 예측 글자(`mmit -m "docs"`)가 진하게 표시돼 직접 입력한 글자와 구분되지 않는 문제가 보입니다.
+> 목업 파일: `docs/guides/productivity/mockups/powershell-solarized-light-preview.svg` (브라우저나 VS Code에서 바로 열림). 왼쪽은 원본 + PowerShell 기본 색을 근사한 것으로, 폴더 이름 `src`가 파란 배경에 묻히고 자동 완성 예측 글자(`mmit -m "docs"`)가 진하게 표시돼 직접 입력한 글자와 구분되지 않는 문제가 보입니다.
 
 | 요소 | 색 | 배경 대비 | 의도 |
 |---|---|---|---|

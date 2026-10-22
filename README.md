@@ -12,6 +12,7 @@
 - **[docs/guides/](docs/guides/)** — 읽는 가이드
   - [productivity/](docs/guides/productivity/) — 업무 효율·작업 환경
     - [갤럭시 S26 울트라 앱별 키보드 가이드](docs/guides/productivity/galaxy-s26-ultra-app-keyboard-guide.md)
+    - [PowerShell 7 · Solarized Light 다듬기 가이드](docs/guides/productivity/powershell-solarized-light-guide.md)
   - ops/ — 운영 노하우·장애 대응 (아직 없음)
 - **[docs/templates/](docs/templates/)** — 받아서 쓰는 Office 양식
   - [infra-kit/](docs/templates/infra-kit/) — IT 인프라 문서 세트: 장비 도면(Excel), PPT 구성 요소, 아이콘 60종

@@ -90,6 +90,8 @@ try {
     $copy = @($rows | ForEach-Object { $_.PSObject.Copy() }); $copy[0].Selected = $false
     & $module { param($data) Set-WtTaskSnapshot $data } $copy
     Assert-Active '새로 고침은 ID로 선택 유지' ((& $module { $script:items[0].Selected }) -eq $true)
+    $hostIds = @(Get-WtTaskHostIds)
+    Assert-Active 'WorkTool을 띄운 프로세스 목록에 자기 자신은 없음' ($hostIds -notcontains $PID -and -not @($hostIds | Where-Object { $_ -isnot [int] }).Count)
     Set-WtTaskRefresh 'manual' '5'
 
     if ($IsWindows -and [Threading.Thread]::CurrentThread.GetApartmentState() -eq 'STA') {
@@ -146,6 +148,15 @@ try {
             }
             Assert-Active '그룹 체크는 해당 프로그램의 닫기 가능한 행만 선택' ((& $module { @($script:items | Where-Object Selected).Count }) -eq 2)
             $testHost.Dispatcher.Invoke([action]{}, [Windows.Threading.DispatcherPriority]::ContextIdle)
+            Assert-Active '그룹 체크 뒤 다시 만든 같은 그룹 체크박스로 포커스를 돌려준다' ([object]::ReferenceEquals([Windows.Input.FocusManager]::GetFocusedElement($testHost), (& $module { $script:ui.GroupChecks['Google Chrome'] })))
+            & $module {
+                $rowCheck = Get-WtVisualChild (Find-WtTaskRow $script:ui.Grid 'b') ([Windows.Controls.CheckBox])
+                $rowCheck.IsChecked = $false
+                $rowCheck.RaiseEvent([Windows.RoutedEventArgs]::new([Windows.Controls.Primitives.ButtonBase]::ClickEvent))
+            }
+            $testHost.Dispatcher.Invoke([action]{}, [Windows.Threading.DispatcherPriority]::ContextIdle)
+            $focused = [Windows.Input.FocusManager]::GetFocusedElement($testHost)
+            Assert-Active '행 체크 뒤 같은 항목 체크박스로 포커스를 돌려준다' ($focused -is [Windows.Controls.CheckBox] -and $focused.Tag -eq 'task' -and $focused.DataContext.Id -eq 'b' -and -not (& $module { ($script:items | Where-Object Id -eq 'b').Selected }))
             & $module { $node = Get-WtVisualChild $script:ui.Grid ([Windows.Controls.Expander]); $node.IsExpanded = $false; Update-WtTaskList -KeepSelection }
             $testHost.Dispatcher.Invoke([action]{}, [Windows.Threading.DispatcherPriority]::ContextIdle)
             Assert-Active '새로 고침 후 접은 그룹 유지' (-not (& $module { (Get-WtVisualChild $script:ui.Grid ([Windows.Controls.Expander])).IsExpanded }))
@@ -196,8 +207,9 @@ try {
         $fixture = [Windows.Window]::new(); $fixture.Title = 'WorkTool 전용 UIA 테스트'; $fixture.Width = 400; $fixture.Height = 240
         $fixture.ShowActivated = $false; $fixture.ShowInTaskbar = $false
         $tabs = [Windows.Controls.TabControl]::new()
+        $tabRefs = [Collections.Generic.List[object]]::new()   # 제목이 모두 같으므로 어떤 탭이 남았는지는 객체로 확인한다
         for ($i = 0; $i -lt 3; $i++) {
-            $tab = [Windows.Controls.TabItem]::new()
+            $tab = [Windows.Controls.TabItem]::new(); $tabRefs.Add($tab)
             [Windows.Automation.AutomationProperties]::SetName($tab, '같은 제목')
             $header = [Windows.Controls.StackPanel]::new(); $header.Orientation = 'Horizontal'
             $label = [Windows.Controls.TextBlock]::new(); $label.Text = '같은 제목'; [void]$header.Children.Add($label)
@@ -229,13 +241,21 @@ try {
         $request.Targets = @($wrongTitle)
         $bad = Invoke-TestWorker $request
         Assert-Active '실제 제목이 달라지면 닫지 않음' ($bad.Results[0].State -eq 'failed' -and $tabs.Items.Count -eq 3)
-        $request.Targets = @($snapshot.Items | Where-Object Kind -eq tab | Select-Object -First 2)
+        # 1번째와 3번째 탭을 고른다. 제목이나 순서로 고르면 가운데 탭이 닫히므로 식별자로 닫는지 가려진다.
+        $tabRows = @($snapshot.Items | Where-Object Kind -eq tab | Sort-Object TabIndex)
+        $request.Targets = @($tabRows[0], $tabRows[2])
         $request.Cancel.Value = $true
         $canceled = Invoke-TestWorker $request
         Assert-Active '취소된 일괄 닫기는 아무 탭도 닫지 않음' (@($canceled.Results | Where-Object State -eq canceled).Count -eq 2 -and $tabs.Items.Count -eq 3)
         $request.Cancel.Value = $false
+        $hostRequest = $request.Clone(); $hostRequest.HostProcessIds = @($PID)
+        $refused = Invoke-TestWorker $hostRequest
+        Assert-Active 'WorkTool을 띄운 프로그램의 창·탭은 닫지 않음' (@($refused.Results | Where-Object State -eq failed).Count -eq 2 -and $tabs.Items.Count -eq 3)
         $closed = Invoke-TestWorker $request
-        Assert-Active '선택한 두 탭을 일괄 닫고 나머지 유지' (@($closed.Results | Where-Object State -eq closed).Count -eq 2 -and $tabs.Items.Count -eq 1)
+        Assert-Active '같은 제목이어도 고른 두 탭만 닫고 가운데 탭 유지' (@($closed.Results | Where-Object State -eq closed).Count -eq 2 -and $tabs.Items.Count -eq 1 -and [object]::ReferenceEquals($tabs.Items[0], $tabRefs[1]))
+        $hostScan = Invoke-TestWorker @{ Action = 'scan'; Handles = @($handle); BrowserNames = @((Get-Process -Id $PID).ProcessName); SelfProcessId = -1; HostProcessIds = @($PID); Cancel = [hashtable]::Synchronized(@{ Value = $false }) }
+        $hostRows = @($hostScan.Items)
+        Assert-Active 'WorkTool을 띄운 프로그램 창은 닫기 불가로 표시' ($hostRows.Count -eq 1 -and $hostRows[0].Kind -eq 'window' -and -not $hostRows[0].CanClose -and $hostRows[0].Status -eq 'WorkTool 실행 중')
         $request.Action = 'scan'; $request.BrowserNames = @('not-a-browser')
         $snapshot = Invoke-TestWorker $request
         $windowTarget = @($snapshot.Items)[0]

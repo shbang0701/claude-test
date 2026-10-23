@@ -4201,8 +4201,9 @@ $script:addons = [System.Collections.Generic.List[hashtable]]::new()
   Refresh      { param($view) } → 화면을 열 때마다 부른다 (선택)
   HomeCard     { } → 홈에 놓을 카드 요소(여러 개 가능)를 돌려준다 (선택)
   ImportLegacy { param($folder) } → 예전 WorkTool data 폴더에서 이 탭 데이터를 가져와 저장한다. 가져온 개수를 돌려준다 (선택)
-  OnExit       { } → 모든 SavePending 성공 뒤 타이머·조회 등 실행 자원을 정리한다 (선택)
-  SavePending  { } → 화면 전환·종료 전 저장. 실패하면 $false를 돌려줘 전환을 막는다 (선택)
+  OnExit       { } → 끝내기 직전(SavePending 확인 뒤) 타이머·조회 등 실행 자원을 정리한다 (선택)
+  SavePending  { } → 이 화면을 떠날 때 · 끝낼 때 저장. 실패하면 $false를 돌려준다.
+                     그러면 셸이 다시 시도 · 저장하지 않고 이동(끝내기) · 취소를 묻는다 (선택)
 #>
 function Register-WtAddon {
     param(
@@ -4696,7 +4697,8 @@ function Select-WtPage([string]$Id) {
     if ($script:selecting -or -not $Id) { return }
     $script:selecting = $true
     try {
-        if (-not (Save-WtPendingChanges)) { return }
+        # 떠나는 화면에 저장하지 못한 내용이 있으면 묻는다 (다른 화면의 저장 상태는 그 화면을 떠날 때 묻는다)
+        if ($script:current -and $Id -ne $script:current -and -not (Save-WtPendingChanges -Purpose switch -Only $script:current)) { return }
         $page = Get-WtPageView $Id
         if (-not $page) { return }
         if ($page.Addon -and $page.Addon.Refresh) { [void](& $page.Addon.Refresh $page.View) }
@@ -4915,24 +4917,59 @@ function Show-WtMainWindow {
     [void]$script:window.Activate()
 }
 
-# 정리 처리 전에 모든 저장을 확인한다. 실패하면 타이머와 창을 그대로 유지한다.
-function Save-WtPendingChanges {
+# 저장하지 못한 내용이 있을 때 묻는다. 'retry'(다시 시도) · 'proceed'(그대로 끝내기 · 이동) · 'cancel' 중 하나를 돌려준다.
+function Show-WtPendingChoice([string]$Purpose, [string]$Title) {
+    $exit = $Purpose -eq 'exit'
+    $dialog = New-WtModal $(if ($exit) { '저장하지 않고 끝낼까요?' } else { '저장하지 않고 이동할까요?' })
+    $text = if ($exit) { "$Title 화면에서 저장하지 못한 내용은 끝내면 사라집니다." }
+    else { "$Title 화면에서 저장하지 못한 내용은 그 화면에 그대로 남습니다." }
+    [void](Add-WtChild $dialog.Body (New-WtText $text))
+    $retry = New-WtButton '다시 시도' -Kind Primary; $retry.IsDefault = $true
+    $go = if ($exit) { New-WtButton '끝내기' -Kind Danger } else { New-WtButton '이동' }
+    $cancel = New-WtButton '취소'; $cancel.IsCancel = $true
+    $dialog.Window.Tag = @{ Choice = 'cancel'; Focus = $retry }
+    foreach ($pair in @(@($retry, 'retry'), @($go, 'proceed'))) {
+        $pair[0].Tag = @{ Window = $dialog.Window; Choice = $pair[1] }
+        $pair[0].Add_Click({ param($s, $e) $s.Tag.Window.Tag.Choice = $s.Tag.Choice; $s.Tag.Window.DialogResult = $true })
+        [void](Add-WtChild $dialog.Buttons $pair[0])
+    }
+    [void](Add-WtChild $dialog.Buttons $cancel)
+    $dialog.Window.Add_ContentRendered({ param($s, $e) [void]$s.Tag.Focus.Focus() })
+    [void]$dialog.Window.ShowDialog()
+    [string]$dialog.Window.Tag.Choice
+}
+
+# 저장하지 않은 내용을 저장한다. 계속해도 되면 $true.
+# -Purpose exit · switch: 저장하지 못하면 다시 시도 · 그대로 진행 · 취소를 묻는다. 막기만 하면 끄거나 옮길 방법이 없어진다.
+#          check: 묻지 않고 알린 뒤 $false (예전 데이터 가져오기처럼 덮어쓰는 작업 전)
+# -Only: 그 애드온만 확인한다 (화면을 떠날 때는 떠나는 화면만)
+function Save-WtPendingChanges([ValidateSet('check', 'switch', 'exit')][string]$Purpose = 'check', [string]$Only = '') {
     foreach ($a in @(Get-WtAddon -All)) {
-        if (-not $a.SavePending) { continue }
-        try {
-            if ((& $a.SavePending) -eq $false) {
-                Show-WtMessage '저장하지 못한 내용이 있습니다. 메모의 저장 오류를 해결한 뒤 다시 시도하세요.' '저장 확인' 'Warning'
+        if (-not $a.SavePending -or ($Only -and $a.Id -ne $Only)) { continue }
+        while ($true) {
+            $saved = $false
+            try { $saved = (@(& $a.SavePending) | Select-Object -Last 1) -ne $false }
+            catch { Show-WtError $_ "저장 확인: $($a.Title)" }
+            if ($saved) { break }
+            if ($Purpose -eq 'check') {
+                Show-WtMessage "$($a.Title) 화면에 저장하지 못한 내용이 있습니다. 저장 오류를 해결한 뒤 다시 시도하세요." '저장 확인' 'Warning'
                 return $false
             }
-        } catch { Show-WtError $_ "저장 확인: $($a.Title)"; return $false }
+            # 트레이에 숨어 있으면 창을 띄워서 무엇을 저장하지 못했는지 볼 수 있게 한다
+            if ($script:window -and -not $script:window.IsVisible) { Show-WtMainWindow }
+            $choice = Show-WtPendingChoice $Purpose $a.Title
+            if ($choice -eq 'retry') { continue }
+            if ($choice -eq 'proceed') { break }
+            return $false
+        }
     }
     $true
 }
 
-# 저장에 성공한 뒤에만 트레이·타이머를 정리하고 메시지 돌리기를 멈춘다.
+# 저장을 확인한 뒤에만(또는 저장하지 않고 끝내기를 고른 뒤에만) 트레이·타이머를 정리하고 메시지 돌리기를 멈춘다.
 function Stop-WtApp {
     if (-not $script:exiting) {
-        if (-not (Save-WtPendingChanges)) { return $false }
+        if (-not (Save-WtPendingChanges -Purpose exit)) { return $false }
         foreach ($a in @(Get-WtAddon -All)) {
             if ($a.OnExit) { try { [void](& $a.OnExit) } catch { Show-WtError $_ "끝내기 전 저장: $($a.Title)" } }
         }
@@ -5149,6 +5186,7 @@ $script:lastError = ''
 $script:appFilter = '*'
 $script:sortColumn = 'DisplayTitle'
 $script:sortDirection = 'Ascending'
+$script:focusTarget = $null   # 표를 다시 만든 뒤 포커스를 돌려줄 체크박스 @{ Id } 또는 @{ Group }
 Register-WtSettingDefault 'tasks.refresh' @{ mode = 'manual'; minutes = 5 }
 
 function ConvertTo-WtTaskMinutes([string]$Text) {
@@ -5202,6 +5240,23 @@ function Get-WtTaskCheckState([object[]]$Items) {
     if (-not $picked) { return $false }
     if ($picked -eq $available.Count) { return $true }
     $null
+}
+
+# WorkTool을 띄운 터미널 · 편집기 같은 조상 프로세스. 그 창을 닫으면 WorkTool도 꺼지므로 표에는 보여 주되 닫지 않는다.
+# 탐색기 · 시스템 프로세스에서 멈춘다(그 창들은 그대로 닫을 수 있게). 이미 끝난 부모의 PID를 다른 프로그램이 받았으면 시작 시각으로 걸러 낸다.
+function Get-WtTaskHostIds {
+    $ids = [System.Collections.Generic.List[int]]::new()
+    $stop = @('explorer', 'svchost', 'sihost', 'services', 'wininit', 'winlogon', 'userinit', 'RuntimeBroker', 'csrss', 'smss')
+    try {
+        $child = Get-Process -Id $PID
+        for ($depth = 0; $depth -lt 8; $depth++) {
+            $parent = $child.Parent
+            if (-not $parent -or $parent.ProcessName -in $stop -or $parent.StartTime -gt $child.StartTime) { break }
+            $ids.Add($parent.Id)
+            $child = $parent
+        }
+    } catch { }
+    $ids.ToArray()
 }
 
 function Set-WtTaskSnapshot([object[]]$Items) {
@@ -5272,7 +5327,7 @@ $script:worker = {
         @{ Tabs = @($tabs.ToArray()); Partial = $partial }
     }
     function New-Row($windowInfo, $processInfo, [string]$windowId, [int]$ordinal, [string]$kind, [string]$title, [string]$runtime, [int]$tabIndex, [bool]$canClose, [string]$status) {
-        $labels = @{ chrome = 'Google Chrome'; msedge = 'Microsoft Edge'; EXCEL = 'Microsoft Excel'; WINWORD = 'Microsoft Word'; POWERPNT = 'Microsoft PowerPoint'; explorer = '파일 탐색기'; notepad = '메모장' }
+        $labels = @{ chrome = 'Google Chrome'; msedge = 'Microsoft Edge'; whale = '네이버 웨일'; EXCEL = 'Microsoft Excel'; WINWORD = 'Microsoft Word'; POWERPNT = 'Microsoft PowerPoint'; explorer = '파일 탐색기'; notepad = '메모장' }
         $appLabel = $processInfo.Name
         if ($labels.ContainsKey($appLabel)) { $appLabel = $labels[$appLabel] }
         [pscustomobject]@{
@@ -5296,7 +5351,9 @@ $script:worker = {
         }
         $rows = [Collections.Generic.List[object]]::new()
         $ordinals = @{}; $failed = 0
-        $browsers = if ($request.BrowserNames) { $request.BrowserNames } else { @('chrome', 'msedge') }
+        # 탭 단위로 다루는 Chromium 계열 브라우저. 탭을 못 읽으면 창 전체를 닫는 대신 '탭 확인 불가'로 둔다
+        $browsers = if ($request.BrowserNames) { $request.BrowserNames } else { @('chrome', 'msedge', 'whale') }
+        $hosts = @($request.HostProcessIds)
         foreach ($window in $windows) {
             if ($request.Cancel.Value) { break }
             try {
@@ -5313,6 +5370,12 @@ $script:worker = {
                 $ordinals[$processInfo.Name]++
                 $ordinal = $ordinals[$processInfo.Name]
                 $minimized = $wp -and $wp.Current.WindowVisualState -eq 'Minimized'
+                if ($info.ProcessId -in $hosts) {
+                    $row = New-Row $wi $processInfo $windowId $ordinal 'window' $info.Name $windowRuntime 0 $false 'WorkTool 실행 중'
+                    $row.CloseHint = 'WorkTool이 이 프로그램에서 실행 중입니다. 닫으면 WorkTool도 꺼지므로 여기서는 닫지 않습니다.'
+                    $rows.Add($row)
+                    continue
+                }
                 if ($processInfo.Name -notin $browsers) {
                     $status = if ($minimized) { '최소화' } elseif (-not $wp) { '닫기 지원 안 됨' } else { '' }
                     $rows.Add((New-Row $wi $processInfo $windowId $ordinal 'window' $info.Name $windowRuntime 0 ([bool]$wp) $status))
@@ -5365,6 +5428,7 @@ $script:worker = {
         $state = 'failed'; $message = ''
         try {
             if ($request.Cancel.Value) { $state = 'canceled'; $message = '취소됨' }
+            elseif ($target.ProcessId -in @($request.HostProcessIds)) { throw 'WorkTool이 실행 중인 프로그램이라 닫지 않습니다.' }
             else {
                 $element = Find-Target $target
                 if (-not $element) { $state = 'gone'; $message = '이미 없음' }
@@ -5411,7 +5475,7 @@ function Start-WtTaskJob([string]$Action, [object[]]$Targets = @()) {
     $runspace = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
     $runspace.ApartmentState = 'MTA'; $runspace.ThreadOptions = 'ReuseThread'; $runspace.Open()
     $ps = [powershell]::Create(); $ps.Runspace = $runspace
-    [void]$ps.AddScript($script:worker.ToString()).AddArgument(@{ Action = $Action; Targets = $Targets; SelfProcessId = $PID; Cancel = $cancel })
+    [void]$ps.AddScript($script:worker.ToString()).AddArgument(@{ Action = $Action; Targets = $Targets; SelfProcessId = $PID; HostProcessIds = @(Get-WtTaskHostIds); Cancel = $cancel })
     try {
         $handle = $ps.BeginInvoke()
         $script:job = @{ PowerShell = $ps; Runspace = $runspace; Handle = $handle; Cancel = $cancel; Action = $Action; Started = [datetime]::UtcNow }
@@ -5511,6 +5575,33 @@ function Update-WtTaskList([switch]$KeepSelection) {
     $script:ui.Grid.UpdateLayout()
     if ($scroll) { $scroll.ScrollToVerticalOffset($offset) }
     Update-WtTaskStatus
+}
+
+# 표를 다시 만들면 방금 누른 체크박스가 새것으로 바뀐다. 같은 항목 · 같은 그룹의 체크박스로 포커스를 돌려줘
+# Space · Tab으로 이어서 고를 수 있게 한다.
+function Restore-WtTaskFocus {
+    $target = $script:focusTarget; $script:focusTarget = $null
+    if (-not $target -or -not $script:ui.Count) { return }
+    $check = $null
+    if ($target.Group) { $check = $script:ui.GroupChecks[$target.Group] }
+    else {
+        $item = $script:visible | Where-Object Id -eq $target.Id | Select-Object -First 1
+        if ($item) {
+            $script:ui.Grid.ScrollIntoView($item)
+            $row = Find-WtTaskRow $script:ui.Grid $target.Id
+            if ($row) { $check = Get-WtVisualChild $row ([System.Windows.Controls.CheckBox]) }
+        }
+    }
+    if ($check) { [void]$check.Focus() }
+}
+
+function Find-WtTaskRow($Root, [string]$Id) {
+    if ($Root -is [System.Windows.Controls.DataGridRow]) { if ([string]$Root.Item.Id -eq $Id) { return $Root }; return $null }
+    for ($i = 0; $i -lt [System.Windows.Media.VisualTreeHelper]::GetChildrenCount($Root); $i++) {
+        $found = Find-WtTaskRow ([System.Windows.Media.VisualTreeHelper]::GetChild($Root, $i)) $Id
+        if ($found) { return $found }
+    }
+    $null
 }
 
 function Show-WtTaskRefreshDialog {
@@ -5625,9 +5716,15 @@ function New-WtActiveTasksView {
         if ($check -isnot [System.Windows.Controls.CheckBox]) { return }
         if ($check.Tag -eq 'group') {
             foreach ($row in @($check.DataContext.Items)) { if ($row.CanClose) { $row.Selected = $check.IsChecked -eq $true } }
-        } elseif ($check.Tag -eq 'task') { $check.DataContext.Selected = $check.IsChecked -eq $true }
+            $script:focusTarget = @{ Group = [string]$check.DataContext.Name }
+        } elseif ($check.Tag -eq 'task') {
+            $check.DataContext.Selected = $check.IsChecked -eq $true
+            $script:focusTarget = @{ Id = [string]$check.DataContext.Id }
+        }
         else { return }
         Update-WtTaskList -KeepSelection
+        # 그룹 체크박스는 그룹 머리글이 다시 만들어진 뒤(Loaded) 등록되므로 그보다 늦은 순서로 돌려준다
+        [void]$s.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{ Restore-WtTaskFocus })
     })
     # Loaded는 자식에서 버블링하지 않으므로 GroupItem 스타일에서 직접 받는다.
     $groupStyle = [System.Windows.Style]::new([System.Windows.Controls.GroupItem], $grid.GroupStyle[0].ContainerStyle)
@@ -5671,7 +5768,7 @@ Register-WtAddon -Id 'active-tasks' -Title '활성 작업' -Icon 0xE7C4 -Order 6
     -NewView { New-WtActiveTasksView } -Refresh { param($view) Start-WtTaskJob 'scan' } -OnExit { Stop-WtTasks }
 
 Export-ModuleMember -Function ConvertTo-WtTaskMinutes, Get-WtTaskRefresh, Set-WtTaskRefresh, Test-WtTaskAutoDue,
-    Find-WtTaskItems, Get-WtTaskCheckState, Get-WtTaskWorker
+    Find-WtTaskItems, Get-WtTaskCheckState, Get-WtTaskWorker, Get-WtTaskHostIds
 } | Import-Module -Force -DisableNameChecking
 # ---- addons\active-tasks\ActiveTasks.psm1 끝 ----
 
@@ -5894,7 +5991,9 @@ $script:pollTimer = $null
 $script:filterTimer = $null
 $script:stopping = $false
 $script:treeGeneration = 0
-$script:treeSelectionPath = $null
+$script:treeTarget = $null       # 트리에서 찾아가는 중인 경로. 하위 폴더를 다 읽으면 이어서 찾는다
+$script:treeWaitNode = $null     # 그 경로로 가려고 하위 폴더를 읽는 중인 항목
+$script:folderFallback = $null   # 마지막으로 본 폴더를 못 열면 대신 열 폴더 @{ From; To }
 $script:treeBatches = [System.Collections.Generic.List[object]]::new()
 $script:treeBatchScheduled = $false
 
@@ -6057,7 +6156,7 @@ function Copy-WtDocPath([string]$Path) {
 
 # ---- 화면 -------------------------------------------------------------------------------------
 
-# 최대 두 조회만 실행한다. 취소는 다음 파일부터 적용되며 진행 중인 OS 호출은 기다릴 수 있다.
+# 조회 하나를 실행하는 코드. 취소는 다음 파일부터 적용되며, 진행 중인 OS 호출은 끝날 때까지 기다릴 수 있다.
 $script:worker = {
     param($request, $kinds, $icons)
     $ErrorActionPreference = 'Stop'
@@ -6085,9 +6184,20 @@ function Start-WtDocRequest([string]$Key, [string]$Action, [string]$Path = '', $
     $true
 }
 
+# 응답 없는 공유 폴더를 기다리느라 다른 조회가 막히지 않게, 취소했거나 새 요청으로 바뀐 조회는 자리를 차지하지 않는다.
+# 폴더 · 홈 즐겨찾기는 하나씩, 트리는 둘까지 실행한다. 취소한 것까지 합쳐 8개가 돌고 있으면 끝나기를 기다린다.
+function Test-WtDocJobSlot([string]$Key) {
+    if ($script:jobs.Count -ge 8) { return $false }
+    $active = @($script:jobs | Where-Object { -not $_.Request.Cancel.Value })
+    if ($Key -in 'folder', 'home') { return -not @($active | Where-Object Key -eq $Key).Count }
+    @($active | Where-Object { $_.Key -notin 'folder', 'home' }).Count -lt 2
+}
+
 function Start-WtDocJobs {
-    while (-not $script:stopping -and $script:jobs.Count -lt 2 -and $script:pending.Count) {
-        $key = if ($script:pending.Contains('folder')) { 'folder' } elseif ($script:pending.Contains('home')) { 'home' } else { @($script:pending.Keys)[0] }
+    if ($script:stopping) { return }
+    $keys = @(@('folder', 'home') | Where-Object { $script:pending.Contains($_) }) + @($script:pending.Keys | Where-Object { $_ -notin 'folder', 'home' })
+    foreach ($key in $keys) {
+        if (-not $script:pending.Contains($key) -or -not (Test-WtDocJobSlot $key)) { continue }
         $job = $script:pending[$key]; $script:pending.Remove($key)
         $state = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
         foreach ($name in 'Get-WtDocKind', 'Get-WtDocIcon', 'Format-WtDocSize', 'New-WtDocEntry', 'Get-WtDocEntries', 'Get-WtDocSubfolders', 'Get-WtDocPinEntries') {
@@ -6126,6 +6236,12 @@ function Set-WtDocResult($Job, $Result) {
     switch ($Job.Key) {
         'folder' {
             if (-not $script:ui.Count -or $Job.Request.Path -ne $script:current) { return }
+            $fallback = $script:folderFallback; $script:folderFallback = $null
+            if ($Result.Error -and $fallback -and $fallback.From -eq $Job.Request.Path) {
+                # 마지막으로 본 폴더가 없어졌거나 연결되지 않으면 첫 폴더를 연다 (화면을 멈추는 존재 확인 없이)
+                Show-WtDocFolder $fallback.To -SelectTree
+                return
+            }
             $script:entries = @($Result.Items)
             $script:ui.Loading = $false
             $script:ui.Error = if ($Result.Error) { "폴더를 열지 못했습니다. $($Result.Error)" } else { $null }
@@ -6150,7 +6266,11 @@ function Set-WtDocResult($Job, $Result) {
             if ($Job.Generation -ne $script:treeGeneration) { return }
             $node = $Job.Context
             $node.Items.Clear()
-            if ($Result.Error) { $node.Tag.Loading = $false; [void]$node.Items.Add('읽지 못했습니다. 접었다 다시 펼치세요.'); $node.ToolTip = $Result.Error; return }
+            if ($Result.Error) {
+                $node.Tag.Loading = $false; [void]$node.Items.Add('읽지 못했습니다. 접었다 다시 펼치세요.'); $node.ToolTip = $Result.Error
+                if ([object]::ReferenceEquals($node, $script:treeWaitNode)) { $script:treeWaitNode = $null; $script:treeTarget = $null }
+                return
+            }
             $node.Tag.Loading = $true
             [void]$node.Items.Add('불러오는 중…')
             $script:treeBatches.Add(@{ Node = $node; Paths = @($Result.Items); Index = 0; Generation = $Job.Generation })
@@ -6184,7 +6304,8 @@ function Complete-WtDocTreeBatch {
     if ($batch.Index -eq $batch.Paths.Count) {
         $node.Tag.Loaded = $true; $node.Tag.Loading = $false
         $script:treeBatches.RemoveAt(0)
-        if ($script:treeSelectionPath) { Select-WtDocTreePath $script:treeSelectionPath }
+        # 찾아가던 길의 폴더를 다 읽었을 때만 이어서 찾는다. 다른 폴더를 펼쳐도 선택 · 스크롤 · 접어 둔 폴더를 건드리지 않는다
+        if ($script:treeTarget -and [object]::ReferenceEquals($node, $script:treeWaitNode)) { Select-WtDocTreePath $script:treeTarget }
     } else { [void]$node.Items.Add('불러오는 중…') }
     Request-WtDocTreeBatch
 }
@@ -6196,7 +6317,11 @@ function Stop-WtDocs {
     foreach ($job in $script:jobs) {
         $job.Request.Cancel.Value = $true
         $job.Context = $null
-        if (-not $job.Handle.IsCompleted) { [void]$job.PowerShell.BeginStop($null, $null); $job.Runspace.CloseAsync() }
+        if (-not $job.Handle.IsCompleted) {
+            # 응답 없는 OS 호출 중에는 멈추기 · 닫기가 실패할 수 있다. 끝낼 때 오류 창을 띄우지 않는다
+            try { [void]$job.PowerShell.BeginStop($null, $null) } catch { }
+            try { $job.Runspace.CloseAsync() } catch { }
+        }
     }
     if ($script:filterTimer) { $script:filterTimer.Stop() }
     Complete-WtDocJobs
@@ -6248,6 +6373,7 @@ function Get-WtDocRootLabel([string]$Path) {
 
 function Update-WtDocTree {
     $script:treeGeneration++
+    $script:treeTarget = $null; $script:treeWaitNode = $null
     $script:treeBatches.Clear()
     foreach ($key in @($script:pending.Keys)) { if ($key.StartsWith('tree:')) { $script:pending.Remove($key) } }
     foreach ($job in $script:jobs) { if ($job.Request.Action -eq 'tree') { $job.Request.Cancel.Value = $true; $job.Context = $null } }
@@ -6258,9 +6384,10 @@ function Update-WtDocTree {
     $script:ui.RemoveRoot.IsEnabled = $false
 }
 
-# 트리에서 경로에 맞는 항목을 펼쳐 찾아 고른다
+# 트리에서 경로에 맞는 항목을 펼쳐 찾아 고른다. 아직 읽지 않은 폴더를 만나면 읽은 뒤 이어서 찾는다
 function Select-WtDocTreePath([string]$Path) {
-    $script:treeSelectionPath = $Path
+    $script:treeTarget = $Path
+    $script:treeWaitNode = $null
     $items = $script:ui.Tree.Items
     $found = $null
     if ($Path -eq '*') { $found = $items[0] }
@@ -6269,20 +6396,26 @@ function Select-WtDocTreePath([string]$Path) {
             $next = $items | Where-Object { $_ -is [System.Windows.Controls.TreeViewItem] -and $_.Tag.Path.TrimEnd('\') -ieq $step.TrimEnd('\') } | Select-Object -First 1
             if (-not $next) { break }
             $found = $next
-            if ($step.TrimEnd('\') -ine $Path.TrimEnd('\')) { Expand-WtDocNode $next; $next.IsExpanded = $true; if (-not $next.Tag.Loaded) { break } }
+            if ($step.TrimEnd('\') -ine $Path.TrimEnd('\')) {
+                Expand-WtDocNode $next; $next.IsExpanded = $true
+                if (-not $next.Tag.Loaded) { $script:treeWaitNode = $next; break }
+            }
             $items = $next.Items
         }
     }
+    if (-not $script:treeWaitNode) { $script:treeTarget = $null }
     if ($found) {
         $script:selecting = $true
         try { $found.IsSelected = $true; $found.BringIntoView() } finally { $script:selecting = $false }
     }
 }
 
-# 오른쪽에 폴더(또는 즐겨찾기 '*')를 보여 준다
-function Show-WtDocFolder([string]$Path, [switch]$SelectTree) {
+# 오른쪽에 폴더(또는 즐겨찾기 '*')를 보여 준다. -Fallback: 이 폴더를 못 열면 대신 열 폴더
+function Show-WtDocFolder([string]$Path, [switch]$SelectTree, [string]$Fallback = '') {
     $script:current = $Path
-    $script:treeSelectionPath = $Path
+    $script:folderFallback = if ($Fallback) { @{ From = $Path; To = $Fallback } } else { $null }
+    # 트리를 직접 고른 경우 등: 찾아가던 길이 있으면 그만둔다
+    if (-not $SelectTree) { $script:treeTarget = $null; $script:treeWaitNode = $null }
     $script:entries = @()
     $script:ui.Loading = [bool]$Path
     $script:ui.Filter.Text = ''
@@ -6554,10 +6687,11 @@ function New-WtDocsView {
 
 function Update-WtDocsView {
     Update-WtDocTree
+    $roots = @(Get-WtDocRoots)
+    $first = if ($roots.Count) { $roots[0] } else { '*' }
     $last = [string](Get-WtSetting 'docs.last')
-    $start = if ($last -and (Get-WtDocChain (Get-WtDocRoots) $last).Count) { $last }
-    elseif (@(Get-WtDocRoots).Count) { @(Get-WtDocRoots)[0] } else { '*' }
-    Show-WtDocFolder $start -SelectTree
+    if ($last -and $last -ne $first -and (Get-WtDocChain $roots $last).Count) { Show-WtDocFolder $last -SelectTree -Fallback $first }
+    else { Show-WtDocFolder $first -SelectTree }
 }
 
 # 홈: 즐겨찾기 바로 열기

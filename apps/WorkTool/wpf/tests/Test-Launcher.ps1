@@ -72,7 +72,8 @@ try { Start-WtApp -AppRoot $PSScriptRoot } finally { $script:sampleTimer.Stop() 
 
     $cmdInfo = [Diagnostics.ProcessStartInfo]::new()
     $cmdInfo.FileName = Join-Path ([Environment]::SystemDirectory) 'cmd.exe'
-    $cmdInfo.Arguments = '/d /c Start-WorkTool.cmd'
+    # 현재 폴더를 명령 검색에서 빼는 환경(NoDefaultCurrentDirectoryInExePath)에서도 찾도록 .\를 붙인다
+    $cmdInfo.Arguments = '/d /c .\Start-WorkTool.cmd'
     $cmdInfo.WorkingDirectory = $fixture
     $cmdInfo.UseShellExecute = $false; $cmdInfo.CreateNoWindow = $true
     $cmdInfo.RedirectStandardOutput = $true; $cmdInfo.RedirectStandardError = $true

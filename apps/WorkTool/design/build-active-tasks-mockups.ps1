@@ -151,6 +151,7 @@ Add-Icon 268 130 0xE721 20
 Add-Label 300 130 '이름으로 찾기' 14 $C.Sub
 Add-Button 628 120 160 '모든 프로그램'
 Add-Icon 764 134 0xE70D 12
+Add-Label 828 132 $(if ($sample.refresh.mode -eq 'auto') { '자동 · {0}분' -f $sample.refresh.intervalMinutes } else { '수동' }) 12.5 $C.Sub
 Add-Button 956 120 136 '새로 고침' 'primary' 0xE72C
 Add-Button 1104 120 152 ('선택 닫기 {0}' -f $selected.Count) 'danger' 0xE8BB
 
@@ -240,6 +241,41 @@ Add-Label 24 904 '해당 브라우저 창을 확인한 뒤 새로 고침합니�
 Add-Crop 24 940 672 64 916 464 336 32 $main
 Add-Label 24 1044 '04  선택한 대상만 확인하고 닫기' 16 $C.Text $true
 Add-Crop 24 1088 672 649.6 0 0 480 464 $dialog
+
+# 자동 새로 고침: 우클릭 메뉴와 분 입력 모달을 별도로 크게 보여 준다.
+$script:canvas = [Collections.Generic.List[object]]::new()
+$refreshMenu = $script:canvas
+Add-Box 0 0 480 168 $C.Back
+Add-Button 24 8 136 '새로 고침' 'primary' 0xE72C
+Add-Box 24 56 240 104 $C.Card $C.Border 8
+Add-Label 68 70 '수동' 14 $C.Text
+if ($sample.refresh.menuModeBeforeApply -eq 'manual') { Add-Icon 40 72 0xE73E 16 $C.Text }
+Add-Box 28 108 232 44 $C.Selected '' 4
+if ($sample.refresh.menuModeBeforeApply -eq 'auto') { Add-Icon 40 120 0xE73E 16 $C.AccentText }
+Add-Label 68 118 '자동…' 14 $C.AccentText
+$script:canvas = [Collections.Generic.List[object]]::new()
+$refreshDialog = $script:canvas
+Add-Box 0 0 480 304 $C.Card $C.Border 12
+Add-Label 24 24 '자동 새로 고침' 20 $C.Text $true
+Add-Label 24 80 '새로 고침 간격' 14 $C.Text
+Add-Box 24 108 160 40 $C.Card $C.Accent 8 2
+Add-Label 40 118 ([string]$sample.refresh.intervalMinutes) 14 $C.Text
+Add-Label 196 118 '분' 14 $C.Text
+Add-Label 24 160 '1~1,440분 사이의 정수를 입력하세요.' 12.5 $C.Sub
+Add-Label 24 188 '활성 작업 탭을 보는 동안 자동으로 갱신합니다.' 12.5 $C.Sub
+Add-Button 248 240 104 '적용' 'primary'
+Add-Button 360 240 96 '취소'
+$script:canvas = [Collections.Generic.List[object]]::new()
+$refreshDetail = $script:canvas
+Add-Box 0 0 720 1072 $C.Back
+Add-Label 24 24 '자동 새로 고침 · 설정 흐름' 26 $C.Text $true
+Add-Label 24 68 '우클릭 → 자동 → 분 단위 간격 설정' 14 $C.Sub
+Add-Label 24 108 '01  새로 고침 버튼을 우클릭' 16 $C.Text $true
+Add-Crop 24 144 672 235.2 0 0 480 168 $refreshMenu
+Add-Label 24 412 '02  간격을 입력하고 적용' 16 $C.Text $true
+Add-Crop 24 448 672 425.6 0 0 480 304 $refreshDialog
+Add-Label 24 908 '03  버튼 옆에 현재 모드 표시' 16 $C.Text $true
+Add-Crop 24 944 672 84 800 112 480 60 $main
 
 function Write-SvgShapes($Writer, $Shapes) {
     foreach ($s in $Shapes) {
@@ -334,3 +370,4 @@ function Export-Scene([string]$Name, [int]$Width, [int]$Height, $Shapes, [string
 
 Export-Scene 'active-tasks' 1280 672 $main 'WorkTool 활성 작업 — 전체 화면 목업'
 Export-Scene 'active-tasks-detail' 720 1776 $detail 'WorkTool 활성 작업 — 폰 열람용 확대본'
+Export-Scene 'active-tasks-refresh' 720 1072 $refreshDetail 'WorkTool 활성 작업 — 자동 새로 고침 설정 목업'

@@ -2,6 +2,7 @@
   "isMock": true,
   "description": "활성 작업 화면 검토용 가짜 데이터. 실제 창이나 브라우저에서 수집한 정보가 아닙니다.",
   "capturedAt": "2026-10-23T14:30:00+09:00",
+  "refresh": { "mode": "auto", "intervalMinutes": 5, "menuModeBeforeApply": "manual" },
   "groups": [
     { "id": "chrome", "name": "Google Chrome", "expanded": true },
     { "id": "edge", "name": "Microsoft Edge", "expanded": true },

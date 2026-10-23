@@ -32,6 +32,9 @@ $script:stylesXaml = @'
     <Setter Property="FontSize" Value="{DynamicResource F.Number}"/>
     <Setter Property="FontWeight" Value="Bold"/>
   </Style>
+  <Style x:Key="T.Dialog" TargetType="TextBlock" BasedOn="{StaticResource T.H2}">
+    <Setter Property="FontSize" Value="{DynamicResource F.Dialog}"/>
+  </Style>
   <Style x:Key="T.Strong" TargetType="TextBlock" BasedOn="{StaticResource T.Body}">
     <Setter Property="FontWeight" Value="SemiBold"/>
   </Style>
@@ -614,6 +617,70 @@ $script:stylesXaml = @'
     <Setter Property="Foreground" Value="{DynamicResource B.SubText}"/>
   </Style>
 
+  <Style x:Key="Task.Check" TargetType="CheckBox">
+    <Setter Property="VerticalAlignment" Value="Center"/>
+    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    <Setter Property="Padding" Value="12,8"/>
+    <Setter Property="MinHeight" Value="32"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.Text}"/>
+    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox">
+      <Border x:Name="HitArea" Padding="{TemplateBinding Padding}" Background="Transparent">
+        <Border x:Name="Box" Width="16" Height="16" HorizontalAlignment="Left" VerticalAlignment="Center"
+          CornerRadius="4" Background="{DynamicResource B.Card}" BorderBrush="{DynamicResource B.InputBorder}" BorderThickness="1">
+          <Grid>
+            <Path x:Name="Mark" Data="M 2,7 L 6,11 L 12,3" Stroke="{DynamicResource B.OnAccent}" StrokeThickness="2" Visibility="Collapsed"/>
+            <Border x:Name="Dash" Width="8" Height="2" Background="{DynamicResource B.OnAccent}" Visibility="Collapsed"/>
+          </Grid>
+        </Border>
+      </Border>
+      <ControlTemplate.Triggers>
+        <Trigger Property="IsChecked" Value="True"><Setter TargetName="Box" Property="Background" Value="{DynamicResource B.Accent}"/><Setter TargetName="Mark" Property="Visibility" Value="Visible"/></Trigger>
+        <Trigger Property="IsChecked" Value="{x:Null}"><Setter TargetName="Box" Property="Background" Value="{DynamicResource B.Accent}"/><Setter TargetName="Dash" Property="Visibility" Value="Visible"/></Trigger>
+        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="HitArea" Property="Background" Value="{DynamicResource B.Hover}"/></Trigger>
+        <Trigger Property="IsPressed" Value="True"><Setter TargetName="HitArea" Property="Background" Value="{DynamicResource B.AccentSoft}"/></Trigger>
+        <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource B.Text}"/><Setter TargetName="Box" Property="BorderThickness" Value="2"/></Trigger>
+        <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
+      </ControlTemplate.Triggers>
+    </ControlTemplate></Setter.Value></Setter>
+  </Style>
+  <Style x:Key="Task.Row" TargetType="DataGridRow">
+    <Setter Property="MinHeight" Value="32"/>
+    <Setter Property="Background" Value="{DynamicResource B.Card}"/>
+    <Setter Property="BorderThickness" Value="3,0,0,0"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Style.Triggers>
+      <DataTrigger Binding="{Binding Selected}" Value="True">
+        <Setter Property="Background" Value="{DynamicResource B.AccentSoft}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource B.Accent}"/>
+      </DataTrigger>
+      <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{DynamicResource B.Hover}"/></Trigger>
+    </Style.Triggers>
+  </Style>
+  <Style x:Key="Task.Cell" TargetType="DataGridCell">
+    <Setter Property="Padding" Value="12,4"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.Text}"/>
+    <Setter Property="Background" Value="Transparent"/>
+    <Style.Triggers>
+      <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource B.Accent}"/></Trigger>
+      <Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{DynamicResource B.AccentSoft}"/></Trigger>
+    </Style.Triggers>
+  </Style>
+  <Style x:Key="Task.Header" TargetType="DataGridColumnHeader">
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Padding" Value="12,8"/>
+    <Setter Property="Background" Value="{DynamicResource B.Card}"/>
+    <Setter Property="Foreground" Value="{DynamicResource B.SubText}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource B.Border}"/>
+    <Setter Property="BorderThickness" Value="0,0,0,1"/>
+  </Style>
+  <Style x:Key="Task.Text" TargetType="TextBlock" BasedOn="{StaticResource T.Body}">
+    <Setter Property="TextWrapping" Value="NoWrap"/>
+    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+    <Setter Property="ToolTip" Value="{Binding RelativeSource={RelativeSource Self}, Path=Text}"/>
+  </Style>
 </ResourceDictionary>
 '@
 
@@ -928,6 +995,104 @@ function Show-WtError($ErrorRecord, [string]$Where = '') {
     try { Show-WtMessage $msg 'WorkTool 오류' 'Error' } catch { Write-Host $msg }
 }
 
-Export-ModuleMember -Function Get-WtStyleDictionary, ConvertFrom-WtXaml, Get-WtNamedElements, Set-WtStyle, Set-WtResource,
+function New-WtTaskGrid {
+    $grid = ConvertFrom-WtXaml @'
+<DataGrid {NS} AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False"
+  HeadersVisibility="Column" SelectionMode="Single" SelectionUnit="FullRow" BorderThickness="0"
+  Background="{DynamicResource B.Card}" Foreground="{DynamicResource B.Text}"
+  FontFamily="{DynamicResource Font.UI}" FontSize="{DynamicResource F.Body}"
+  RowStyle="{DynamicResource Task.Row}" CellStyle="{DynamicResource Task.Cell}" ColumnHeaderStyle="{DynamicResource Task.Header}"
+  GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{DynamicResource B.Divider}"
+  EnableRowVirtualization="True" EnableColumnVirtualization="True"
+  VirtualizingPanel.IsVirtualizingWhenGrouping="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True">
+  <DataGrid.Columns>
+    <DataGridTemplateColumn Header="선택" Width="48" CanUserSort="False">
+      <DataGridTemplateColumn.CellTemplate><DataTemplate>
+        <CheckBox Tag="task" Style="{DynamicResource Task.Check}" IsChecked="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+          IsEnabled="{Binding CanClose}" ToolTip="{Binding CloseHint}" AutomationProperties.Name="{Binding DisplayTitle}"/>
+      </DataTemplate></DataGridTemplateColumn.CellTemplate>
+    </DataGridTemplateColumn>
+    <DataGridTextColumn Header="이름" Binding="{Binding DisplayTitle}" SortMemberPath="DisplayTitle" Width="*" MinWidth="200" ElementStyle="{DynamicResource Task.Text}"/>
+    <DataGridTextColumn Header="종류" Binding="{Binding KindLabel}" SortMemberPath="KindLabel" Width="80" ElementStyle="{DynamicResource Task.Text}"/>
+    <DataGridTextColumn Header="창" Binding="{Binding WindowLabel}" SortMemberPath="WindowNumber" Width="96" ElementStyle="{DynamicResource Task.Text}"/>
+    <DataGridTextColumn Header="상태" Binding="{Binding Status}" SortMemberPath="Status" Width="240" ElementStyle="{DynamicResource Task.Text}"/>
+  </DataGrid.Columns>
+  <DataGrid.GroupStyle><GroupStyle>
+    <GroupStyle.ContainerStyle><Style TargetType="GroupItem"><Setter Property="Template"><Setter.Value>
+      <ControlTemplate TargetType="GroupItem">
+        <Expander Tag="task-group" IsExpanded="True" Background="{DynamicResource B.Sidebar}" Foreground="{DynamicResource B.Text}">
+          <Expander.Header><StackPanel Orientation="Horizontal">
+            <CheckBox Tag="group" IsThreeState="True" Style="{DynamicResource Task.Check}" AutomationProperties.Name="{Binding Name}"/>
+            <TextBlock Text="{Binding Name}" Style="{DynamicResource T.Strong}" VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding ItemCount}" Style="{DynamicResource T.Sub}" Margin="16,0,4,0" VerticalAlignment="Center"/>
+            <TextBlock Text="개 표시" Style="{DynamicResource T.Sub}" VerticalAlignment="Center"/>
+          </StackPanel></Expander.Header>
+          <ItemsPresenter/>
+        </Expander>
+      </ControlTemplate>
+    </Setter.Value></Setter></Style></GroupStyle.ContainerStyle>
+  </GroupStyle></DataGrid.GroupStyle>
+</DataGrid>
+'@
+    # 그룹 행의 ItemsPresenter가 무한 폭으로 측정돼도 이름 열이 남는 폭을 채운다.
+    $grid.Add_SizeChanged({ param($s, $e) $s.Columns[1].Width = [System.Windows.Controls.DataGridLength]::new([Math]::Max(200, $s.ActualWidth - 48 - 80 - 96 - 240 - 24)) })
+    $grid
+}
+
+function New-WtTaskPage {
+    $page = New-WtPage -Fill
+    $page.Root.Margin = [System.Windows.Thickness]::new(24, 8, 24, 24)
+    $page
+}
+
+# 대화상자 모양은 여기에서만 정한다. 호출자는 본문/버튼과 처리기만 붙인다.
+function New-WtModal([string]$Title) {
+    $w = [System.Windows.Window]::new()
+    $w.Title = $Title; $w.Width = 480; $w.SizeToContent = 'Height'; $w.ResizeMode = 'NoResize'
+    $w.WindowStyle = 'ToolWindow'; $w.ShowInTaskbar = $false; $w.WindowStartupLocation = 'CenterOwner'
+    $owner = Get-WtWindow
+    if ($owner -and $owner.IsVisible) { $w.Owner = $owner; $w.Resources.MergedDictionaries.Add($owner.Resources) }
+    else { $w.Resources.MergedDictionaries.Add((New-WtThemeDictionary)); $w.Resources.MergedDictionaries.Add((Get-WtStyleDictionary)) }
+    Set-WtResource $w Background 'B.Card'; Set-WtResource $w Foreground 'B.Text'; Set-WtResource $w FontFamily 'Font.UI'
+    $body = New-WtStack Vertical 12; $body.Margin = [System.Windows.Thickness]::new(24)
+    $heading = New-WtText $Title 'T.Dialog'
+    [void](Add-WtChild $body $heading)
+    $content = New-WtStack Vertical 8; [void](Add-WtChild $body $content)
+    $errorText = New-WtText '' 'T.Sub'; Set-WtResource $errorText Foreground 'B.Danger'
+    $errorText.Visibility = 'Collapsed'; [void](Add-WtChild $body $errorText)
+    $buttons = New-WtStack Horizontal 8; $buttons.HorizontalAlignment = 'Right'
+    $buttons.Margin = [System.Windows.Thickness]::new(0, 12, 0, 0); [void](Add-WtChild $body $buttons)
+    $w.Content = $body
+    @{ Window = $w; Body = $content; Error = $errorText; Buttons = $buttons }
+}
+
+function New-WtMinuteInput([int]$Value) {
+    $row = New-WtStack Horizontal 12
+    $box = [System.Windows.Controls.TextBox]::new(); Set-WtStyle $box 'Input'
+    $box.Width = 160; $box.Text = [string]$Value
+    [System.Windows.Automation.AutomationProperties]::SetName($box, '새로 고침 간격 (분)')
+    [void](Add-WtChild $row $box)
+    $unit = New-WtText '분'; $unit.VerticalAlignment = 'Center'; [void](Add-WtChild $row $unit)
+    @{ Root = $row; Box = $box }
+}
+
+function New-WtContextMenu {
+    $menu = [System.Windows.Controls.ContextMenu]::new()
+    Set-WtResource $menu Background 'B.Card'; Set-WtResource $menu Foreground 'B.Text'
+    Set-WtResource $menu FontFamily 'Font.UI'; Set-WtResource $menu FontSize 'F.Body'
+    $menu
+}
+
+function Get-WtVisualChild($Root, [type]$Type) {
+    if ($Root -is $Type) { return $Root }
+    for ($i = 0; $i -lt [System.Windows.Media.VisualTreeHelper]::GetChildrenCount($Root); $i++) {
+        $found = Get-WtVisualChild ([System.Windows.Media.VisualTreeHelper]::GetChild($Root, $i)) $Type
+        if ($found) { return $found }
+    }
+    $null
+}
+
+Export-ModuleMember -Function New-WtTaskGrid, New-WtTaskPage, New-WtModal, New-WtMinuteInput, New-WtContextMenu, Get-WtVisualChild,
+    Get-WtStyleDictionary, ConvertFrom-WtXaml, Get-WtNamedElements, Set-WtStyle, Set-WtResource,
     New-WtText, New-WtIcon, New-WtStack, Add-WtChild, New-WtCard, New-WtCardHeader, New-WtButton, New-WtButtonContent, New-WtSegmented, New-WtSearchBox, New-WtTag,
     New-WtStatTile, New-WtPageHeader, New-WtPage, New-WtListRow, Format-WtDate, Show-WtMessage, Confirm-WtYesNo, Show-WtError

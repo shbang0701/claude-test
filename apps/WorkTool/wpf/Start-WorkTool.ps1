@@ -25,6 +25,7 @@ if ([System.Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA') {
     return
 }
 
+try {
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Xaml
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 
@@ -38,10 +39,14 @@ foreach ($file in (Get-ChildItem (Join-Path $PSScriptRoot 'addons') -Filter '*.p
 }
 #endregion
 
-try {
     Start-WtApp -AppRoot $PSScriptRoot
 } catch {
     $msg = "$($_.Exception.Message)`n`n위치: $($_.InvocationInfo.PositionMessage)"
     Write-Host $msg -ForegroundColor Red
-    try { [void][System.Windows.MessageBox]::Show($msg, 'WorkTool 시작 오류', 'OK', 'Error') } catch { }
+    try { [void][System.Windows.MessageBox]::Show($msg, 'WorkTool 시작 오류', 'OK', 'Error') } catch {
+        try {
+            Add-Type -AssemblyName System.Windows.Forms
+            [void][System.Windows.Forms.MessageBox]::Show($msg, 'WorkTool 시작 오류', 'OK', 'Error')
+        } catch { }
+    }
 }

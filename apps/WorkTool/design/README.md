@@ -98,6 +98,8 @@ HTML 배치 기준: 기존 색·본문 14·제목 26·카드 제목 16·보조 1
 
 검수: 모의 실행기의 20개 검사를 통과했습니다. 브라우저에서 폼 항목·선택지 추가, 폴더 변수 연결, 실행 결과, 알람 표시·다시 알림·연결 업무, 가상 URL 탭, 모달·함께 쓰는 창, 500개 모의 대상 취소를 확인했습니다. 잘못된 참조·순서, 저장 실패, 대소문자 파일 충돌, 과도한 문자열 증가와 오래된 보조 폼을 방어합니다. 휴대폰 폭 390에서 문서 가로 넘침과 중복 ID가 없었습니다. 실제 WPF 성능·복구·알람 서비스 검증은 아닙니다.
 
+500개 대상은 가짜 서버 목록입니다. 실제 파일 500개 저장이나 대용량 출력·디스크 용량 한도·복구를 시험한 것은 아닙니다. 사용자 출력은 건별 파일과 결과 목록을 허용하며, 예상 개수·용량 확인과 실행 중·누적 생성량 통제는 후속 백엔드 설계·로컬 검증 대상입니다.
+
 - [사용법과 결과 비교](../../../docs/plans/workflows-preview.md) — 세 가지 업무, 설정 변경 전후, 내부 API 제안, 현재 구현과의 차이
 - 전체 화면: `apps/WorkTool/design/workflows-overview.svg` · [SVG](workflows-overview.svg) · [PNG](workflows-overview.png)
 - 구성 편집: `apps/WorkTool/design/workflows-builder.svg` · [SVG](workflows-builder.svg) · [PNG](workflows-builder.png)

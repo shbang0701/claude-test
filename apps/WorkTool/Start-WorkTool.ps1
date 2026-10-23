@@ -208,8 +208,7 @@ function Exit-WorkTool {
 $script:trayTipShown = $false
 $form.add_FormClosing({
     param($s, $e)
-    # 트레이 메뉴의 종료나 윈도우 종료·로그오프면 그대로 닫는다
-    if ($e.Cancel) { return }
+    # 트레이 메뉴의 종료나 윈도우 종료·로그오프면 그대로 닫는다 (메모를 저장하지 못했으면 메모 화면이 끝낼지 묻는다)
     if ($script:exiting -or $e.CloseReason -ne [System.Windows.Forms.CloseReason]::UserClosing) { return }
     $e.Cancel = $true
     $s.Hide()

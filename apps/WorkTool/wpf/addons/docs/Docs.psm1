@@ -16,7 +16,9 @@ $script:pollTimer = $null
 $script:filterTimer = $null
 $script:stopping = $false
 $script:treeGeneration = 0
-$script:treeSelectionPath = $null
+$script:treeTarget = $null       # 트리에서 찾아가는 중인 경로. 하위 폴더를 다 읽으면 이어서 찾는다
+$script:treeWaitNode = $null     # 그 경로로 가려고 하위 폴더를 읽는 중인 항목
+$script:folderFallback = $null   # 마지막으로 본 폴더를 못 열면 대신 열 폴더 @{ From; To }
 $script:treeBatches = [System.Collections.Generic.List[object]]::new()
 $script:treeBatchScheduled = $false
 
@@ -179,7 +181,7 @@ function Copy-WtDocPath([string]$Path) {
 
 # ---- 화면 -------------------------------------------------------------------------------------
 
-# 최대 두 조회만 실행한다. 취소는 다음 파일부터 적용되며 진행 중인 OS 호출은 기다릴 수 있다.
+# 조회 하나를 실행하는 코드. 취소는 다음 파일부터 적용되며, 진행 중인 OS 호출은 끝날 때까지 기다릴 수 있다.
 $script:worker = {
     param($request, $kinds, $icons)
     $ErrorActionPreference = 'Stop'
@@ -207,9 +209,20 @@ function Start-WtDocRequest([string]$Key, [string]$Action, [string]$Path = '', $
     $true
 }
 
+# 응답 없는 공유 폴더를 기다리느라 다른 조회가 막히지 않게, 취소했거나 새 요청으로 바뀐 조회는 자리를 차지하지 않는다.
+# 폴더 · 홈 즐겨찾기는 하나씩, 트리는 둘까지 실행한다. 취소한 것까지 합쳐 8개가 돌고 있으면 끝나기를 기다린다.
+function Test-WtDocJobSlot([string]$Key) {
+    if ($script:jobs.Count -ge 8) { return $false }
+    $active = @($script:jobs | Where-Object { -not $_.Request.Cancel.Value })
+    if ($Key -in 'folder', 'home') { return -not @($active | Where-Object Key -eq $Key).Count }
+    @($active | Where-Object { $_.Key -notin 'folder', 'home' }).Count -lt 2
+}
+
 function Start-WtDocJobs {
-    while (-not $script:stopping -and $script:jobs.Count -lt 2 -and $script:pending.Count) {
-        $key = if ($script:pending.Contains('folder')) { 'folder' } elseif ($script:pending.Contains('home')) { 'home' } else { @($script:pending.Keys)[0] }
+    if ($script:stopping) { return }
+    $keys = @(@('folder', 'home') | Where-Object { $script:pending.Contains($_) }) + @($script:pending.Keys | Where-Object { $_ -notin 'folder', 'home' })
+    foreach ($key in $keys) {
+        if (-not $script:pending.Contains($key) -or -not (Test-WtDocJobSlot $key)) { continue }
         $job = $script:pending[$key]; $script:pending.Remove($key)
         $state = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
         foreach ($name in 'Get-WtDocKind', 'Get-WtDocIcon', 'Format-WtDocSize', 'New-WtDocEntry', 'Get-WtDocEntries', 'Get-WtDocSubfolders', 'Get-WtDocPinEntries') {
@@ -248,6 +261,12 @@ function Set-WtDocResult($Job, $Result) {
     switch ($Job.Key) {
         'folder' {
             if (-not $script:ui.Count -or $Job.Request.Path -ne $script:current) { return }
+            $fallback = $script:folderFallback; $script:folderFallback = $null
+            if ($Result.Error -and $fallback -and $fallback.From -eq $Job.Request.Path) {
+                # 마지막으로 본 폴더가 없어졌거나 연결되지 않으면 첫 폴더를 연다 (화면을 멈추는 존재 확인 없이)
+                Show-WtDocFolder $fallback.To -SelectTree
+                return
+            }
             $script:entries = @($Result.Items)
             $script:ui.Loading = $false
             $script:ui.Error = if ($Result.Error) { "폴더를 열지 못했습니다. $($Result.Error)" } else { $null }
@@ -272,7 +291,11 @@ function Set-WtDocResult($Job, $Result) {
             if ($Job.Generation -ne $script:treeGeneration) { return }
             $node = $Job.Context
             $node.Items.Clear()
-            if ($Result.Error) { $node.Tag.Loading = $false; [void]$node.Items.Add('읽지 못했습니다. 접었다 다시 펼치세요.'); $node.ToolTip = $Result.Error; return }
+            if ($Result.Error) {
+                $node.Tag.Loading = $false; [void]$node.Items.Add('읽지 못했습니다. 접었다 다시 펼치세요.'); $node.ToolTip = $Result.Error
+                if ([object]::ReferenceEquals($node, $script:treeWaitNode)) { $script:treeWaitNode = $null; $script:treeTarget = $null }
+                return
+            }
             $node.Tag.Loading = $true
             [void]$node.Items.Add('불러오는 중…')
             $script:treeBatches.Add(@{ Node = $node; Paths = @($Result.Items); Index = 0; Generation = $Job.Generation })
@@ -306,7 +329,8 @@ function Complete-WtDocTreeBatch {
     if ($batch.Index -eq $batch.Paths.Count) {
         $node.Tag.Loaded = $true; $node.Tag.Loading = $false
         $script:treeBatches.RemoveAt(0)
-        if ($script:treeSelectionPath) { Select-WtDocTreePath $script:treeSelectionPath }
+        # 찾아가던 길의 폴더를 다 읽었을 때만 이어서 찾는다. 다른 폴더를 펼쳐도 선택 · 스크롤 · 접어 둔 폴더를 건드리지 않는다
+        if ($script:treeTarget -and [object]::ReferenceEquals($node, $script:treeWaitNode)) { Select-WtDocTreePath $script:treeTarget }
     } else { [void]$node.Items.Add('불러오는 중…') }
     Request-WtDocTreeBatch
 }
@@ -318,7 +342,11 @@ function Stop-WtDocs {
     foreach ($job in $script:jobs) {
         $job.Request.Cancel.Value = $true
         $job.Context = $null
-        if (-not $job.Handle.IsCompleted) { [void]$job.PowerShell.BeginStop($null, $null); $job.Runspace.CloseAsync() }
+        if (-not $job.Handle.IsCompleted) {
+            # 응답 없는 OS 호출 중에는 멈추기 · 닫기가 실패할 수 있다. 끝낼 때 오류 창을 띄우지 않는다
+            try { [void]$job.PowerShell.BeginStop($null, $null) } catch { }
+            try { $job.Runspace.CloseAsync() } catch { }
+        }
     }
     if ($script:filterTimer) { $script:filterTimer.Stop() }
     Complete-WtDocJobs
@@ -370,6 +398,7 @@ function Get-WtDocRootLabel([string]$Path) {
 
 function Update-WtDocTree {
     $script:treeGeneration++
+    $script:treeTarget = $null; $script:treeWaitNode = $null
     $script:treeBatches.Clear()
     foreach ($key in @($script:pending.Keys)) { if ($key.StartsWith('tree:')) { $script:pending.Remove($key) } }
     foreach ($job in $script:jobs) { if ($job.Request.Action -eq 'tree') { $job.Request.Cancel.Value = $true; $job.Context = $null } }
@@ -380,9 +409,10 @@ function Update-WtDocTree {
     $script:ui.RemoveRoot.IsEnabled = $false
 }
 
-# 트리에서 경로에 맞는 항목을 펼쳐 찾아 고른다
+# 트리에서 경로에 맞는 항목을 펼쳐 찾아 고른다. 아직 읽지 않은 폴더를 만나면 읽은 뒤 이어서 찾는다
 function Select-WtDocTreePath([string]$Path) {
-    $script:treeSelectionPath = $Path
+    $script:treeTarget = $Path
+    $script:treeWaitNode = $null
     $items = $script:ui.Tree.Items
     $found = $null
     if ($Path -eq '*') { $found = $items[0] }
@@ -391,20 +421,26 @@ function Select-WtDocTreePath([string]$Path) {
             $next = $items | Where-Object { $_ -is [System.Windows.Controls.TreeViewItem] -and $_.Tag.Path.TrimEnd('\') -ieq $step.TrimEnd('\') } | Select-Object -First 1
             if (-not $next) { break }
             $found = $next
-            if ($step.TrimEnd('\') -ine $Path.TrimEnd('\')) { Expand-WtDocNode $next; $next.IsExpanded = $true; if (-not $next.Tag.Loaded) { break } }
+            if ($step.TrimEnd('\') -ine $Path.TrimEnd('\')) {
+                Expand-WtDocNode $next; $next.IsExpanded = $true
+                if (-not $next.Tag.Loaded) { $script:treeWaitNode = $next; break }
+            }
             $items = $next.Items
         }
     }
+    if (-not $script:treeWaitNode) { $script:treeTarget = $null }
     if ($found) {
         $script:selecting = $true
         try { $found.IsSelected = $true; $found.BringIntoView() } finally { $script:selecting = $false }
     }
 }
 
-# 오른쪽에 폴더(또는 즐겨찾기 '*')를 보여 준다
-function Show-WtDocFolder([string]$Path, [switch]$SelectTree) {
+# 오른쪽에 폴더(또는 즐겨찾기 '*')를 보여 준다. -Fallback: 이 폴더를 못 열면 대신 열 폴더
+function Show-WtDocFolder([string]$Path, [switch]$SelectTree, [string]$Fallback = '') {
     $script:current = $Path
-    $script:treeSelectionPath = $Path
+    $script:folderFallback = if ($Fallback) { @{ From = $Path; To = $Fallback } } else { $null }
+    # 트리를 직접 고른 경우 등: 찾아가던 길이 있으면 그만둔다
+    if (-not $SelectTree) { $script:treeTarget = $null; $script:treeWaitNode = $null }
     $script:entries = @()
     $script:ui.Loading = [bool]$Path
     $script:ui.Filter.Text = ''
@@ -676,10 +712,11 @@ function New-WtDocsView {
 
 function Update-WtDocsView {
     Update-WtDocTree
+    $roots = @(Get-WtDocRoots)
+    $first = if ($roots.Count) { $roots[0] } else { '*' }
     $last = [string](Get-WtSetting 'docs.last')
-    $start = if ($last -and (Get-WtDocChain (Get-WtDocRoots) $last).Count) { $last }
-    elseif (@(Get-WtDocRoots).Count) { @(Get-WtDocRoots)[0] } else { '*' }
-    Show-WtDocFolder $start -SelectTree
+    if ($last -and $last -ne $first -and (Get-WtDocChain $roots $last).Count) { Show-WtDocFolder $last -SelectTree -Fallback $first }
+    else { Show-WtDocFolder $first -SelectTree }
 }
 
 # 홈: 즐겨찾기 바로 열기

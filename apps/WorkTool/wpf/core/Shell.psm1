@@ -125,7 +125,8 @@ function Select-WtPage([string]$Id) {
     if ($script:selecting -or -not $Id) { return }
     $script:selecting = $true
     try {
-        if (-not (Save-WtPendingChanges)) { return }
+        # 떠나는 화면에 저장하지 못한 내용이 있으면 묻는다 (다른 화면의 저장 상태는 그 화면을 떠날 때 묻는다)
+        if ($script:current -and $Id -ne $script:current -and -not (Save-WtPendingChanges -Purpose switch -Only $script:current)) { return }
         $page = Get-WtPageView $Id
         if (-not $page) { return }
         if ($page.Addon -and $page.Addon.Refresh) { [void](& $page.Addon.Refresh $page.View) }
@@ -344,24 +345,59 @@ function Show-WtMainWindow {
     [void]$script:window.Activate()
 }
 
-# 정리 처리 전에 모든 저장을 확인한다. 실패하면 타이머와 창을 그대로 유지한다.
-function Save-WtPendingChanges {
+# 저장하지 못한 내용이 있을 때 묻는다. 'retry'(다시 시도) · 'proceed'(그대로 끝내기 · 이동) · 'cancel' 중 하나를 돌려준다.
+function Show-WtPendingChoice([string]$Purpose, [string]$Title) {
+    $exit = $Purpose -eq 'exit'
+    $dialog = New-WtModal $(if ($exit) { '저장하지 않고 끝낼까요?' } else { '저장하지 않고 이동할까요?' })
+    $text = if ($exit) { "$Title 화면에서 저장하지 못한 내용은 끝내면 사라집니다." }
+    else { "$Title 화면에서 저장하지 못한 내용은 그 화면에 그대로 남습니다." }
+    [void](Add-WtChild $dialog.Body (New-WtText $text))
+    $retry = New-WtButton '다시 시도' -Kind Primary; $retry.IsDefault = $true
+    $go = if ($exit) { New-WtButton '끝내기' -Kind Danger } else { New-WtButton '이동' }
+    $cancel = New-WtButton '취소'; $cancel.IsCancel = $true
+    $dialog.Window.Tag = @{ Choice = 'cancel'; Focus = $retry }
+    foreach ($pair in @(@($retry, 'retry'), @($go, 'proceed'))) {
+        $pair[0].Tag = @{ Window = $dialog.Window; Choice = $pair[1] }
+        $pair[0].Add_Click({ param($s, $e) $s.Tag.Window.Tag.Choice = $s.Tag.Choice; $s.Tag.Window.DialogResult = $true })
+        [void](Add-WtChild $dialog.Buttons $pair[0])
+    }
+    [void](Add-WtChild $dialog.Buttons $cancel)
+    $dialog.Window.Add_ContentRendered({ param($s, $e) [void]$s.Tag.Focus.Focus() })
+    [void]$dialog.Window.ShowDialog()
+    [string]$dialog.Window.Tag.Choice
+}
+
+# 저장하지 않은 내용을 저장한다. 계속해도 되면 $true.
+# -Purpose exit · switch: 저장하지 못하면 다시 시도 · 그대로 진행 · 취소를 묻는다. 막기만 하면 끄거나 옮길 방법이 없어진다.
+#          check: 묻지 않고 알린 뒤 $false (예전 데이터 가져오기처럼 덮어쓰는 작업 전)
+# -Only: 그 애드온만 확인한다 (화면을 떠날 때는 떠나는 화면만)
+function Save-WtPendingChanges([ValidateSet('check', 'switch', 'exit')][string]$Purpose = 'check', [string]$Only = '') {
     foreach ($a in @(Get-WtAddon -All)) {
-        if (-not $a.SavePending) { continue }
-        try {
-            if ((& $a.SavePending) -eq $false) {
-                Show-WtMessage '저장하지 못한 내용이 있습니다. 메모의 저장 오류를 해결한 뒤 다시 시도하세요.' '저장 확인' 'Warning'
+        if (-not $a.SavePending -or ($Only -and $a.Id -ne $Only)) { continue }
+        while ($true) {
+            $saved = $false
+            try { $saved = (@(& $a.SavePending) | Select-Object -Last 1) -ne $false }
+            catch { Show-WtError $_ "저장 확인: $($a.Title)" }
+            if ($saved) { break }
+            if ($Purpose -eq 'check') {
+                Show-WtMessage "$($a.Title) 화면에 저장하지 못한 내용이 있습니다. 저장 오류를 해결한 뒤 다시 시도하세요." '저장 확인' 'Warning'
                 return $false
             }
-        } catch { Show-WtError $_ "저장 확인: $($a.Title)"; return $false }
+            # 트레이에 숨어 있으면 창을 띄워서 무엇을 저장하지 못했는지 볼 수 있게 한다
+            if ($script:window -and -not $script:window.IsVisible) { Show-WtMainWindow }
+            $choice = Show-WtPendingChoice $Purpose $a.Title
+            if ($choice -eq 'retry') { continue }
+            if ($choice -eq 'proceed') { break }
+            return $false
+        }
     }
     $true
 }
 
-# 저장에 성공한 뒤에만 트레이·타이머를 정리하고 메시지 돌리기를 멈춘다.
+# 저장을 확인한 뒤에만(또는 저장하지 않고 끝내기를 고른 뒤에만) 트레이·타이머를 정리하고 메시지 돌리기를 멈춘다.
 function Stop-WtApp {
     if (-not $script:exiting) {
-        if (-not (Save-WtPendingChanges)) { return $false }
+        if (-not (Save-WtPendingChanges -Purpose exit)) { return $false }
         foreach ($a in @(Get-WtAddon -All)) {
             if ($a.OnExit) { try { [void](& $a.OnExit) } catch { Show-WtError $_ "끝내기 전 저장: $($a.Title)" } }
         }

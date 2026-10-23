@@ -15,6 +15,7 @@ $script:lastError = ''
 $script:appFilter = '*'
 $script:sortColumn = 'DisplayTitle'
 $script:sortDirection = 'Ascending'
+$script:focusTarget = $null   # 표를 다시 만든 뒤 포커스를 돌려줄 체크박스 @{ Id } 또는 @{ Group }
 Register-WtSettingDefault 'tasks.refresh' @{ mode = 'manual'; minutes = 5 }
 
 function ConvertTo-WtTaskMinutes([string]$Text) {
@@ -68,6 +69,23 @@ function Get-WtTaskCheckState([object[]]$Items) {
     if (-not $picked) { return $false }
     if ($picked -eq $available.Count) { return $true }
     $null
+}
+
+# WorkTool을 띄운 터미널 · 편집기 같은 조상 프로세스. 그 창을 닫으면 WorkTool도 꺼지므로 표에는 보여 주되 닫지 않는다.
+# 탐색기 · 시스템 프로세스에서 멈춘다(그 창들은 그대로 닫을 수 있게). 이미 끝난 부모의 PID를 다른 프로그램이 받았으면 시작 시각으로 걸러 낸다.
+function Get-WtTaskHostIds {
+    $ids = [System.Collections.Generic.List[int]]::new()
+    $stop = @('explorer', 'svchost', 'sihost', 'services', 'wininit', 'winlogon', 'userinit', 'RuntimeBroker', 'csrss', 'smss')
+    try {
+        $child = Get-Process -Id $PID
+        for ($depth = 0; $depth -lt 8; $depth++) {
+            $parent = $child.Parent
+            if (-not $parent -or $parent.ProcessName -in $stop -or $parent.StartTime -gt $child.StartTime) { break }
+            $ids.Add($parent.Id)
+            $child = $parent
+        }
+    } catch { }
+    $ids.ToArray()
 }
 
 function Set-WtTaskSnapshot([object[]]$Items) {
@@ -138,7 +156,7 @@ $script:worker = {
         @{ Tabs = @($tabs.ToArray()); Partial = $partial }
     }
     function New-Row($windowInfo, $processInfo, [string]$windowId, [int]$ordinal, [string]$kind, [string]$title, [string]$runtime, [int]$tabIndex, [bool]$canClose, [string]$status) {
-        $labels = @{ chrome = 'Google Chrome'; msedge = 'Microsoft Edge'; EXCEL = 'Microsoft Excel'; WINWORD = 'Microsoft Word'; POWERPNT = 'Microsoft PowerPoint'; explorer = '파일 탐색기'; notepad = '메모장' }
+        $labels = @{ chrome = 'Google Chrome'; msedge = 'Microsoft Edge'; whale = '네이버 웨일'; EXCEL = 'Microsoft Excel'; WINWORD = 'Microsoft Word'; POWERPNT = 'Microsoft PowerPoint'; explorer = '파일 탐색기'; notepad = '메모장' }
         $appLabel = $processInfo.Name
         if ($labels.ContainsKey($appLabel)) { $appLabel = $labels[$appLabel] }
         [pscustomobject]@{
@@ -162,7 +180,9 @@ $script:worker = {
         }
         $rows = [Collections.Generic.List[object]]::new()
         $ordinals = @{}; $failed = 0
-        $browsers = if ($request.BrowserNames) { $request.BrowserNames } else { @('chrome', 'msedge') }
+        # 탭 단위로 다루는 Chromium 계열 브라우저. 탭을 못 읽으면 창 전체를 닫는 대신 '탭 확인 불가'로 둔다
+        $browsers = if ($request.BrowserNames) { $request.BrowserNames } else { @('chrome', 'msedge', 'whale') }
+        $hosts = @($request.HostProcessIds)
         foreach ($window in $windows) {
             if ($request.Cancel.Value) { break }
             try {
@@ -179,6 +199,12 @@ $script:worker = {
                 $ordinals[$processInfo.Name]++
                 $ordinal = $ordinals[$processInfo.Name]
                 $minimized = $wp -and $wp.Current.WindowVisualState -eq 'Minimized'
+                if ($info.ProcessId -in $hosts) {
+                    $row = New-Row $wi $processInfo $windowId $ordinal 'window' $info.Name $windowRuntime 0 $false 'WorkTool 실행 중'
+                    $row.CloseHint = 'WorkTool이 이 프로그램에서 실행 중입니다. 닫으면 WorkTool도 꺼지므로 여기서는 닫지 않습니다.'
+                    $rows.Add($row)
+                    continue
+                }
                 if ($processInfo.Name -notin $browsers) {
                     $status = if ($minimized) { '최소화' } elseif (-not $wp) { '닫기 지원 안 됨' } else { '' }
                     $rows.Add((New-Row $wi $processInfo $windowId $ordinal 'window' $info.Name $windowRuntime 0 ([bool]$wp) $status))
@@ -231,6 +257,7 @@ $script:worker = {
         $state = 'failed'; $message = ''
         try {
             if ($request.Cancel.Value) { $state = 'canceled'; $message = '취소됨' }
+            elseif ($target.ProcessId -in @($request.HostProcessIds)) { throw 'WorkTool이 실행 중인 프로그램이라 닫지 않습니다.' }
             else {
                 $element = Find-Target $target
                 if (-not $element) { $state = 'gone'; $message = '이미 없음' }
@@ -277,7 +304,7 @@ function Start-WtTaskJob([string]$Action, [object[]]$Targets = @()) {
     $runspace = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
     $runspace.ApartmentState = 'MTA'; $runspace.ThreadOptions = 'ReuseThread'; $runspace.Open()
     $ps = [powershell]::Create(); $ps.Runspace = $runspace
-    [void]$ps.AddScript($script:worker.ToString()).AddArgument(@{ Action = $Action; Targets = $Targets; SelfProcessId = $PID; Cancel = $cancel })
+    [void]$ps.AddScript($script:worker.ToString()).AddArgument(@{ Action = $Action; Targets = $Targets; SelfProcessId = $PID; HostProcessIds = @(Get-WtTaskHostIds); Cancel = $cancel })
     try {
         $handle = $ps.BeginInvoke()
         $script:job = @{ PowerShell = $ps; Runspace = $runspace; Handle = $handle; Cancel = $cancel; Action = $Action; Started = [datetime]::UtcNow }
@@ -377,6 +404,33 @@ function Update-WtTaskList([switch]$KeepSelection) {
     $script:ui.Grid.UpdateLayout()
     if ($scroll) { $scroll.ScrollToVerticalOffset($offset) }
     Update-WtTaskStatus
+}
+
+# 표를 다시 만들면 방금 누른 체크박스가 새것으로 바뀐다. 같은 항목 · 같은 그룹의 체크박스로 포커스를 돌려줘
+# Space · Tab으로 이어서 고를 수 있게 한다.
+function Restore-WtTaskFocus {
+    $target = $script:focusTarget; $script:focusTarget = $null
+    if (-not $target -or -not $script:ui.Count) { return }
+    $check = $null
+    if ($target.Group) { $check = $script:ui.GroupChecks[$target.Group] }
+    else {
+        $item = $script:visible | Where-Object Id -eq $target.Id | Select-Object -First 1
+        if ($item) {
+            $script:ui.Grid.ScrollIntoView($item)
+            $row = Find-WtTaskRow $script:ui.Grid $target.Id
+            if ($row) { $check = Get-WtVisualChild $row ([System.Windows.Controls.CheckBox]) }
+        }
+    }
+    if ($check) { [void]$check.Focus() }
+}
+
+function Find-WtTaskRow($Root, [string]$Id) {
+    if ($Root -is [System.Windows.Controls.DataGridRow]) { if ([string]$Root.Item.Id -eq $Id) { return $Root }; return $null }
+    for ($i = 0; $i -lt [System.Windows.Media.VisualTreeHelper]::GetChildrenCount($Root); $i++) {
+        $found = Find-WtTaskRow ([System.Windows.Media.VisualTreeHelper]::GetChild($Root, $i)) $Id
+        if ($found) { return $found }
+    }
+    $null
 }
 
 function Show-WtTaskRefreshDialog {
@@ -491,9 +545,15 @@ function New-WtActiveTasksView {
         if ($check -isnot [System.Windows.Controls.CheckBox]) { return }
         if ($check.Tag -eq 'group') {
             foreach ($row in @($check.DataContext.Items)) { if ($row.CanClose) { $row.Selected = $check.IsChecked -eq $true } }
-        } elseif ($check.Tag -eq 'task') { $check.DataContext.Selected = $check.IsChecked -eq $true }
+            $script:focusTarget = @{ Group = [string]$check.DataContext.Name }
+        } elseif ($check.Tag -eq 'task') {
+            $check.DataContext.Selected = $check.IsChecked -eq $true
+            $script:focusTarget = @{ Id = [string]$check.DataContext.Id }
+        }
         else { return }
         Update-WtTaskList -KeepSelection
+        # 그룹 체크박스는 그룹 머리글이 다시 만들어진 뒤(Loaded) 등록되므로 그보다 늦은 순서로 돌려준다
+        [void]$s.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{ Restore-WtTaskFocus })
     })
     # Loaded는 자식에서 버블링하지 않으므로 GroupItem 스타일에서 직접 받는다.
     $groupStyle = [System.Windows.Style]::new([System.Windows.Controls.GroupItem], $grid.GroupStyle[0].ContainerStyle)
@@ -537,4 +597,4 @@ Register-WtAddon -Id 'active-tasks' -Title '활성 작업' -Icon 0xE7C4 -Order 6
     -NewView { New-WtActiveTasksView } -Refresh { param($view) Start-WtTaskJob 'scan' } -OnExit { Stop-WtTasks }
 
 Export-ModuleMember -Function ConvertTo-WtTaskMinutes, Get-WtTaskRefresh, Set-WtTaskRefresh, Test-WtTaskAutoDue,
-    Find-WtTaskItems, Get-WtTaskCheckState, Get-WtTaskWorker
+    Find-WtTaskItems, Get-WtTaskCheckState, Get-WtTaskWorker, Get-WtTaskHostIds

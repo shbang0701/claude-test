@@ -12,10 +12,19 @@ $script:dirty      = $false  # 편집 내용이 저장되지 않았는지
 $script:busy       = $false  # 코드로 화면을 바꾸는 동안 이벤트를 무시한다
 $script:readFailed = $false  # 파일을 못 읽었으면 빈 목록으로 덮어쓰지 않게 저장을 막는다
 $script:closeHooked = $false
+$script:lastSaveError = ''   # 마지막 저장 실패 이유 (끝낼 때 묻는 창에 보여 준다)
 
 function Show-MemoMessage([string]$Text) {
     [void][System.Windows.Forms.MessageBox]::Show($Text, '메모',
         [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+}
+
+# 저장하지 못한 채 끝낼지 묻는다. 예면 $true. 기본 단추는 아니요다.
+function Confirm-MemoDiscard([string]$Reason) {
+    $answer = [System.Windows.Forms.MessageBox]::Show("$Reason`n`n저장하지 않고 끝낼까요? 저장하지 못한 내용은 사라집니다.", '메모',
+        [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Warning,
+        [System.Windows.Forms.MessageBoxDefaultButton]::Button2)
+    $answer -eq [System.Windows.Forms.DialogResult]::Yes
 }
 
 function Set-MemoStatus([string]$Text) {
@@ -69,10 +78,11 @@ function Show-Memo($Memo) {
     }
 }
 
-# 편집 중인 메모를 저장한다. 성공하면 $true.
-function Save-CurrentMemo {
+# 편집 중인 메모를 저장한다. 성공하면 $true. -Quiet면 실패해도 알림 창 없이 이유만 남긴다.
+function Save-CurrentMemo([switch]$Quiet) {
     if ($script:readFailed) {
-        Show-MemoMessage '메모 파일을 읽지 못해 저장하지 않았습니다. 툴을 다시 열어 주세요.'
+        $script:lastSaveError = '메모 파일을 읽지 못해 저장하지 않았습니다. 툴을 다시 열어 주세요.'
+        if (-not $Quiet) { Show-MemoMessage $script:lastSaveError }
         return $false
     }
     $title = $script:titleBox.Text.Trim()
@@ -99,7 +109,8 @@ function Save-CurrentMemo {
     try {
         Save-Records memo $all
     } catch {
-        Show-MemoMessage "저장하지 못했습니다. memo.csv가 Excel 등에서 열려 있는지 확인해 주세요.`n`n$($_.Exception.Message)"
+        $script:lastSaveError = "저장하지 못했습니다. memo.csv가 Excel 등에서 열려 있는지 확인해 주세요.`n`n$($_.Exception.Message)"
+        if (-not $Quiet) { Show-MemoMessage $script:lastSaveError }
         return $false
     }
     $script:memos = $all
@@ -285,12 +296,21 @@ function New-MemoView {
     $deleteButton.add_Click({ Remove-CurrentMemo })
 
     # 창을 닫을 때 저장 안 한 내용을 저장한다. 화면이 창에 붙은 뒤에야 창을 찾을 수 있다.
+    # 메인 창의 처리기가 먼저 불린다. X로 트레이에 숨길 때는 그쪽이 이미 닫기를 취소해 둔다.
     $view.add_HandleCreated({
         $form = $this.FindForm()
         if ($form -and -not $script:closeHooked) {
             $form.add_FormClosing({
                 param($sender, $event)
-                if ($script:dirty -and -not (Save-CurrentMemo)) { $event.Cancel = $true }
+                if (-not $script:dirty) { return }
+                if ($event.Cancel) {
+                    # 트레이로 숨기는 중: 내용은 메모리에 남는다. 저장을 못 했으면 창을 다시 띄워 알린다
+                    if (-not (Save-CurrentMemo -Quiet)) { $sender.Show(); $sender.Activate(); Show-MemoMessage $script:lastSaveError }
+                    return
+                }
+                if (Save-CurrentMemo -Quiet) { return }
+                # 실제로 끝나는 중(트레이 종료 · Windows 종료 · 로그오프): 끝낼지 묻는다. 막기만 하면 끌 방법이 없어진다
+                if (-not (Confirm-MemoDiscard $script:lastSaveError)) { $event.Cancel = $true }
             })
             $script:closeHooked = $true
         }

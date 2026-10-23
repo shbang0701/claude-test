@@ -80,6 +80,27 @@ WPF로 옮길 때 기준으로 삼는 화면 시안과 구현된 화면을 모�
 - 전체 화면과 확대본의 배치, 선택 수·대상 일치, 목업 데이터와 이미지 일치, 외부 리소스 없는 SVG를 확인합니다.
 - 실제 모달의 취소·오류·적용, 그룹 체크, 검색 후 체크 해제, 접기 유지, 타이머 경로는 전용 테스트 창에서 검사합니다. Chrome·Edge는 새 테스트 프로필의 가짜 페이지로 조회·개별 닫기를 검사합니다. 업무 PC의 DRM 앱·보안 정책과 모든 화면 배율 조합은 별도 현장 확인이 필요합니다.
 
+### 사용자 구성 업무 (목업 · 미구현)
+
+업무를 구성하는 사람과 실제 사용하는 사람의 흐름을 함께 확인하는 시안입니다. 모든 이름·입력·결과는 가짜이며, 알람 예약·파일 생성·ping도 시뮬레이션입니다.
+
+- [사용법과 결과 비교](../../../docs/plans/workflows-preview.md) — 세 가지 업무, 설정 변경 전후, 내부 API 제안, 현재 구현과의 차이
+- 전체 화면: `apps/WorkTool/design/workflows-overview.svg` · [SVG](workflows-overview.svg) · [PNG](workflows-overview.png)
+- 구성 편집: `apps/WorkTool/design/workflows-builder.svg` · [SVG](workflows-builder.svg) · [PNG](workflows-builder.png)
+- 사용 결과: `apps/WorkTool/design/workflows-result.svg` · [SVG](workflows-result.svg) · [PNG](workflows-result.png)
+- 폰용 확대본: [요청 처리](workflows-request.png) · [자료 작성](workflows-report.png) · [서버 점검](workflows-check.png)
+- 원본: [샘플 JSON](workflows-sample.json) · [계산한 모의 결과](workflows-results.json) · [목업 생성 스크립트](build-workflows-mockups.ps1)
+
+![업무 트리, 사용자 입력 폼, 접을 수 있는 설명 패널의 제안 화면](workflows-overview.svg)
+
+아래 값은 이 목업의 배치 기준입니다. 구현된 앱 토큰이나 확정된 사용자 데이터 형식은 아닙니다.
+
+- 전체 화면: 1280 × 672. 제목 줄 40, 접힌 앱 메뉴 68, 업무 트리 252, 오른쪽 설명 320, 아래 상태 줄 24. 중앙은 남은 폭을 씁니다.
+- 입력·명령 높이 40, 패널 안쪽 여백 24, 항목 간격 12, 카드 반지름 12, 입력·버튼 반지름 8. 기존 색·글꼴·본문 14·보조 12.5·소제목 20을 사용합니다.
+- 폰용 그림은 논리 폭 480의 설명용 세로 판을 1.5배 확대해 SVG 폭 720으로 내보냅니다. PNG는 여기에 1.5배의 렌더링 밀도를 적용해 폭 1080입니다. 모바일 앱 시안이 아닙니다. 단계 높이는 글 길이에 따라 늘립니다.
+- PNG는 SVG와 동일한 도형 목록을 WPF로 렌더링합니다. 실제 화면 캡처나 외부 리소스를 사용하지 않습니다.
+- 생성기는 글자를 측정해 줄바꿈과 그림 경계를 검사합니다. 실제 키보드·호버·모달·화면 배율·대비 테마 동작은 아직 검증하지 않았습니다.
+
 ## 기준 값
 
 **바탕 · 선**

@@ -1,0 +1,1461 @@
+{
+  "checks": {
+    "cases": 9,
+    "expectations": "passed",
+    "shapeBounds": "passed"
+  },
+  "clock": "2026-10-23T09:00:00+09:00",
+  "isMock": true,
+  "mockSchema": 1,
+  "mode": "simulation",
+  "runs": [
+    {
+      "at": "2026-10-23T09:00:00+09:00",
+      "cancelledBefore": null,
+      "definitionSnapshot": {
+        "description": "대여 가능 여부와 반납 시각을 확인하세요. 처리 뒤 지정한 시각에 후속 확인을 알립니다.",
+        "fields": [
+          {
+            "id": "requestNo",
+            "label": "요청 번호",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "id": "title",
+            "label": "요청 제목",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "choices": [
+              "프로젝터",
+              "케이블",
+              "기타"
+            ],
+            "id": "item",
+            "label": "물품",
+            "required": true,
+            "type": "choice"
+          },
+          {
+            "id": "quantity",
+            "label": "수량",
+            "min": 1,
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "id": "followupAt",
+            "label": "후속 확인 시각",
+            "required": true,
+            "type": "datetime-offset"
+          },
+          {
+            "id": "availableChecked",
+            "label": "대여 가능 확인",
+            "required": true,
+            "type": "checkbox"
+          },
+          {
+            "id": "returnChecked",
+            "label": "반납 시각 확인",
+            "required": true,
+            "type": "checkbox"
+          }
+        ],
+        "folder": "일반 업무",
+        "helpVisible": true,
+        "id": "request",
+        "settings": {},
+        "steps": [
+          {
+            "action": "record.append",
+            "args": {
+              "collection": "requests",
+              "values": {
+                "availableChecked": "${input.availableChecked}",
+                "item": "${input.item}",
+                "quantity": "${input.quantity}",
+                "requestNo": "${input.requestNo}",
+                "returnChecked": "${input.returnChecked}",
+                "title": "${input.title}"
+              }
+            },
+            "id": "record",
+            "version": 1
+          },
+          {
+            "action": "alarm.schedule",
+            "args": {
+              "at": "${input.followupAt}",
+              "message": "요청 ${input.requestNo} 후속 확인",
+              "taskId": "${context.instanceId}",
+              "title": "${input.title}"
+            },
+            "id": "remind",
+            "version": 1
+          }
+        ],
+        "title": "요청 처리",
+        "version": 1,
+        "windowMode": "modeless"
+      },
+      "definitionVersion": 1,
+      "error": null,
+      "id": "request-base",
+      "input": {
+        "availableChecked": true,
+        "followupAt": "2026-10-23T14:00:00+09:00",
+        "item": "프로젝터",
+        "quantity": 1,
+        "requestNo": "DEMO-001",
+        "returnChecked": true,
+        "title": "회의실 장비 대여"
+      },
+      "instanceId": "mock-task-request-base",
+      "kind": "base",
+      "mode": "simulation",
+      "status": "succeeded",
+      "trace": [
+        {
+          "action": "record.append",
+          "args": {
+            "collection": "requests",
+            "values": {
+              "availableChecked": true,
+              "item": "프로젝터",
+              "quantity": 1,
+              "requestNo": "DEMO-001",
+              "returnChecked": true,
+              "title": "회의실 장비 대여"
+            }
+          },
+          "id": "record",
+          "response": {
+            "data": {
+              "collection": "requests",
+              "recordId": "mock-request-base-record",
+              "values": {
+                "availableChecked": true,
+                "item": "프로젝터",
+                "quantity": 1,
+                "requestNo": "DEMO-001",
+                "returnChecked": true,
+                "title": "회의실 장비 대여"
+              }
+            },
+            "error": null,
+            "mode": "simulation",
+            "status": "succeeded"
+          },
+          "version": 1
+        },
+        {
+          "action": "alarm.schedule",
+          "args": {
+            "at": "2026-10-23T14:00:00+09:00",
+            "message": "요청 DEMO-001 후속 확인",
+            "taskId": "mock-task-request-base",
+            "title": "회의실 장비 대여"
+          },
+          "id": "remind",
+          "response": {
+            "data": {
+              "alarmId": "mock-request-base-remind",
+              "at": "2026-10-23T14:00:00+09:00",
+              "message": "요청 DEMO-001 후속 확인",
+              "state": "scheduled",
+              "taskId": "mock-task-request-base",
+              "title": "회의실 장비 대여"
+            },
+            "error": null,
+            "mode": "simulation",
+            "status": "succeeded"
+          },
+          "version": 1
+        }
+      ],
+      "workflowId": "request"
+    },
+    {
+      "at": "2026-10-23T09:00:00+09:00",
+      "cancelledBefore": null,
+      "definitionSnapshot": {
+        "description": "대여 가능 여부와 반납 시각을 확인하세요. 처리 뒤 지정한 시각에 후속 확인을 알립니다.",
+        "fields": [
+          {
+            "id": "requestNo",
+            "label": "요청 번호",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "id": "title",
+            "label": "요청 제목",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "choices": [
+              "프로젝터",
+              "케이블",
+              "기타"
+            ],
+            "id": "item",
+            "label": "물품",
+            "required": true,
+            "type": "choice"
+          },
+          {
+            "id": "quantity",
+            "label": "수량",
+            "min": 1,
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "id": "followupAt",
+            "label": "후속 확인 시각",
+            "required": true,
+            "type": "datetime-offset"
+          },
+          {
+            "id": "availableChecked",
+            "label": "대여 가능 확인",
+            "required": true,
+            "type": "checkbox"
+          },
+          {
+            "id": "returnChecked",
+            "label": "반납 시각 확인",
+            "required": true,
+            "type": "checkbox"
+          }
+        ],
+        "folder": "일반 업무",
+        "helpVisible": true,
+        "id": "request",
+        "settings": {},
+        "steps": [
+          {
+            "action": "record.append",
+            "args": {
+              "collection": "requests",
+              "values": {
+                "availableChecked": "${input.availableChecked}",
+                "item": "${input.item}",
+                "quantity": "${input.quantity}",
+                "requestNo": "${input.requestNo}",
+                "returnChecked": "${input.returnChecked}",
+                "title": "${input.title}"
+              }
+            },
+            "id": "record",
+            "version": 1
+          },
+          {
+            "action": "alarm.schedule",
+            "args": {
+              "at": "${input.followupAt}",
+              "message": "요청 ${input.requestNo} 후속 확인",
+              "taskId": "${context.instanceId}",
+              "title": "${input.title}"
+            },
+            "id": "remind",
+            "version": 1
+          }
+        ],
+        "title": "요청 처리",
+        "version": 1,
+        "windowMode": "modeless"
+      },
+      "definitionVersion": 1,
+      "error": null,
+      "id": "request-changed",
+      "input": {
+        "availableChecked": true,
+        "followupAt": "2026-10-23T15:30:00+09:00",
+        "item": "케이블",
+        "quantity": 2,
+        "requestNo": "DEMO-002",
+        "returnChecked": true,
+        "title": "연결 케이블 대여"
+      },
+      "instanceId": "mock-task-request-changed",
+      "kind": "changed",
+      "mode": "simulation",
+      "status": "succeeded",
+      "trace": [
+        {
+          "action": "record.append",
+          "args": {
+            "collection": "requests",
+            "values": {
+              "availableChecked": true,
+              "item": "케이블",
+              "quantity": 2,
+              "requestNo": "DEMO-002",
+              "returnChecked": true,
+              "title": "연결 케이블 대여"
+            }
+          },
+          "id": "record",
+          "response": {
+            "data": {
+              "collection": "requests",
+              "recordId": "mock-request-changed-record",
+              "values": {
+                "availableChecked": true,
+                "item": "케이블",
+                "quantity": 2,
+                "requestNo": "DEMO-002",
+                "returnChecked": true,
+                "title": "연결 케이블 대여"
+              }
+            },
+            "error": null,
+            "mode": "simulation",
+            "status": "succeeded"
+          },
+          "version": 1
+        },
+        {
+          "action": "alarm.schedule",
+          "args": {
+            "at": "2026-10-23T15:30:00+09:00",
+            "message": "요청 DEMO-002 후속 확인",
+            "taskId": "mock-task-request-changed",
+            "title": "연결 케이블 대여"
+          },
+          "id": "remind",
+          "response": {
+            "data": {
+              "alarmId": "mock-request-changed-remind",
+              "at": "2026-10-23T15:30:00+09:00",
+              "message": "요청 DEMO-002 후속 확인",
+              "state": "scheduled",
+              "taskId": "mock-task-request-changed",
+              "title": "연결 케이블 대여"
+            },
+            "error": null,
+            "mode": "simulation",
+            "status": "succeeded"
+          },
+          "version": 1
+        }
+      ],
+      "workflowId": "request"
+    },
+    {
+      "at": "2026-10-23T09:00:00+09:00",
+      "cancelledBefore": null,
+      "definitionSnapshot": {
+        "description": "대여 가능 여부와 반납 시각을 확인하세요. 처리 뒤 지정한 시각에 후속 확인을 알립니다.",
+        "fields": [
+          {
+            "id": "requestNo",
+            "label": "요청 번호",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "id": "title",
+            "label": "요청 제목",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "choices": [
+              "프로젝터",
+              "케이블",
+              "기타"
+            ],
+            "id": "item",
+            "label": "물품",
+            "required": true,
+            "type": "choice"
+          },
+          {
+            "id": "quantity",
+            "label": "수량",
+            "min": 1,
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "id": "followupAt",
+            "label": "후속 확인 시각",
+            "required": true,
+            "type": "datetime-offset"
+          },
+          {
+            "id": "availableChecked",
+            "label": "대여 가능 확인",
+            "required": true,
+            "type": "checkbox"
+          },
+          {
+            "id": "returnChecked",
+            "label": "반납 시각 확인",
+            "required": true,
+            "type": "checkbox"
+          }
+        ],
+        "folder": "일반 업무",
+        "helpVisible": true,
+        "id": "request",
+        "settings": {},
+        "steps": [
+          {
+            "action": "record.append",
+            "args": {
+              "collection": "requests",
+              "values": {
+                "availableChecked": "${input.availableChecked}",
+                "item": "${input.item}",
+                "quantity": "${input.quantity}",
+                "requestNo": "${input.requestNo}",
+                "returnChecked": "${input.returnChecked}",
+                "title": "${input.title}"
+              }
+            },
+            "id": "record",
+            "version": 1
+          },
+          {
+            "action": "alarm.schedule",
+            "args": {
+              "at": "${input.followupAt}",
+              "message": "요청 ${input.requestNo} 후속 확인",
+              "taskId": "${context.instanceId}",
+              "title": "${input.title}"
+            },
+            "id": "remind",
+            "version": 1
+          }
+        ],
+        "title": "요청 처리",
+        "version": 1,
+        "windowMode": "modeless"
+      },
+      "definitionVersion": 1,
+      "error": {
+        "code": "INPUT_REQUIRED",
+        "field": "title",
+        "message": "요청 제목 항목을 입력하거나 확인하세요."
+      },
+      "id": "request-invalid",
+      "input": {
+        "availableChecked": true,
+        "followupAt": "2026-10-23T14:00:00+09:00",
+        "item": "프로젝터",
+        "quantity": 1,
+        "requestNo": "DEMO-003",
+        "returnChecked": true,
+        "title": ""
+      },
+      "instanceId": "mock-task-request-invalid",
+      "kind": "edge",
+      "mode": "simulation",
+      "status": "failed",
+      "trace": [],
+      "workflowId": "request"
+    },
+    {
+      "at": "2026-10-23T09:00:00+09:00",
+      "cancelledBefore": null,
+      "definitionSnapshot": {
+        "description": "작업 폴더, 파일명, 본문 양식을 정하고 결과 미리보기를 확인하세요.",
+        "fields": [
+          {
+            "id": "title",
+            "label": "자료 제목",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "id": "month",
+            "label": "기준 월",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "id": "summary",
+            "label": "요약",
+            "required": true,
+            "type": "text"
+          }
+        ],
+        "folder": "일반 업무",
+        "helpVisible": true,
+        "id": "report",
+        "settings": {
+          "filename": "${input.title}_${context.date}_${context.sequence}.txt",
+          "folder": "${settings.root}/${input.month}",
+          "root": "작업폴더",
+          "template": "제목: ${input.title}\n기준 월: ${input.month}\n요약: ${input.summary}"
+        },
+        "steps": [
+          {
+            "action": "path.compose",
+            "args": {
+              "folder": "${settings.folder}",
+              "name": "${settings.filename}"
+            },
+            "id": "path",
+            "version": 1
+          },
+          {
+            "action": "content.render",
+            "args": {
+              "template": "${settings.template}"
+            },
+            "id": "content",
+            "version": 1
+          },
+          {
+            "action": "file.create",
+            "args": {
+              "path": "${steps.path.path}",
+              "text": "${steps.content.text}"
+            },
+            "id": "save",
+            "version": 1
+          },
+          {
+            "action": "record.append",
+            "args": {
+              "collection": "outputs",
+              "values": {
+                "path": "${steps.save.path}",
+                "title": "${input.title}"
+              }
+            },
+            "id": "record",
+            "version": 1
+          }
+        ],
+        "title": "자료 작성",
+        "version": 1,
+        "windowMode": "modal"
+      },
+      "definitionVersion": 1,
+      "error": null,
+      "id": "report-base",
+      "input": {
+        "month": "2026-10",
+        "summary": "가상 요청 3건 처리",
+        "title": "월간 정리"
+      },
+      "instanceId": "mock-task-report-base",
+      "kind": "base",
+      "mode": "simulation",
+      "status": "succeeded",
+      "trace": [
+        {
+          "action": "path.compose",
+          "args": {
+            "folder": "작업폴더/2026-10",
+            "name": "월간 정리_20261023_001.txt"
+          },
+          "id": "path",
+          "response": {
+            "data": {
+              "path": "작업폴더/2026-10/월간 정리_20261023_001.txt"
+            },
+            "error": null,
+            "mode": "simulation",
+            "status": "succeeded"
+          },
+          "version": 1
+        },
+        {
+          "action": "content.render",
+          "args": {
+            "template": "제목: 월간 정리\n기준 월: 2026-10\n요약: 가상 요청 3건 처리"
+          },
+          "id": "content",
+          "response": {
+            "data": {
+              "text": "제목: 월간 정리\n기준 월: 2026-10\n요약: 가상 요청 3건 처리"
+            },
+            "error": null,
+            "mode": "simulation",
+            "status": "succeeded"
+          },
+          "version": 1
+        },
+        {
+          "action": "file.create",
+          "args": {
+            "path": "작업폴더/2026-10/월간 정리_20261023_001.txt",
+            "text": "제목: 월간 정리\n기준 월: 2026-10\n요약: 가상 요청 3건 처리"
+          },
+          "id": "save",
+          "response": {
+            "data": {
+              "path": "작업폴더/2026-10/월간 정리_20261023_001.txt",
+              "state": "created",
+              "text": "제목: 월간 정리\n기준 월: 2026-10\n요약: 가상 요청 3건 처리"
+            },
+            "error": null,
+            "mode": "simulation",
+            "status": "succeeded"
+          },
+          "version": 1
+        },
+        {
+          "action": "record.append",
+          "args": {
+            "collection": "outputs",
+            "values": {
+              "path": "작업폴더/2026-10/월간 정리_20261023_001.txt",
+              "title": "월간 정리"
+            }
+          },
+          "id": "record",
+          "response": {
+            "data": {
+              "collection": "outputs",
+              "recordId": "mock-report-base-record",
+              "values": {
+                "path": "작업폴더/2026-10/월간 정리_20261023_001.txt",
+                "title": "월간 정리"
+              }
+            },
+            "error": null,
+            "mode": "simulation",
+            "status": "succeeded"
+          },
+          "version": 1
+        }
+      ],
+      "workflowId": "report"
+    },
+    {
+      "at": "2026-10-23T09:00:00+09:00",
+      "cancelledBefore": null,
+      "definitionSnapshot": {
+        "description": "작업 폴더, 파일명, 본문 양식을 정하고 결과 미리보기를 확인하세요.",
+        "fields": [
+          {
+            "id": "title",
+            "label": "자료 제목",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "id": "month",
+            "label": "기준 월",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "id": "summary",
+            "label": "요약",
+            "required": true,
+            "type": "text"
+          }
+        ],
+        "folder": "일반 업무",
+        "helpVisible": true,
+        "id": "report",
+        "settings": {
+          "filename": "${context.date}_${input.title}_${context.sequence}.txt",
+          "folder": "${settings.root}/완료/${input.month}",
+          "root": "다른작업폴더",
+          "template": "[${input.month}] ${input.title}\n처리 내용: ${input.summary}"
+        },
+        "steps": [
+          {
+            "action": "path.compose",
+            "args": {
+              "folder": "${settings.folder}",
+              "name": "${settings.filename}"
+            },
+            "id": "path",
+            "version": 1
+          },
+          {
+            "action": "content.render",
+            "args": {
+              "template": "${settings.template}"
+            },
+            "id": "content",
+            "version": 1
+          },
+          {
+            "action": "file.create",
+            "args": {
+              "path": "${steps.path.path}",
+              "text": "${steps.content.text}"
+            },
+            "id": "save",
+            "version": 1
+          },
+          {
+            "action": "record.append",
+            "args": {
+              "collection": "outputs",
+              "values": {
+                "path": "${steps.save.path}",
+                "title": "${input.title}"
+              }
+            },
+            "id": "record",
+            "version": 1
+          }
+        ],
+        "title": "자료 작성",
+        "version": 2,
+        "windowMode": "modal"
+      },
+      "definitionVersion": 2,
+      "error": null,
+      "id": "report-changed",
+      "input": {
+        "month": "2026-10",
+        "summary": "가상 요청 3건 처리",
+        "title": "월간 정리"
+      },
+      "instanceId": "mock-task-report-changed",
+      "kind": "changed",
+      "mode": "simulation",
+      "status": "succeeded",
+      "trace": [
+        {
+          "action": "path.compose",
+          "args": {
+            "folder": "다른작업폴더/완료/2026-10",
+            "name": "20261023_월간 정리_002.txt"
+          },
+          "id": "path",
+          "response": {
+            "data": {
+              "path": "다른작업폴더/완료/2026-10/20261023_월간 정리_002.txt"
+            },
+            "error": null,
+            "mode": "simulation",
+            "status": "succeeded"
+          },
+          "version": 1
+        },
+        {
+          "action": "content.render",
+          "args": {
+            "template": "[2026-10] 월간 정리\n처리 내용: 가상 요청 3건 처리"
+          },
+          "id": "content",
+          "response": {
+            "data": {
+              "text": "[2026-10] 월간 정리\n처리 내용: 가상 요청 3건 처리"
+            },
+            "error": null,
+            "mode": "simulation",
+            "status": "succeeded"
+          },
+          "version": 1
+        },
+        {
+          "action": "file.create",
+          "args": {
+            "path": "다른작업폴더/완료/2026-10/20261023_월간 정리_002.txt",
+            "text": "[2026-10] 월간 정리\n처리 내용: 가상 요청 3건 처리"
+          },
+          "id": "save",
+          "response": {
+            "data": {
+              "path": "다른작업폴더/완료/2026-10/20261023_월간 정리_002.txt",
+              "state": "created",
+              "text": "[2026-10] 월간 정리\n처리 내용: 가상 요청 3건 처리"
+            },
+            "error": null,
+            "mode": "simulation",
+            "status": "succeeded"
+          },
+          "version": 1
+        },
+        {
+          "action": "record.append",
+          "args": {
+            "collection": "outputs",
+            "values": {
+              "path": "다른작업폴더/완료/2026-10/20261023_월간 정리_002.txt",
+              "title": "월간 정리"
+            }
+          },
+          "id": "record",
+          "response": {
+            "data": {
+              "collection": "outputs",
+              "recordId": "mock-report-changed-record",
+              "values": {
+                "path": "다른작업폴더/완료/2026-10/20261023_월간 정리_002.txt",
+                "title": "월간 정리"
+              }
+            },
+            "error": null,
+            "mode": "simulation",
+            "status": "succeeded"
+          },
+          "version": 1
+        }
+      ],
+      "workflowId": "report"
+    },
+    {
+      "at": "2026-10-23T09:00:00+09:00",
+      "cancelledBefore": null,
+      "definitionSnapshot": {
+        "description": "작업 폴더, 파일명, 본문 양식을 정하고 결과 미리보기를 확인하세요.",
+        "fields": [
+          {
+            "id": "title",
+            "label": "자료 제목",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "id": "month",
+            "label": "기준 월",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "id": "summary",
+            "label": "요약",
+            "required": true,
+            "type": "text"
+          }
+        ],
+        "folder": "일반 업무",
+        "helpVisible": true,
+        "id": "report",
+        "settings": {
+          "filename": "${input.title}_${context.date}_${context.sequence}.txt",
+          "folder": "${settings.root}/${input.month}",
+          "root": "작업폴더",
+          "template": "제목: ${input.title}\n기준 월: ${input.month}\n요약: ${input.summary}"
+        },
+        "steps": [
+          {
+            "action": "path.compose",
+            "args": {
+              "folder": "${settings.folder}",
+              "name": "${settings.filename}"
+            },
+            "id": "path",
+            "version": 1
+          },
+          {
+            "action": "content.render",
+            "args": {
+              "template": "${settings.template}"
+            },
+            "id": "content",
+            "version": 1
+          },
+          {
+            "action": "file.create",
+            "args": {
+              "path": "${steps.path.path}",
+              "text": "${steps.content.text}"
+            },
+            "id": "save",
+            "version": 1
+          },
+          {
+            "action": "record.append",
+            "args": {
+              "collection": "outputs",
+              "values": {
+                "path": "${steps.save.path}",
+                "title": "${input.title}"
+              }
+            },
+            "id": "record",
+            "version": 1
+          }
+        ],
+        "title": "자료 작성",
+        "version": 1,
+        "windowMode": "modal"
+      },
+      "definitionVersion": 1,
+      "error": {
+        "code": "MOCK_WRITE_DENIED",
+        "field": "path",
+        "message": "가짜 저장 실패입니다. 저장 위치를 확인하세요."
+      },
+      "id": "report-failed",
+      "input": {
+        "month": "2026-10",
+        "summary": "가상 요청 3건 처리",
+        "title": "월간 정리"
+      },
+      "instanceId": "mock-task-report-failed",
+      "kind": "edge",
+      "mode": "simulation",
+      "status": "failed",
+      "trace": [
+        {
+          "action": "path.compose",
+          "args": {
+            "folder": "작업폴더/2026-10",
+            "name": "월간 정리_20261023_003.txt"
+          },
+          "id": "path",
+          "response": {
+            "data": {
+              "path": "작업폴더/2026-10/월간 정리_20261023_003.txt"
+            },
+            "error": null,
+            "mode": "simulation",
+            "status": "succeeded"
+          },
+          "version": 1
+        },
+        {
+          "action": "content.render",
+          "args": {
+            "template": "제목: 월간 정리\n기준 월: 2026-10\n요약: 가상 요청 3건 처리"
+          },
+          "id": "content",
+          "response": {
+            "data": {
+              "text": "제목: 월간 정리\n기준 월: 2026-10\n요약: 가상 요청 3건 처리"
+            },
+            "error": null,
+            "mode": "simulation",
+            "status": "succeeded"
+          },
+          "version": 1
+        },
+        {
+          "action": "file.create",
+          "args": {
+            "path": "작업폴더/2026-10/월간 정리_20261023_003.txt",
+            "text": "제목: 월간 정리\n기준 월: 2026-10\n요약: 가상 요청 3건 처리"
+          },
+          "id": "save",
+          "response": {
+            "data": null,
+            "error": {
+              "code": "MOCK_WRITE_DENIED",
+              "field": "path",
+              "message": "가짜 저장 실패입니다. 저장 위치를 확인하세요."
+            },
+            "mode": "simulation",
+            "status": "failed"
+          },
+          "version": 1
+        }
+      ],
+      "workflowId": "report"
+    },
+    {
+      "at": "2026-10-23T09:00:00+09:00",
+      "cancelledBefore": null,
+      "definitionSnapshot": {
+        "description": "서버 목록과 제한 시간을 입력하세요. 실패한 대상이 있으면 재확인 알람을 연결합니다.",
+        "fields": [
+          {
+            "id": "targets",
+            "label": "서버 목록",
+            "required": true,
+            "type": "list"
+          },
+          {
+            "id": "timeoutMs",
+            "label": "제한 시간(ms)",
+            "min": 1,
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "id": "followupAt",
+            "label": "재확인 시각",
+            "required": true,
+            "type": "datetime-offset"
+          }
+        ],
+        "folder": "점검",
+        "helpVisible": false,
+        "id": "check",
+        "settings": {},
+        "steps": [
+          {
+            "action": "network.ping",
+            "args": {
+              "targets": "${input.targets}",
+              "timeoutMs": "${input.timeoutMs}"
+            },
+            "id": "probe",
+            "version": 1
+          },
+          {
+            "action": "record.append",
+            "args": {
+              "collection": "checks",
+              "values": {
+                "failedCount": "${steps.probe.failedCount}",
+                "rows": "${steps.probe.rows}"
+              }
+            },
+            "id": "record",
+            "version": 1
+          },
+          {
+            "action": "alarm.schedule",
+            "args": {
+              "at": "${input.followupAt}",
+              "message": "실패 ${steps.probe.failedCount}건 확인",
+              "taskId": "${context.instanceId}",
+              "title": "서버 점검 재확인"
+            },
+            "id": "remind",
+            "version": 1,
+            "when": {
+              "operator": "gt",
+              "ref": "steps.probe.failedCount",
+              "value": 0
+            }
+          }
+        ],
+        "title": "서버 점검",
+        "version": 1,
+        "windowMode": "modeless"
+      },
+      "definitionVersion": 1,
+      "error": null,
+      "id": "check-base",
+      "input": {
+        "followupAt": "2026-10-23T09:10:00+09:00",
+        "targets": [
+          "10.0.0.10",
+          "10.0.0.11"
+        ],
+        "timeoutMs": 1000
+      },
+      "instanceId": "mock-task-check-base",
+      "kind": "base",
+      "mode": "simulation",
+      "status": "succeeded",
+      "trace": [
+        {
+          "action": "network.ping",
+          "args": {
+            "targets": [
+              "10.0.0.10",
+              "10.0.0.11"
+            ],
+            "timeoutMs": 1000
+          },
+          "id": "probe",
+          "response": {
+            "data": {
+              "failedCount": 1,
+              "rows": [
+                {
+                  "latencyMs": 12,
+                  "status": "success",
+                  "target": "10.0.0.10"
+                },
+                {
+                  "latencyMs": null,
+                  "status": "timeout",
+                  "target": "10.0.0.11"
+                }
+              ]
+            },
+            "error": null,
+            "mode": "simulation",
+            "status": "succeeded"
+          },
+          "version": 1
+        },
+        {
+          "action": "record.append",
+          "args": {
+            "collection": "checks",
+            "values": {
+              "failedCount": 1,
+              "rows": [
+                {
+                  "latencyMs": 12,
+                  "status": "success",
+                  "target": "10.0.0.10"
+                },
+                {
+                  "latencyMs": null,
+                  "status": "timeout",
+                  "target": "10.0.0.11"
+                }
+              ]
+            }
+          },
+          "id": "record",
+          "response": {
+            "data": {
+              "collection": "checks",
+              "recordId": "mock-check-base-record",
+              "values": {
+                "failedCount": 1,
+                "rows": [
+                  {
+                    "latencyMs": 12,
+                    "status": "success",
+                    "target": "10.0.0.10"
+                  },
+                  {
+                    "latencyMs": null,
+                    "status": "timeout",
+                    "target": "10.0.0.11"
+                  }
+                ]
+              }
+            },
+            "error": null,
+            "mode": "simulation",
+            "status": "succeeded"
+          },
+          "version": 1
+        },
+        {
+          "action": "alarm.schedule",
+          "args": {
+            "at": "2026-10-23T09:10:00+09:00",
+            "message": "실패 1건 확인",
+            "taskId": "mock-task-check-base",
+            "title": "서버 점검 재확인"
+          },
+          "id": "remind",
+          "response": {
+            "data": {
+              "alarmId": "mock-check-base-remind",
+              "at": "2026-10-23T09:10:00+09:00",
+              "message": "실패 1건 확인",
+              "state": "scheduled",
+              "taskId": "mock-task-check-base",
+              "title": "서버 점검 재확인"
+            },
+            "error": null,
+            "mode": "simulation",
+            "status": "succeeded"
+          },
+          "version": 1
+        }
+      ],
+      "workflowId": "check"
+    },
+    {
+      "at": "2026-10-23T09:00:00+09:00",
+      "cancelledBefore": null,
+      "definitionSnapshot": {
+        "description": "서버 목록과 제한 시간을 입력하세요. 실패한 대상이 있으면 재확인 알람을 연결합니다.",
+        "fields": [
+          {
+            "id": "targets",
+            "label": "서버 목록",
+            "required": true,
+            "type": "list"
+          },
+          {
+            "id": "timeoutMs",
+            "label": "제한 시간(ms)",
+            "min": 1,
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "id": "followupAt",
+            "label": "재확인 시각",
+            "required": true,
+            "type": "datetime-offset"
+          }
+        ],
+        "folder": "점검",
+        "helpVisible": false,
+        "id": "check",
+        "settings": {},
+        "steps": [
+          {
+            "action": "network.ping",
+            "args": {
+              "targets": "${input.targets}",
+              "timeoutMs": "${input.timeoutMs}"
+            },
+            "id": "probe",
+            "version": 1
+          },
+          {
+            "action": "record.append",
+            "args": {
+              "collection": "checks",
+              "values": {
+                "failedCount": "${steps.probe.failedCount}",
+                "rows": "${steps.probe.rows}"
+              }
+            },
+            "id": "record",
+            "version": 1
+          },
+          {
+            "action": "alarm.schedule",
+            "args": {
+              "at": "${input.followupAt}",
+              "message": "실패 ${steps.probe.failedCount}건 확인",
+              "taskId": "${context.instanceId}",
+              "title": "서버 점검 재확인"
+            },
+            "id": "remind",
+            "version": 1,
+            "when": {
+              "operator": "gt",
+              "ref": "steps.probe.failedCount",
+              "value": 0
+            }
+          }
+        ],
+        "title": "서버 점검",
+        "version": 1,
+        "windowMode": "modeless"
+      },
+      "definitionVersion": 1,
+      "error": null,
+      "id": "check-changed",
+      "input": {
+        "followupAt": "2026-10-23T09:10:00+09:00",
+        "targets": [
+          "10.0.0.10",
+          "10.0.0.11"
+        ],
+        "timeoutMs": 2000
+      },
+      "instanceId": "mock-task-check-changed",
+      "kind": "changed",
+      "mode": "simulation",
+      "status": "succeeded",
+      "trace": [
+        {
+          "action": "network.ping",
+          "args": {
+            "targets": [
+              "10.0.0.10",
+              "10.0.0.11"
+            ],
+            "timeoutMs": 2000
+          },
+          "id": "probe",
+          "response": {
+            "data": {
+              "failedCount": 0,
+              "rows": [
+                {
+                  "latencyMs": 12,
+                  "status": "success",
+                  "target": "10.0.0.10"
+                },
+                {
+                  "latencyMs": 1500,
+                  "status": "success",
+                  "target": "10.0.0.11"
+                }
+              ]
+            },
+            "error": null,
+            "mode": "simulation",
+            "status": "succeeded"
+          },
+          "version": 1
+        },
+        {
+          "action": "record.append",
+          "args": {
+            "collection": "checks",
+            "values": {
+              "failedCount": 0,
+              "rows": [
+                {
+                  "latencyMs": 12,
+                  "status": "success",
+                  "target": "10.0.0.10"
+                },
+                {
+                  "latencyMs": 1500,
+                  "status": "success",
+                  "target": "10.0.0.11"
+                }
+              ]
+            }
+          },
+          "id": "record",
+          "response": {
+            "data": {
+              "collection": "checks",
+              "recordId": "mock-check-changed-record",
+              "values": {
+                "failedCount": 0,
+                "rows": [
+                  {
+                    "latencyMs": 12,
+                    "status": "success",
+                    "target": "10.0.0.10"
+                  },
+                  {
+                    "latencyMs": 1500,
+                    "status": "success",
+                    "target": "10.0.0.11"
+                  }
+                ]
+              }
+            },
+            "error": null,
+            "mode": "simulation",
+            "status": "succeeded"
+          },
+          "version": 1
+        },
+        {
+          "action": "alarm.schedule",
+          "args": null,
+          "id": "remind",
+          "response": {
+            "data": null,
+            "error": null,
+            "mode": "simulation",
+            "status": "skipped"
+          },
+          "version": 1
+        }
+      ],
+      "workflowId": "check"
+    },
+    {
+      "at": "2026-10-23T09:00:00+09:00",
+      "cancelledBefore": "record",
+      "definitionSnapshot": {
+        "description": "서버 목록과 제한 시간을 입력하세요. 실패한 대상이 있으면 재확인 알람을 연결합니다.",
+        "fields": [
+          {
+            "id": "targets",
+            "label": "서버 목록",
+            "required": true,
+            "type": "list"
+          },
+          {
+            "id": "timeoutMs",
+            "label": "제한 시간(ms)",
+            "min": 1,
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "id": "followupAt",
+            "label": "재확인 시각",
+            "required": true,
+            "type": "datetime-offset"
+          }
+        ],
+        "folder": "점검",
+        "helpVisible": false,
+        "id": "check",
+        "settings": {},
+        "steps": [
+          {
+            "action": "network.ping",
+            "args": {
+              "targets": "${input.targets}",
+              "timeoutMs": "${input.timeoutMs}"
+            },
+            "id": "probe",
+            "version": 1
+          },
+          {
+            "action": "record.append",
+            "args": {
+              "collection": "checks",
+              "values": {
+                "failedCount": "${steps.probe.failedCount}",
+                "rows": "${steps.probe.rows}"
+              }
+            },
+            "id": "record",
+            "version": 1
+          },
+          {
+            "action": "alarm.schedule",
+            "args": {
+              "at": "${input.followupAt}",
+              "message": "실패 ${steps.probe.failedCount}건 확인",
+              "taskId": "${context.instanceId}",
+              "title": "서버 점검 재확인"
+            },
+            "id": "remind",
+            "version": 1,
+            "when": {
+              "operator": "gt",
+              "ref": "steps.probe.failedCount",
+              "value": 0
+            }
+          }
+        ],
+        "title": "서버 점검",
+        "version": 1,
+        "windowMode": "modeless"
+      },
+      "definitionVersion": 1,
+      "error": null,
+      "id": "check-cancelled",
+      "input": {
+        "followupAt": "2026-10-23T09:10:00+09:00",
+        "targets": [
+          "10.0.0.10",
+          "10.0.0.11"
+        ],
+        "timeoutMs": 1000
+      },
+      "instanceId": "mock-task-check-cancelled",
+      "kind": "edge",
+      "mode": "simulation",
+      "status": "cancelled",
+      "trace": [
+        {
+          "action": "network.ping",
+          "args": {
+            "targets": [
+              "10.0.0.10",
+              "10.0.0.11"
+            ],
+            "timeoutMs": 1000
+          },
+          "id": "probe",
+          "response": {
+            "data": {
+              "failedCount": 1,
+              "rows": [
+                {
+                  "latencyMs": 12,
+                  "status": "success",
+                  "target": "10.0.0.10"
+                },
+                {
+                  "latencyMs": null,
+                  "status": "timeout",
+                  "target": "10.0.0.11"
+                }
+              ]
+            },
+            "error": null,
+            "mode": "simulation",
+            "status": "succeeded"
+          },
+          "version": 1
+        }
+      ],
+      "workflowId": "check"
+    }
+  ],
+  "source": "workflows-sample.json"
+}

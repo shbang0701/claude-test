@@ -7,6 +7,16 @@ $dataDir = Join-Path (Split-Path $PSScriptRoot -Parent) 'data'
 # Excel에서 열어도 한글이 깨지지 않게 BOM을 붙인다.
 $encoding = [System.Text.UTF8Encoding]::new($true)
 
+# 핸들을 앱이 끝날 때까지 유지한다. 비정상 종료되어도 OS가 잠금을 풀어 준다.
+function Open-WorkToolDataLock {
+    [void][System.IO.Directory]::CreateDirectory($dataDir)
+    try {
+        [System.IO.File]::Open((Join-Path $dataDir '.worktool.lock'), 'OpenOrCreate', 'ReadWrite', 'None')
+    } catch {
+        throw '같은 데이터 폴더를 사용하는 WorkTool이 실행 중이거나 폴더를 잠글 수 없습니다. 기존 창·트레이를 확인하세요.'
+    }
+}
+
 function Get-DataPath {
     param([Parameter(Mandatory)][ValidatePattern('^[A-Za-z0-9_-]+$')][string]$Name)
     if (-not (Test-Path $dataDir)) { New-Item -ItemType Directory -Path $dataDir | Out-Null }
@@ -44,4 +54,4 @@ function New-RecordId {
     [guid]::NewGuid().ToString('N').Substring(0, 12)
 }
 
-Export-ModuleMember -Function Get-Records, Save-Records, New-RecordId
+Export-ModuleMember -Function Get-Records, Save-Records, New-RecordId, Open-WorkToolDataLock

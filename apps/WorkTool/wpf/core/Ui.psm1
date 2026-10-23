@@ -329,6 +329,47 @@ $script:stylesXaml = @'
     <Setter Property="BorderThickness" Value="0"/>
     <Setter Property="ItemContainerStyle" Value="{StaticResource Row}"/>
     <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+    <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
+    <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
+    <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+    <Setter Property="ItemsPanel"><Setter.Value><ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate></Setter.Value></Setter>
+  </Style>
+
+  <DataTemplate x:Key="Memo.Item">
+    <StackPanel>
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Right" Text="{Binding Stamp}" Style="{DynamicResource T.Sub}" Margin="8,0,0,0"/>
+        <TextBlock Text="{Binding Title}" Style="{DynamicResource T.Strong}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+      </DockPanel>
+      <TextBlock Text="{Binding Snippet}" Style="{DynamicResource T.Sub}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+    </StackPanel>
+  </DataTemplate>
+  <Style x:Key="Memo.List" TargetType="ListBox" BasedOn="{StaticResource List}">
+    <Setter Property="ItemTemplate" Value="{StaticResource Memo.Item}"/>
+  </Style>
+  <Style x:Key="Doc.Row" TargetType="ListBoxItem" BasedOn="{StaticResource Row}">
+    <Setter Property="Padding" Value="12,6"/>
+    <Setter Property="Tag" Value="{Binding}"/>
+    <Setter Property="ToolTip" Value="{Binding Path}"/>
+  </Style>
+  <DataTemplate x:Key="Doc.Item">
+    <DockPanel>
+      <TextBlock DockPanel.Dock="Right" Text="{Binding SizeText}" Style="{DynamicResource T.Sub}" Width="80" TextAlignment="Right" Margin="12,0,0,0" VerticalAlignment="Center"/>
+      <TextBlock DockPanel.Dock="Right" Text="{Binding ModifiedText}" Style="{DynamicResource T.Sub}" Width="130" Margin="12,0,0,0" VerticalAlignment="Center"/>
+      <TextBlock DockPanel.Dock="Right" Text="{Binding Kind}" Style="{DynamicResource T.Sub}" Width="90" Margin="12,0,0,0" VerticalAlignment="Center"/>
+      <TextBlock x:Name="DocIcon" DockPanel.Dock="Left" Text="{Binding IconText}" Style="{DynamicResource T.Icon}" Foreground="{DynamicResource B.SubText}" Width="20"/>
+      <TextBlock x:Name="DocName" Text="{Binding Name}" Style="{DynamicResource T.Body}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Margin="8,0,0,0" VerticalAlignment="Center"/>
+    </DockPanel>
+    <DataTemplate.Triggers>
+      <DataTrigger Binding="{Binding Missing}" Value="True">
+        <Setter TargetName="DocIcon" Property="Foreground" Value="{DynamicResource B.Warn}"/>
+        <Setter TargetName="DocName" Property="Foreground" Value="{DynamicResource B.SubText}"/>
+      </DataTrigger>
+    </DataTemplate.Triggers>
+  </DataTemplate>
+  <Style x:Key="Doc.List" TargetType="ListBox" BasedOn="{StaticResource List}">
+    <Setter Property="ItemContainerStyle" Value="{StaticResource Doc.Row}"/>
+    <Setter Property="ItemTemplate" Value="{StaticResource Doc.Item}"/>
   </Style>
 
   <!-- 트리 (문서 탭 폴더 등): 펼침 화살표 + 목록 행과 같은 둥근 바탕 -->
@@ -1076,6 +1117,15 @@ function New-WtMinuteInput([int]$Value) {
     @{ Root = $row; Box = $box }
 }
 
+function New-WtPollTimer([scriptblock]$Tick) {
+    $timer = [System.Windows.Threading.DispatcherTimer]::new()
+    $timer.Interval = [TimeSpan]::FromMilliseconds(250)
+    $timer.Add_Tick($Tick)
+    $timer
+}
+
+function Get-WtUiWorkBudget { @{ Milliseconds = 16; Items = 32 } }
+
 function New-WtContextMenu {
     $menu = [System.Windows.Controls.ContextMenu]::new()
     Set-WtResource $menu Background 'B.Card'; Set-WtResource $menu Foreground 'B.Text'
@@ -1092,7 +1142,7 @@ function Get-WtVisualChild($Root, [type]$Type) {
     $null
 }
 
-Export-ModuleMember -Function New-WtTaskGrid, New-WtTaskPage, New-WtModal, New-WtMinuteInput, New-WtContextMenu, Get-WtVisualChild,
+Export-ModuleMember -Function Get-WtUiWorkBudget, New-WtPollTimer, New-WtTaskGrid, New-WtTaskPage, New-WtModal, New-WtMinuteInput, New-WtContextMenu, Get-WtVisualChild,
     Get-WtStyleDictionary, ConvertFrom-WtXaml, Get-WtNamedElements, Set-WtStyle, Set-WtResource,
     New-WtText, New-WtIcon, New-WtStack, Add-WtChild, New-WtCard, New-WtCardHeader, New-WtButton, New-WtButtonContent, New-WtSegmented, New-WtSearchBox, New-WtTag,
     New-WtStatTile, New-WtPageHeader, New-WtPage, New-WtListRow, Format-WtDate, Show-WtMessage, Confirm-WtYesNo, Show-WtError

@@ -16,6 +16,12 @@ try { [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($fal
 Import-Module (Join-Path $root 'modules\Storage.psm1') -Force
 Import-Module (Join-Path $root 'modules\UiHelper.psm1') -Force
 
+$dataLock = Open-WorkToolDataLock
+$notify = $null
+$form = $null
+$pages = @()
+try {
+
 # 기능 목록. 기능을 추가할 때 modules\<Module>.psm1을 만들고 여기 한 줄 넣는다.
 # 각 모듈은 New-<Module>View 함수로 화면(Control)을 돌려준다. Icon은 Segoe 아이콘 글꼴의 글자 코드.
 $features = @(
@@ -194,13 +200,16 @@ function Show-MainWindow {
 $script:exiting = $false
 function Exit-WorkTool {
     $script:exiting = $true
-    $form.Close()
+    try { $form.Close() } finally {
+        if (-not $form.IsDisposed) { $script:exiting = $false; Show-MainWindow }
+    }
 }
 
 $script:trayTipShown = $false
 $form.add_FormClosing({
     param($s, $e)
     # 트레이 메뉴의 종료나 윈도우 종료·로그오프면 그대로 닫는다
+    if ($e.Cancel) { return }
     if ($script:exiting -or $e.CloseReason -ne [System.Windows.Forms.CloseReason]::UserClosing) { return }
     $e.Cancel = $true
     $s.Hide()
@@ -212,12 +221,15 @@ $form.add_FormClosing({
 })
 
 Select-Page 0
-try {
-    [System.Windows.Forms.Application]::Run($form)
+[System.Windows.Forms.Application]::Run($form)
 } finally {
+    try {
     # 아이콘을 치우지 않으면 툴이 끝나도 트레이에 남아 보인다
-    $notify.Visible = $false
-    $notify.Dispose()
+    if ($notify) { $notify.Visible = $false; $notify.Dispose() }
     # 떠 있던 알림 창도 닫는다
     foreach ($f in @([System.Windows.Forms.Application]::OpenForms)) { $f.Dispose() }
+    foreach ($page in $pages) { if ($page.View -and -not $page.View.IsDisposed) { $page.View.Dispose() } }
+    if ($form -and -not $form.IsDisposed) { $form.Dispose() }
+    if ($appIcon) { $appIcon.Dispose() }
+    } finally { $dataLock.Dispose() }
 }

@@ -125,6 +125,7 @@ function Select-WtPage([string]$Id) {
     if ($script:selecting -or -not $Id) { return }
     $script:selecting = $true
     try {
+        if (-not (Save-WtPendingChanges)) { return }
         $page = Get-WtPageView $Id
         if (-not $page) { return }
         if ($page.Addon -and $page.Addon.Refresh) { [void](& $page.Addon.Refresh $page.View) }
@@ -135,13 +136,14 @@ function Select-WtPage([string]$Id) {
         foreach ($k in @($script:navButtons.Keys)) { $script:navButtons[$k].Button.IsChecked = ($k -eq $script:current) }
         Show-WtError $_ "화면 열기: $Id"
     } finally {
+        foreach ($k in @($script:navButtons.Keys)) { $script:navButtons[$k].Button.IsChecked = ($k -eq $script:current) }
         $script:selecting = $false
     }
 }
 
-# 데이터를 다시 가져온 뒤 등: 만들어 둔 화면을 버리고 지금 화면을 다시 연다
+# 데이터를 다시 가져온 뒤 현재 화면을 갱신한다. 숨긴 화면도 재진입할 때 갱신한다.
 function Reset-WtViews {
-    $script:views = @{}
+    if (-not (Save-WtPendingChanges)) { return }
     if ($script:current) {
         $id = $script:current
         $script:current = $null
@@ -342,9 +344,24 @@ function Show-WtMainWindow {
     [void]$script:window.Activate()
 }
 
-# 트레이 아이콘 · 아이콘을 치우고 메시지 돌리기를 멈춘다 (창을 닫는 중에도 부를 수 있다)
+# 정리 처리 전에 모든 저장을 확인한다. 실패하면 타이머와 창을 그대로 유지한다.
+function Save-WtPendingChanges {
+    foreach ($a in @(Get-WtAddon -All)) {
+        if (-not $a.SavePending) { continue }
+        try {
+            if ((& $a.SavePending) -eq $false) {
+                Show-WtMessage '저장하지 못한 내용이 있습니다. 메모의 저장 오류를 해결한 뒤 다시 시도하세요.' '저장 확인' 'Warning'
+                return $false
+            }
+        } catch { Show-WtError $_ "저장 확인: $($a.Title)"; return $false }
+    }
+    $true
+}
+
+# 저장에 성공한 뒤에만 트레이·타이머를 정리하고 메시지 돌리기를 멈춘다.
 function Stop-WtApp {
     if (-not $script:exiting) {
+        if (-not (Save-WtPendingChanges)) { return $false }
         foreach ($a in @(Get-WtAddon -All)) {
             if ($a.OnExit) { try { [void](& $a.OnExit) } catch { Show-WtError $_ "끝내기 전 저장: $($a.Title)" } }
         }
@@ -353,10 +370,11 @@ function Stop-WtApp {
     try { $script:notify.Visible = $false; $script:notify.Dispose() } catch { }
     try { if ($script:icon) { $script:icon.Dispose() } } catch { }
     if ($script:frame) { $script:frame.Continue = $false }
+    $true
 }
 
 function Exit-WtApp {
-    Stop-WtApp
+    if (-not (Stop-WtApp)) { return }
     try { $script:window.Close() } catch { }
 }
 
@@ -382,6 +400,7 @@ function New-WtTrayIcon([System.Drawing.Icon]$Icon) {
 # 예전 WorkTool(WinForms) data 폴더에서 탭마다 데이터를 가져온다.
 # -Force가 없으면 아직 저장소가 없는 탭만 가져온다 (처음 실행할 때).
 function Import-WtLegacyData([switch]$Force) {
+    if ($Force -and -not (Save-WtPendingChanges)) { throw '저장하지 못한 메모가 있어 가져오기를 취소했습니다.' }
     $folder = Find-WtLegacyFolder
     $result = @{ Folder = $folder; Count = 0; Tabs = @(); At = $null }
     if (-not $folder) { return $result }
@@ -415,6 +434,8 @@ function Start-WtApp {
     $script:maxed = $false
     $script:fullscreen = $false
     Set-WtAppRoot $AppRoot
+    $dataLock = Open-WtDataLock
+    try {
     Initialize-WtSettings
     $script:themeDict = New-WtThemeDictionary
 
@@ -455,7 +476,7 @@ function Start-WtApp {
     $w.Add_Closing({
             param($s, $e)
             if ($script:exiting) { return }
-            if (-not [bool](Get-WtSetting 'window.closeToTray')) { Stop-WtApp; return }
+            if (-not [bool](Get-WtSetting 'window.closeToTray')) { $e.Cancel = -not (Stop-WtApp); return }
             $e.Cancel = $true
             $s.Hide()
             if (-not $script:trayTipShown) {
@@ -503,7 +524,7 @@ function Start-WtApp {
             'ui.opacity' { Set-WtOpacity }
             'nav.collapsed' { Update-WtCollapsed }
             'window.closeToTray' { Update-WtCloseTip }
-            'addons.disabled' { $script:views = @{}; Update-WtNav }
+            'addons.disabled' { Update-WtNav }
         }
     }
 
@@ -524,6 +545,12 @@ function Start-WtApp {
     $first = @(Get-WtAddon)[0]
     if ($first) { Select-WtPage $first.Id } else { Select-WtPage '_settings' }
     if (-not $script:exiting) { [System.Windows.Threading.Dispatcher]::PushFrame($script:frame) }
+    } finally {
+        try {
+            if ($script:notify) { $script:notify.Visible = $false; $script:notify.Dispose() }
+            if ($script:icon) { $script:icon.Dispose() }
+        } finally { $dataLock.Dispose() }
+    }
 }
 
 Export-ModuleMember -Function Get-WtWindow, Select-WtPage, Reset-WtViews, Update-WtNav, Switch-WtCollapsed, Set-WtOpacity,

@@ -53,6 +53,15 @@ function Set-WtAppRoot([string]$Path) {
 
 function Get-WtAppRoot { $script:appRoot }
 
+# 데이터 폴더마다 하나의 앱만 쓴다. 빈 잠금 파일은 남겨 두고 핸들만 해제한다.
+function Open-WtDataLock {
+    try {
+        [System.IO.File]::Open((Join-Path (Get-WtDataRoot) '.worktool.lock'), 'OpenOrCreate', 'ReadWrite', 'None')
+    } catch {
+        throw '같은 데이터 폴더를 사용하는 WorkTool이 실행 중이거나 폴더를 잠글 수 없습니다. 기존 창·트레이를 확인하세요.'
+    }
+}
+
 # 데이터 폴더. 앱 폴더에 datapath.txt가 있으면 그 첫 줄의 경로, 없으면 문서\WorkTool
 function Get-WtDataRoot {
     if ($script:dataRoot) { return $script:dataRoot }
@@ -179,7 +188,7 @@ function Import-WtLegacyCsv([string]$Folder, [string]$Name) {
     , @(Import-Csv -LiteralPath $path -Encoding utf8)
 }
 
-Export-ModuleMember -Function Set-WtAppRoot, Get-WtAppRoot, Get-WtDataRoot, Read-WtJsonFile, Write-WtJsonFile,
+Export-ModuleMember -Function Set-WtAppRoot, Get-WtAppRoot, Get-WtDataRoot, Open-WtDataLock, Read-WtJsonFile, Write-WtJsonFile,
     Get-WtStorePath, Test-WtStore, Read-WtStore, Get-WtStoreItems, Write-WtStore, New-WtId,
     Find-WtLegacyFolder, Import-WtLegacyCsv
 } | Import-Module -Force -DisableNameChecking
@@ -230,14 +239,16 @@ function Test-WtSameValue($A, $B) {
 # 값을 바꾸고 저장한 뒤, 등록된 처리기에 알린다
 function Set-WtSetting([string]$Key, $Value) {
     if ($null -eq $script:values) { Initialize-WtSettings }
+    $next = $script:values.Clone()
     if ($script:defaults.ContainsKey($Key) -and (Test-WtSameValue $script:defaults[$Key] $Value)) {
-        [void]$script:values.Remove($Key)
+        [void]$next.Remove($Key)
     } else {
-        $script:values[$Key] = $Value
+        $next[$Key] = $Value
     }
     $sorted = [ordered]@{}
-    foreach ($k in ($script:values.Keys | Sort-Object)) { $sorted[$k] = $script:values[$k] }
+    foreach ($k in ($next.Keys | Sort-Object)) { $sorted[$k] = $next[$k] }
     Write-WtJsonFile (Get-WtSettingsPath) ([ordered]@{ schema = 1; values = $sorted })
+    $script:values = $next
     foreach ($h in @($script:handlers)) { & $h $Key $Value }
 }
 
@@ -755,6 +766,47 @@ $script:stylesXaml = @'
     <Setter Property="BorderThickness" Value="0"/>
     <Setter Property="ItemContainerStyle" Value="{StaticResource Row}"/>
     <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+    <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
+    <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
+    <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+    <Setter Property="ItemsPanel"><Setter.Value><ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate></Setter.Value></Setter>
+  </Style>
+
+  <DataTemplate x:Key="Memo.Item">
+    <StackPanel>
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Right" Text="{Binding Stamp}" Style="{DynamicResource T.Sub}" Margin="8,0,0,0"/>
+        <TextBlock Text="{Binding Title}" Style="{DynamicResource T.Strong}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+      </DockPanel>
+      <TextBlock Text="{Binding Snippet}" Style="{DynamicResource T.Sub}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+    </StackPanel>
+  </DataTemplate>
+  <Style x:Key="Memo.List" TargetType="ListBox" BasedOn="{StaticResource List}">
+    <Setter Property="ItemTemplate" Value="{StaticResource Memo.Item}"/>
+  </Style>
+  <Style x:Key="Doc.Row" TargetType="ListBoxItem" BasedOn="{StaticResource Row}">
+    <Setter Property="Padding" Value="12,6"/>
+    <Setter Property="Tag" Value="{Binding}"/>
+    <Setter Property="ToolTip" Value="{Binding Path}"/>
+  </Style>
+  <DataTemplate x:Key="Doc.Item">
+    <DockPanel>
+      <TextBlock DockPanel.Dock="Right" Text="{Binding SizeText}" Style="{DynamicResource T.Sub}" Width="80" TextAlignment="Right" Margin="12,0,0,0" VerticalAlignment="Center"/>
+      <TextBlock DockPanel.Dock="Right" Text="{Binding ModifiedText}" Style="{DynamicResource T.Sub}" Width="130" Margin="12,0,0,0" VerticalAlignment="Center"/>
+      <TextBlock DockPanel.Dock="Right" Text="{Binding Kind}" Style="{DynamicResource T.Sub}" Width="90" Margin="12,0,0,0" VerticalAlignment="Center"/>
+      <TextBlock x:Name="DocIcon" DockPanel.Dock="Left" Text="{Binding IconText}" Style="{DynamicResource T.Icon}" Foreground="{DynamicResource B.SubText}" Width="20"/>
+      <TextBlock x:Name="DocName" Text="{Binding Name}" Style="{DynamicResource T.Body}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Margin="8,0,0,0" VerticalAlignment="Center"/>
+    </DockPanel>
+    <DataTemplate.Triggers>
+      <DataTrigger Binding="{Binding Missing}" Value="True">
+        <Setter TargetName="DocIcon" Property="Foreground" Value="{DynamicResource B.Warn}"/>
+        <Setter TargetName="DocName" Property="Foreground" Value="{DynamicResource B.SubText}"/>
+      </DataTrigger>
+    </DataTemplate.Triggers>
+  </DataTemplate>
+  <Style x:Key="Doc.List" TargetType="ListBox" BasedOn="{StaticResource List}">
+    <Setter Property="ItemContainerStyle" Value="{StaticResource Doc.Row}"/>
+    <Setter Property="ItemTemplate" Value="{StaticResource Doc.Item}"/>
   </Style>
 
   <!-- 트리 (문서 탭 폴더 등): 펼침 화살표 + 목록 행과 같은 둥근 바탕 -->
@@ -1502,6 +1554,15 @@ function New-WtMinuteInput([int]$Value) {
     @{ Root = $row; Box = $box }
 }
 
+function New-WtPollTimer([scriptblock]$Tick) {
+    $timer = [System.Windows.Threading.DispatcherTimer]::new()
+    $timer.Interval = [TimeSpan]::FromMilliseconds(250)
+    $timer.Add_Tick($Tick)
+    $timer
+}
+
+function Get-WtUiWorkBudget { @{ Milliseconds = 16; Items = 32 } }
+
 function New-WtContextMenu {
     $menu = [System.Windows.Controls.ContextMenu]::new()
     Set-WtResource $menu Background 'B.Card'; Set-WtResource $menu Foreground 'B.Text'
@@ -1518,7 +1579,7 @@ function Get-WtVisualChild($Root, [type]$Type) {
     $null
 }
 
-Export-ModuleMember -Function New-WtTaskGrid, New-WtTaskPage, New-WtModal, New-WtMinuteInput, New-WtContextMenu, Get-WtVisualChild,
+Export-ModuleMember -Function Get-WtUiWorkBudget, New-WtPollTimer, New-WtTaskGrid, New-WtTaskPage, New-WtModal, New-WtMinuteInput, New-WtContextMenu, Get-WtVisualChild,
     Get-WtStyleDictionary, ConvertFrom-WtXaml, Get-WtNamedElements, Set-WtStyle, Set-WtResource,
     New-WtText, New-WtIcon, New-WtStack, Add-WtChild, New-WtCard, New-WtCardHeader, New-WtButton, New-WtButtonContent, New-WtSegmented, New-WtSearchBox, New-WtTag,
     New-WtStatTile, New-WtPageHeader, New-WtPage, New-WtListRow, Format-WtDate, Show-WtMessage, Confirm-WtYesNo, Show-WtError
@@ -4139,7 +4200,8 @@ $script:addons = [System.Collections.Generic.List[hashtable]]::new()
   Refresh      { param($view) } → 화면을 열 때마다 부른다 (선택)
   HomeCard     { } → 홈에 놓을 카드 요소(여러 개 가능)를 돌려준다 (선택)
   ImportLegacy { param($folder) } → 예전 WorkTool data 폴더에서 이 탭 데이터를 가져와 저장한다. 가져온 개수를 돌려준다 (선택)
-  OnExit       { } → 앱이 끝나기 직전에 부른다. 저장하지 않은 것을 저장한다 (선택)
+  OnExit       { } → 모든 SavePending 성공 뒤 타이머·조회 등 실행 자원을 정리한다 (선택)
+  SavePending  { } → 화면 전환·종료 전 저장. 실패하면 $false를 돌려줘 전환을 막는다 (선택)
 #>
 function Register-WtAddon {
     param(
@@ -4153,6 +4215,7 @@ function Register-WtAddon {
         [scriptblock]$HomeCard,
         [scriptblock]$ImportLegacy,
         [scriptblock]$OnExit,
+        [scriptblock]$SavePending,
         [string]$Description = ''
     )
     for ($i = $script:addons.Count - 1; $i -ge 0; $i--) {
@@ -4162,6 +4225,7 @@ function Register-WtAddon {
             Id = $Id; Title = $Title; Icon = $Icon; Order = $Order; Required = [bool]$Required
             NewView = $NewView; Refresh = $Refresh; HomeCard = $HomeCard; ImportLegacy = $ImportLegacy; OnExit = $OnExit
             Description = $Description
+            SavePending = $SavePending
         })
 }
 
@@ -4631,6 +4695,7 @@ function Select-WtPage([string]$Id) {
     if ($script:selecting -or -not $Id) { return }
     $script:selecting = $true
     try {
+        if (-not (Save-WtPendingChanges)) { return }
         $page = Get-WtPageView $Id
         if (-not $page) { return }
         if ($page.Addon -and $page.Addon.Refresh) { [void](& $page.Addon.Refresh $page.View) }
@@ -4641,13 +4706,14 @@ function Select-WtPage([string]$Id) {
         foreach ($k in @($script:navButtons.Keys)) { $script:navButtons[$k].Button.IsChecked = ($k -eq $script:current) }
         Show-WtError $_ "화면 열기: $Id"
     } finally {
+        foreach ($k in @($script:navButtons.Keys)) { $script:navButtons[$k].Button.IsChecked = ($k -eq $script:current) }
         $script:selecting = $false
     }
 }
 
-# 데이터를 다시 가져온 뒤 등: 만들어 둔 화면을 버리고 지금 화면을 다시 연다
+# 데이터를 다시 가져온 뒤 현재 화면을 갱신한다. 숨긴 화면도 재진입할 때 갱신한다.
 function Reset-WtViews {
-    $script:views = @{}
+    if (-not (Save-WtPendingChanges)) { return }
     if ($script:current) {
         $id = $script:current
         $script:current = $null
@@ -4848,9 +4914,24 @@ function Show-WtMainWindow {
     [void]$script:window.Activate()
 }
 
-# 트레이 아이콘 · 아이콘을 치우고 메시지 돌리기를 멈춘다 (창을 닫는 중에도 부를 수 있다)
+# 정리 처리 전에 모든 저장을 확인한다. 실패하면 타이머와 창을 그대로 유지한다.
+function Save-WtPendingChanges {
+    foreach ($a in @(Get-WtAddon -All)) {
+        if (-not $a.SavePending) { continue }
+        try {
+            if ((& $a.SavePending) -eq $false) {
+                Show-WtMessage '저장하지 못한 내용이 있습니다. 메모의 저장 오류를 해결한 뒤 다시 시도하세요.' '저장 확인' 'Warning'
+                return $false
+            }
+        } catch { Show-WtError $_ "저장 확인: $($a.Title)"; return $false }
+    }
+    $true
+}
+
+# 저장에 성공한 뒤에만 트레이·타이머를 정리하고 메시지 돌리기를 멈춘다.
 function Stop-WtApp {
     if (-not $script:exiting) {
+        if (-not (Save-WtPendingChanges)) { return $false }
         foreach ($a in @(Get-WtAddon -All)) {
             if ($a.OnExit) { try { [void](& $a.OnExit) } catch { Show-WtError $_ "끝내기 전 저장: $($a.Title)" } }
         }
@@ -4859,10 +4940,11 @@ function Stop-WtApp {
     try { $script:notify.Visible = $false; $script:notify.Dispose() } catch { }
     try { if ($script:icon) { $script:icon.Dispose() } } catch { }
     if ($script:frame) { $script:frame.Continue = $false }
+    $true
 }
 
 function Exit-WtApp {
-    Stop-WtApp
+    if (-not (Stop-WtApp)) { return }
     try { $script:window.Close() } catch { }
 }
 
@@ -4888,6 +4970,7 @@ function New-WtTrayIcon([System.Drawing.Icon]$Icon) {
 # 예전 WorkTool(WinForms) data 폴더에서 탭마다 데이터를 가져온다.
 # -Force가 없으면 아직 저장소가 없는 탭만 가져온다 (처음 실행할 때).
 function Import-WtLegacyData([switch]$Force) {
+    if ($Force -and -not (Save-WtPendingChanges)) { throw '저장하지 못한 메모가 있어 가져오기를 취소했습니다.' }
     $folder = Find-WtLegacyFolder
     $result = @{ Folder = $folder; Count = 0; Tabs = @(); At = $null }
     if (-not $folder) { return $result }
@@ -4921,6 +5004,8 @@ function Start-WtApp {
     $script:maxed = $false
     $script:fullscreen = $false
     Set-WtAppRoot $AppRoot
+    $dataLock = Open-WtDataLock
+    try {
     Initialize-WtSettings
     $script:themeDict = New-WtThemeDictionary
 
@@ -4961,7 +5046,7 @@ function Start-WtApp {
     $w.Add_Closing({
             param($s, $e)
             if ($script:exiting) { return }
-            if (-not [bool](Get-WtSetting 'window.closeToTray')) { Stop-WtApp; return }
+            if (-not [bool](Get-WtSetting 'window.closeToTray')) { $e.Cancel = -not (Stop-WtApp); return }
             $e.Cancel = $true
             $s.Hide()
             if (-not $script:trayTipShown) {
@@ -5009,7 +5094,7 @@ function Start-WtApp {
             'ui.opacity' { Set-WtOpacity }
             'nav.collapsed' { Update-WtCollapsed }
             'window.closeToTray' { Update-WtCloseTip }
-            'addons.disabled' { $script:views = @{}; Update-WtNav }
+            'addons.disabled' { Update-WtNav }
         }
     }
 
@@ -5030,6 +5115,12 @@ function Start-WtApp {
     $first = @(Get-WtAddon)[0]
     if ($first) { Select-WtPage $first.Id } else { Select-WtPage '_settings' }
     if (-not $script:exiting) { [System.Windows.Threading.Dispatcher]::PushFrame($script:frame) }
+    } finally {
+        try {
+            if ($script:notify) { $script:notify.Visible = $false; $script:notify.Dispose() }
+            if ($script:icon) { $script:icon.Dispose() }
+        } finally { $dataLock.Dispose() }
+    }
 }
 
 Export-ModuleMember -Function Get-WtWindow, Select-WtPage, Reset-WtViews, Update-WtNav, Switch-WtCollapsed, Set-WtOpacity,
@@ -5795,6 +5886,15 @@ $script:ui = @{}
 $script:current = $null      # 오른쪽에 보이는 폴더 경로. '*' = 즐겨찾기
 $script:entries = @()
 $script:selecting = $false   # 코드로 트리를 고르는 중
+$script:jobs = [System.Collections.Generic.List[object]]::new()
+$script:pending = [ordered]@{}
+$script:pollTimer = $null
+$script:filterTimer = $null
+$script:stopping = $false
+$script:treeGeneration = 0
+$script:treeSelectionPath = $null
+$script:treeBatches = [System.Collections.Generic.List[object]]::new()
+$script:treeBatchScheduled = $false
 
 Register-WtSettingDefault 'docs.roots' @()
 Register-WtSettingDefault 'docs.pins' @()
@@ -5846,14 +5946,17 @@ function New-WtDocEntry([System.IO.FileSystemInfo]$Info) {
     [pscustomobject]@{
         Name = $Info.Name; Path = $Info.FullName; IsDir = $isDir; Kind = $kind
         Size = $(if ($isDir) { $null } else { $Info.Length }); Modified = $Info.LastWriteTime; Missing = $false
+        SizeText = $(if ($isDir) { '' } else { Format-WtDocSize $Info.Length })
+        ModifiedText = $Info.LastWriteTime.ToString('yyyy-MM-dd HH:mm'); IconText = [string][char](Get-WtDocIcon $kind)
     }
 }
 
 # 폴더 안 항목: 숨김 · 시스템은 빼고, 폴더 먼저 · 이름 순. 열 수 없으면 예외
-function Get-WtDocEntries([string]$Path) {
+function Get-WtDocEntries([string]$Path, $Cancel = $null) {
     $dir = [System.IO.DirectoryInfo]::new($Path)
     $hidden = [System.IO.FileAttributes]'Hidden, System'
     $list = foreach ($fsi in $dir.EnumerateFileSystemInfos()) {
+        if ($Cancel -and $Cancel.Value) { return @() }
         if ($fsi.Attributes -band $hidden) { continue }
         New-WtDocEntry $fsi
     }
@@ -5861,21 +5964,22 @@ function Get-WtDocEntries([string]$Path) {
 }
 
 # 하위 폴더 경로들 (트리 펼치기용). 열 수 없으면 빈 목록
-function Get-WtDocSubfolders([string]$Path) {
+function Get-WtDocSubfolders([string]$Path, [switch]$Strict) {
     try {
         $hidden = [System.IO.FileAttributes]'Hidden, System'
         @([System.IO.DirectoryInfo]::new($Path).EnumerateDirectories() | Where-Object { -not ($_.Attributes -band $hidden) } |
                 Sort-Object Name -Culture 'ko-KR' | ForEach-Object { $_.FullName })
-    } catch { @() }
+    } catch { if ($Strict) { throw }; @() }
 }
 
 # 즐겨찾기 항목. 없어진 경로도 보여 줘서 뺄 수 있게 한다
-function Get-WtDocPinEntries {
-    foreach ($p in @(Get-WtSetting 'docs.pins')) {
+function Get-WtDocPinEntries([string[]]$Paths = @(Get-WtSetting 'docs.pins'), $Cancel = $null) {
+    foreach ($p in $Paths) {
+        if ($Cancel -and $Cancel.Value) { return }
         $p = [string]$p
         if (-not $p) { continue }
         if (Test-Path -LiteralPath $p) { New-WtDocEntry (Get-Item -LiteralPath $p -Force) }
-        else { [pscustomobject]@{ Name = (Split-Path $p -Leaf); Path = $p; IsDir = $false; Kind = '없음'; Size = $null; Modified = $null; Missing = $true } }
+        else { [pscustomobject]@{ Name = (Split-Path $p -Leaf); Path = $p; IsDir = $false; Kind = '없음'; Size = $null; Modified = $null; Missing = $true; SizeText = ''; ModifiedText = ''; IconText = [string][char]0xE7BA } }
     }
 }
 
@@ -5951,7 +6055,159 @@ function Copy-WtDocPath([string]$Path) {
 
 # ---- 화면 -------------------------------------------------------------------------------------
 
-function Get-WtDocSelected { if ($script:ui.List.SelectedItem) { $script:ui.List.SelectedItem.Tag } else { $null } }
+# 최대 두 조회만 실행한다. 취소는 다음 파일부터 적용되며 진행 중인 OS 호출은 기다릴 수 있다.
+$script:worker = {
+    param($request, $kinds, $icons)
+    $ErrorActionPreference = 'Stop'
+    $script:kinds = $kinds; $script:kindIcons = $icons
+    try {
+        $items = switch ($request.Action) {
+            'folder' { @(Get-WtDocEntries $request.Path $request.Cancel) }
+            'tree' { @(Get-WtDocSubfolders $request.Path -Strict) }
+            'pins' { @(Get-WtDocPinEntries -Paths $request.Pins -Cancel $request.Cancel) }
+        }
+        @{ Items = @($items); Error = $null }
+    } catch { @{ Items = @(); Error = $_.Exception.InnerException.Message ?? $_.Exception.Message } }
+}
+
+function Start-WtDocRequest([string]$Key, [string]$Action, [string]$Path = '', $Context = $null) {
+    $script:stopping = $false
+    foreach ($job in $script:jobs) { if ($job.Key -eq $Key) { $job.Request.Cancel.Value = $true } }
+    if ($Key -notin 'folder', 'home' -and -not $script:pending.Contains($Key) -and $script:pending.Count -ge 32) { return $false }
+    $request = @{ Action = $Action; Path = $Path; Pins = @(Get-WtSetting 'docs.pins'); Cancel = [hashtable]::Synchronized(@{ Value = $false }) }
+    if ($Key -eq 'home') { $request.Pins = @($request.Pins | Select-Object -First 6) }
+    $script:pending[$Key] = @{ Key = $Key; Request = $request; Context = $Context; Generation = $script:treeGeneration }
+    if (-not $script:pollTimer) { $script:pollTimer = New-WtPollTimer { Complete-WtDocJobs } }
+    $script:pollTimer.Start()
+    Start-WtDocJobs
+    $true
+}
+
+function Start-WtDocJobs {
+    while (-not $script:stopping -and $script:jobs.Count -lt 2 -and $script:pending.Count) {
+        $key = if ($script:pending.Contains('folder')) { 'folder' } elseif ($script:pending.Contains('home')) { 'home' } else { @($script:pending.Keys)[0] }
+        $job = $script:pending[$key]; $script:pending.Remove($key)
+        $state = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
+        foreach ($name in 'Get-WtDocKind', 'Get-WtDocIcon', 'Format-WtDocSize', 'New-WtDocEntry', 'Get-WtDocEntries', 'Get-WtDocSubfolders', 'Get-WtDocPinEntries') {
+            $state.Commands.Add([System.Management.Automation.Runspaces.SessionStateFunctionEntry]::new($name, (Get-Command $name).Definition))
+        }
+        $runspace = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace($state)
+        $runspace.ApartmentState = 'MTA'; $runspace.ThreadOptions = 'ReuseThread'
+        $ps = [powershell]::Create()
+        try {
+            $runspace.Open(); $ps.Runspace = $runspace
+            [void]$ps.AddScript($script:worker.ToString()).AddArgument($job.Request).AddArgument($script:kinds).AddArgument($script:kindIcons)
+            $job.PowerShell = $ps; $job.Runspace = $runspace; $job.Handle = $ps.BeginInvoke()
+            $script:jobs.Add($job)
+        } catch {
+            $ps.Dispose(); $runspace.Dispose()
+            Set-WtDocResult $job @{ Items = @(); Error = $_.Exception.Message }
+        }
+    }
+}
+
+function Complete-WtDocJobs {
+    foreach ($job in @($script:jobs.ToArray())) {
+        if (-not $job.Handle.IsCompleted) { continue }
+        try {
+            $output = @($job.PowerShell.EndInvoke($job.Handle))
+            $result = if ($output.Count) { $output[-1] } else { @{ Items = @(); Error = '조회가 취소되었거나 완료되지 않았습니다.' } }
+        } catch { $result = @{ Items = @(); Error = $_.Exception.Message } }
+        finally { $job.PowerShell.Dispose(); $job.Runspace.Dispose(); [void]$script:jobs.Remove($job) }
+        if (-not $script:stopping -and -not $job.Request.Cancel.Value) { Set-WtDocResult $job $result }
+    }
+    Start-WtDocJobs
+    if (-not $script:jobs.Count -and -not $script:pending.Count -and $script:pollTimer) { $script:pollTimer.Stop() }
+}
+
+function Set-WtDocResult($Job, $Result) {
+    switch ($Job.Key) {
+        'folder' {
+            if (-not $script:ui.Count -or $Job.Request.Path -ne $script:current) { return }
+            $script:entries = @($Result.Items)
+            $script:ui.Loading = $false
+            $script:ui.Error = if ($Result.Error) { "폴더를 열지 못했습니다. $($Result.Error)" } else { $null }
+            if (-not $Result.Error -and $script:current -ne '*') {
+                try { Set-WtSetting 'docs.last' $script:current } catch { $script:ui.Error = '마지막 위치를 저장하지 못했습니다. 폴더 쓰기 권한을 확인하세요.' }
+            }
+            Update-WtDocList
+        }
+        'home' {
+            $col = $Job.Context
+            $col.Children.Clear()
+            [void](Add-WtChild $col (New-WtCardHeader '즐겨찾기 문서' '' '문서 열기' 'docs'))
+            if ($Result.Error) { [void](Add-WtChild $col (New-WtText '즐겨찾기를 읽지 못했습니다. 문서 탭에서 다시 시도하세요.' 'T.Sub')); return }
+            foreach ($p in $Result.Items) {
+                $b = New-WtButton $p.Name -Kind Link -Icon (Get-WtDocIcon $p.Kind) -ToolTip $p.Path
+                $b.HorizontalAlignment = 'Left'; $b.Tag = $p
+                $b.Add_Click({ param($s, $e) if ($s.Tag.IsDir) { Select-WtPage 'docs'; Show-WtDocFolder $s.Tag.Path -SelectTree } else { Open-WtDocEntry $s.Tag } })
+                [void](Add-WtChild $col $b)
+            }
+        }
+        default {
+            if ($Job.Generation -ne $script:treeGeneration) { return }
+            $node = $Job.Context
+            $node.Items.Clear()
+            if ($Result.Error) { $node.Tag.Loading = $false; [void]$node.Items.Add('읽지 못했습니다. 접었다 다시 펼치세요.'); $node.ToolTip = $Result.Error; return }
+            $node.Tag.Loading = $true
+            [void]$node.Items.Add('불러오는 중…')
+            $script:treeBatches.Add(@{ Node = $node; Paths = @($Result.Items); Index = 0; Generation = $Job.Generation })
+            Request-WtDocTreeBatch
+        }
+    }
+}
+
+function Request-WtDocTreeBatch {
+    if ($script:treeBatchScheduled -or $script:stopping -or -not $script:treeBatches.Count) { return }
+    $script:treeBatchScheduled = $true
+    [void]$script:ui.Tree.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [Action]{ Complete-WtDocTreeBatch })
+}
+
+function Complete-WtDocTreeBatch {
+    $script:treeBatchScheduled = $false
+    if ($script:stopping -or -not $script:treeBatches.Count) { return }
+    $batch = $script:treeBatches[0]
+    if ($batch.Generation -ne $script:treeGeneration) { $script:treeBatches.RemoveAt(0); Request-WtDocTreeBatch; return }
+    $node = $batch.Node
+    if ($node.Items.Count -and $node.Items[$node.Items.Count - 1] -is [string]) { $node.Items.RemoveAt($node.Items.Count - 1) }
+    $budget = Get-WtUiWorkBudget
+    $watch = [Diagnostics.Stopwatch]::StartNew()
+    $added = 0
+    while ($batch.Index -lt $batch.Paths.Count -and $added -lt $budget.Items) {
+        $path = $batch.Paths[$batch.Index]
+        [void]$node.Items.Add((New-WtDocTreeItem (Split-Path $path -Leaf) $path 0xE8B7))
+        $batch.Index++; $added++
+        if ($watch.ElapsedMilliseconds -ge $budget.Milliseconds) { break }
+    }
+    if ($batch.Index -eq $batch.Paths.Count) {
+        $node.Tag.Loaded = $true; $node.Tag.Loading = $false
+        $script:treeBatches.RemoveAt(0)
+        if ($script:treeSelectionPath) { Select-WtDocTreePath $script:treeSelectionPath }
+    } else { [void]$node.Items.Add('불러오는 중…') }
+    Request-WtDocTreeBatch
+}
+
+function Stop-WtDocs {
+    $script:stopping = $true
+    $script:pending.Clear()
+    $script:treeBatches.Clear()
+    foreach ($job in $script:jobs) {
+        $job.Request.Cancel.Value = $true
+        $job.Context = $null
+        if (-not $job.Handle.IsCompleted) { [void]$job.PowerShell.BeginStop($null, $null); $job.Runspace.CloseAsync() }
+    }
+    if ($script:filterTimer) { $script:filterTimer.Stop() }
+    Complete-WtDocJobs
+}
+
+function Cancel-WtDocFolder {
+    $script:pending.Remove('folder')
+    foreach ($job in $script:jobs) { if ($job.Key -eq 'folder') { $job.Request.Cancel.Value = $true } }
+    $script:ui.Loading = $false; $script:ui.Error = '조회를 취소했습니다. 새로 고침으로 다시 시도하세요.'
+    Update-WtDocList
+}
+
+function Get-WtDocSelected { $script:ui.List.SelectedItem }
 
 function Set-WtDocStatus([string]$Text) { $script:ui.Status.Text = $Text }
 
@@ -5969,7 +6225,7 @@ function New-WtDocTreeItem([string]$Label, [string]$Path, [int]$Icon, [switch]$L
     [void](Add-WtChild $row $name)
     $ti.Header = $row
     $ti.ToolTip = $Path
-    $ti.Tag = @{ Path = $Path; Loaded = [bool]$Leaf }
+    $ti.Tag = @{ Path = $Path; Loaded = [bool]$Leaf; Loading = $false }
     if (-not $Leaf) { [void]$ti.Items.Add('…') }   # 펼칠 때 하위 폴더를 읽는다
     $ti.Add_Expanded({
             param($s, $e)
@@ -5979,12 +6235,8 @@ function New-WtDocTreeItem([string]$Label, [string]$Path, [int]$Icon, [switch]$L
 }
 
 function Expand-WtDocNode($Node) {
-    if ($Node.Tag.Loaded) { return }
-    $Node.Tag.Loaded = $true
-    $Node.Items.Clear()
-    foreach ($p in (Get-WtDocSubfolders $Node.Tag.Path)) {
-        [void]$Node.Items.Add((New-WtDocTreeItem (Split-Path $p -Leaf) $p 0xE8B7))
-    }
+    if ($Node.Tag.Loaded -or $Node.Tag.Loading) { return }
+    $Node.Tag.Loading = Start-WtDocRequest "tree:$($Node.Tag.Path)" 'tree' $Node.Tag.Path $Node
 }
 
 function Get-WtDocRootLabel([string]$Path) {
@@ -5993,6 +6245,10 @@ function Get-WtDocRootLabel([string]$Path) {
 }
 
 function Update-WtDocTree {
+    $script:treeGeneration++
+    $script:treeBatches.Clear()
+    foreach ($key in @($script:pending.Keys)) { if ($key.StartsWith('tree:')) { $script:pending.Remove($key) } }
+    foreach ($job in $script:jobs) { if ($job.Request.Action -eq 'tree') { $job.Request.Cancel.Value = $true; $job.Context = $null } }
     $tree = $script:ui.Tree
     $tree.Items.Clear()
     [void]$tree.Items.Add((New-WtDocTreeItem '즐겨찾기' '*' 0xE734 -Leaf))
@@ -6002,6 +6258,7 @@ function Update-WtDocTree {
 
 # 트리에서 경로에 맞는 항목을 펼쳐 찾아 고른다
 function Select-WtDocTreePath([string]$Path) {
+    $script:treeSelectionPath = $Path
     $items = $script:ui.Tree.Items
     $found = $null
     if ($Path -eq '*') { $found = $items[0] }
@@ -6010,7 +6267,7 @@ function Select-WtDocTreePath([string]$Path) {
             $next = $items | Where-Object { $_ -is [System.Windows.Controls.TreeViewItem] -and $_.Tag.Path.TrimEnd('\') -ieq $step.TrimEnd('\') } | Select-Object -First 1
             if (-not $next) { break }
             $found = $next
-            if ($step.TrimEnd('\') -ine $Path.TrimEnd('\')) { Expand-WtDocNode $next; $next.IsExpanded = $true }
+            if ($step.TrimEnd('\') -ine $Path.TrimEnd('\')) { Expand-WtDocNode $next; $next.IsExpanded = $true; if (-not $next.Tag.Loaded) { break } }
             $items = $next.Items
         }
     }
@@ -6023,23 +6280,20 @@ function Select-WtDocTreePath([string]$Path) {
 # 오른쪽에 폴더(또는 즐겨찾기 '*')를 보여 준다
 function Show-WtDocFolder([string]$Path, [switch]$SelectTree) {
     $script:current = $Path
+    $script:treeSelectionPath = $Path
+    $script:entries = @()
+    $script:ui.Loading = [bool]$Path
     $script:ui.Filter.Text = ''
     $script:ui.Error = $null
     if ($Path -eq '*') {
         $script:ui.PathText.Text = '즐겨찾기'
-        $script:entries = @(Get-WtDocPinEntries)
+        [void](Start-WtDocRequest 'folder' 'pins' $Path)
     } elseif (-not $Path) {
         $script:ui.PathText.Text = ''
         $script:entries = @()
     } else {
         $script:ui.PathText.Text = Format-WtDocPathLabel (Get-WtDocRoots) $Path
-        try {
-            $script:entries = @(Get-WtDocEntries $Path)
-            Set-WtSetting 'docs.last' $Path
-        } catch {
-            $script:entries = @()
-            $script:ui.Error = "폴더를 열지 못했습니다. $($_.Exception.InnerException.Message ?? $_.Exception.Message)"
-        }
+        [void](Start-WtDocRequest 'folder' 'folder' $Path)
     }
     $script:ui.PathText.ToolTip = if ($Path -and $Path -ne '*') { $Path } else { $null }
     $script:ui.OpenFolder.IsEnabled = $Path -and $Path -ne '*'
@@ -6050,13 +6304,15 @@ function Show-WtDocFolder([string]$Path, [switch]$SelectTree) {
 
 function Update-WtDocList {
     $list = $script:ui.List
-    $list.Items.Clear()
+    $selected = $list.SelectedItem
     $shown = @(Find-WtDocEntry $script:entries $script:ui.Filter.Text)
-    foreach ($e in $shown) { [void]$list.Items.Add((New-WtDocRow $e)) }
+    $list.ItemsSource = $shown
+    if ($selected) { $list.SelectedItem = $shown | Where-Object Path -eq $selected.Path | Select-Object -First 1 }
     # 비어 있을 때 · 오류일 때 안내
     $msg = $null
     $action = $false
-    if ($script:ui.Error) { $msg = $script:ui.Error }
+    if ($script:ui.Loading) { $msg = '불러오는 중…' }
+    elseif ($script:ui.Error) { $msg = $script:ui.Error }
     elseif (-not @(Get-WtDocRoots).Count -and $script:current -ne '*') { $msg = '볼 폴더를 추가하세요.'; $action = $true }
     elseif ($script:current -eq '*' -and -not $script:entries.Count) { $msg = '즐겨찾기가 없습니다. 파일을 고르고 [즐겨찾기]를 누르세요.' }
     elseif (-not $script:current) { $msg = '왼쪽에서 폴더를 고르세요.' }
@@ -6066,37 +6322,10 @@ function Update-WtDocList {
     Set-WtResource $script:ui.EmptyText 'Foreground' $(if ($script:ui.Error) { 'B.Danger' } else { 'B.SubText' })
     $script:ui.EmptyAdd.Visibility = if ($action) { 'Visible' } else { 'Collapsed' }
     $script:ui.Empty.Visibility = if ($msg) { 'Visible' } else { 'Collapsed' }
+    $script:ui.Cancel.Visibility = if ($script:ui.Loading) { 'Visible' } else { 'Collapsed' }
     $dirs = @($shown | Where-Object IsDir).Count
     Set-WtDocStatus $(if ($script:current) { "폴더 $dirs · 파일 $($shown.Count - $dirs)" } else { '' })
     Update-WtDocCommands
-}
-
-function New-WtDocRow($E) {
-    $li = [System.Windows.Controls.ListBoxItem]::new()
-    $li.Tag = $E
-    $li.Padding = [System.Windows.Thickness]::new(12, 6, 12, 6)
-    $size = New-WtText (Format-WtDocSize $E.Size) 'T.Sub'
-    $size.Width = 80; $size.TextAlignment = 'Right'
-    $date = New-WtText $(if ($E.Modified) { $E.Modified.ToString('yyyy-MM-dd HH:mm') } else { '' }) 'T.Sub'
-    $date.Width = 130
-    $kind = New-WtText $E.Kind 'T.Sub'
-    $kind.Width = 90
-    $icon = New-WtIcon (Get-WtDocIcon $E.Kind)
-    Set-WtResource $icon 'Foreground' $(if ($E.Missing) { 'B.Warn' } else { 'B.SubText' })
-    $icon.Width = 20
-    $name = New-WtText $E.Name 'T.Body'
-    $name.TextWrapping = 'NoWrap'
-    $name.TextTrimming = 'CharacterEllipsis'
-    if ($E.Missing) { Set-WtResource $name 'Foreground' 'B.SubText'; $li.ToolTip = "찾을 수 없음: $($E.Path)" } else { $li.ToolTip = $E.Path }
-    $d = [System.Windows.Controls.DockPanel]::new()
-    foreach ($c in @($size, $date, $kind)) { [System.Windows.Controls.DockPanel]::SetDock($c, 'Right'); $c.Margin = [System.Windows.Thickness]::new(12, 0, 0, 0); $c.VerticalAlignment = 'Center'; [void]$d.Children.Add($c) }
-    [System.Windows.Controls.DockPanel]::SetDock($icon, 'Left')
-    [void]$d.Children.Add($icon)
-    $name.Margin = [System.Windows.Thickness]::new(8, 0, 0, 0)
-    $name.VerticalAlignment = 'Center'
-    [void]$d.Children.Add($name)
-    $li.Content = $d
-    $li
 }
 
 # 아래 명령: 고른 항목이 있을 때만 쓸 수 있다
@@ -6134,6 +6363,7 @@ function Remove-WtDocRoot {
 }
 
 function New-WtDocsView {
+    if ($script:filterTimer) { $script:filterTimer.Stop() }
     $script:ui = @{}
     $page = New-WtPage -Fill
     $add = New-WtButton '폴더 추가' -Icon 0xE710 -ToolTip '볼 폴더 추가'
@@ -6196,7 +6426,8 @@ function New-WtDocsView {
     $sb = New-WtSearchBox '이 폴더에서 이름으로 찾기'
     $filter = $sb.Box
     $filter.ToolTip = '띄어 쓰면 낱말이 모두 들어간 이름만 (Ctrl+F)'
-    $filter.Add_TextChanged({ Update-WtDocList })
+    $script:filterTimer = New-WtPollTimer { $script:filterTimer.Stop(); Update-WtDocList }
+    $filter.Add_TextChanged({ $script:filterTimer.Stop(); $script:filterTimer.Start() })
     $sb.Root.Margin = [System.Windows.Thickness]::new(0, 8, 0, 8)
     $cols = [System.Windows.Controls.DockPanel]::new()
     $cols.Margin = [System.Windows.Thickness]::new(12, 0, 12, 4)
@@ -6266,7 +6497,7 @@ function New-WtDocsView {
     # 목록 + 비었을 때 안내
     $area = [System.Windows.Controls.Grid]::new()
     $list = [System.Windows.Controls.ListBox]::new()
-    Set-WtStyle $list 'List'
+    Set-WtStyle $list 'Doc.List'
     $list.Margin = [System.Windows.Thickness]::new(0, 4, 0, 0)
     $list.Add_SelectionChanged({ Update-WtDocCommands })
     $list.Add_MouseDoubleClick({
@@ -6276,7 +6507,7 @@ function New-WtDocsView {
             while ($d -and $d -isnot [System.Windows.Controls.ListBoxItem] -and $d -is [System.Windows.Media.Visual]) { $d = [System.Windows.Media.VisualTreeHelper]::GetParent($d) }
             if ($d -is [System.Windows.Controls.ListBoxItem]) { Open-WtDocEntry $d.Tag }
         })
-    $list.Add_KeyDown({ param($s, $e) if ($e.Key -eq 'Enter' -and $s.SelectedItem) { Open-WtDocEntry $s.SelectedItem.Tag; $e.Handled = $true } })
+    $list.Add_KeyDown({ param($s, $e) if ($e.Key -eq 'Enter' -and $s.SelectedItem) { Open-WtDocEntry $s.SelectedItem; $e.Handled = $true } })
     [void]$area.Children.Add($list)
     $empty = New-WtStack Vertical 12
     $empty.HorizontalAlignment = 'Center'
@@ -6288,6 +6519,10 @@ function New-WtDocsView {
     $emptyAdd.Add_Click({ Add-WtDocRoot })
     [void](Add-WtChild $empty $emptyText)
     [void](Add-WtChild $empty $emptyAdd)
+    $cancel = New-WtButton '취소' -Kind Link
+    $cancel.Add_Click({ Cancel-WtDocFolder })
+    $cancel.Visibility = 'Collapsed'
+    [void](Add-WtChild $empty $cancel)
     [void]$area.Children.Add($empty)
     [void]$rdock.Children.Add($area)
     $right.Child = $rdock
@@ -6310,7 +6545,7 @@ function New-WtDocsView {
     $script:ui = @{
         Tree = $tree; RemoveRoot = $remove; List = $list; Filter = $filter; PathText = $pathText; Status = $status
         Up = $up; OpenFolder = $openFolder; Open = $open; Pin = $pin; ItemButtons = @($open, $reveal, $copy, $pin)
-        Empty = $empty; EmptyText = $emptyText; EmptyAdd = $emptyAdd; Error = $null
+        Empty = $empty; EmptyText = $emptyText; EmptyAdd = $emptyAdd; Cancel = $cancel; Error = $null; Loading = $false
     }
     $page.Root
 }
@@ -6318,37 +6553,29 @@ function New-WtDocsView {
 function Update-WtDocsView {
     Update-WtDocTree
     $last = [string](Get-WtSetting 'docs.last')
-    $start = if ($last -and (Get-WtDocChain (Get-WtDocRoots) $last).Count -and (Test-Path -LiteralPath $last)) { $last }
+    $start = if ($last -and (Get-WtDocChain (Get-WtDocRoots) $last).Count) { $last }
     elseif (@(Get-WtDocRoots).Count) { @(Get-WtDocRoots)[0] } else { '*' }
     Show-WtDocFolder $start -SelectTree
 }
 
 # 홈: 즐겨찾기 바로 열기
 function New-WtDocsHomeCard {
-    $pins = @(Get-WtDocPinEntries)
+    $pins = @(Get-WtSetting 'docs.pins')
     if (-not $pins.Count) { return }
     $card = New-WtCard
     $col = New-WtStack Vertical
     [void](Add-WtChild $col (New-WtCardHeader '즐겨찾기 문서' "$($pins.Count)" '문서 열기' 'docs'))
-    foreach ($p in ($pins | Select-Object -First 6)) {
-        $b = New-WtButton $p.Name -Kind Link -Icon (Get-WtDocIcon $p.Kind) -ToolTip $p.Path
-        $b.HorizontalAlignment = 'Left'
-        $b.Tag = $p
-        $b.Add_Click({
-                param($s, $e)
-                $x = $s.Tag
-                if ($x.IsDir) { Select-WtPage 'docs'; Show-WtDocFolder $x.Path -SelectTree } else { Open-WtDocEntry $x }
-            })
-        [void](Add-WtChild $col $b)
-    }
+    [void](Add-WtChild $col (New-WtText '불러오는 중…' 'T.Sub'))
     $card.Child = $col
+    [void](Start-WtDocRequest 'home' 'pins' '' $col)
     $card
 }
 
 Register-WtAddon -Id 'docs' -Title '문서' -Icon 0xE8B7 -Order 50 `
     -NewView { New-WtDocsView } `
     -Refresh { param($view) Update-WtDocsView } `
-    -HomeCard { New-WtDocsHomeCard }
+    -HomeCard { New-WtDocsHomeCard } `
+    -OnExit { Stop-WtDocs }
 
 Export-ModuleMember -Function Get-WtDocKind, Format-WtDocSize, Get-WtDocEntries, Get-WtDocSubfolders, Get-WtDocPinEntries,
     Test-WtDocPinned, Switch-WtDocPin, Get-WtDocRoots, Get-WtDocChain, Find-WtDocEntry, Format-WtDocPathLabel
@@ -6440,6 +6667,8 @@ $script:lastDeleted = $null  # 실행 취소용
 $script:ui = @{}
 $script:saveTimer = $null
 $script:undoTimer = $null
+$script:listUpdating = $false
+$script:rowCache = @{}
 
 Register-WtSettingDefault 'memo.mode' 'preview'   # 오른쪽 칸: preview(미리보기) | edit(편집)
 
@@ -6530,30 +6759,17 @@ function Import-WtMemoLegacy([string]$Folder) {
 function Get-WtMemoById([string]$Id) { $script:items | Where-Object { $_.id -eq $Id } | Select-Object -First 1 }
 
 function New-WtMemoListItem($Memo) {
-    $li = [System.Windows.Controls.ListBoxItem]::new()
-    $li.Tag = $Memo.id
-    $col = New-WtStack Vertical 2
-    $head = [System.Windows.Controls.DockPanel]::new()
-    $when = New-WtText (Format-WtMemoTime $Memo.updated) 'T.Sub'
-    [System.Windows.Controls.DockPanel]::SetDock($when, 'Right')
-    $when.Margin = [System.Windows.Thickness]::new(8, 0, 0, 0)
-    [void]$head.Children.Add($when)
-    $name = New-WtText $Memo.title 'T.Strong'
-    $name.TextWrapping = 'NoWrap'
-    $name.TextTrimming = 'CharacterEllipsis'
-    [void]$head.Children.Add($name)
-    [void](Add-WtChild $col $head)
-    $snippet = New-WtText (Get-WtMarkdownSnippet ([string]$Memo.body)) 'T.Sub'
-    $snippet.TextWrapping = 'NoWrap'
-    $snippet.TextTrimming = 'CharacterEllipsis'
-    [void](Add-WtChild $col $snippet)
-    $li.Content = $col
-    $li
+    $cached = $script:rowCache[$Memo.id]
+    if ($cached -and $cached.Day -eq [datetime]::Today -and $cached.Body -ceq $Memo.body -and $cached.Title -ceq $Memo.title -and $cached.Updated -eq $Memo.updated) { return $cached.Row }
+    $snippet = if ($cached -and $cached.Body -ceq $Memo.body) { $cached.Row.Snippet } else { Get-WtMarkdownSnippet ([string]$Memo.body) }
+    $row = [pscustomobject]@{ Id = $Memo.id; Title = $Memo.title; Stamp = Format-WtMemoTime $Memo.updated; Snippet = $snippet }
+    $script:rowCache[$Memo.id] = @{ Body = $Memo.body; Title = $Memo.title; Updated = $Memo.updated; Day = [datetime]::Today; Row = $row }
+    $row
 }
 
 # 오른쪽 칸에 메모 하나를 연다 (없으면 빈 화면 안내)
 function Show-WtMemo([string]$Id) {
-    Save-WtMemoNow
+    if (-not (Save-WtMemoNow)) { return }
     $m = if ($Id) { Get-WtMemoById $Id } else { $null }
     $script:currentId = if ($m) { $m.id } else { $null }
     $script:loading = $true
@@ -6570,12 +6786,15 @@ function Show-WtMemo([string]$Id) {
             $script:ui.TitleBox.Text = $m.title
             $script:ui.Meta.Text = '만든 날 {0} · 고친 날 {1}' -f $m.created, $m.updated
             $script:ui.BodyBox.Text = [string]$m.body
-            Set-WtMarkdownText $script:ui.MdView ([string]$m.body)
+            if ([string](Get-WtSetting 'memo.mode') -ne 'edit' -and ($script:ui.MdView.Tag.Text -cne [string]$m.body -or $script:ui.MdView.Tag.Error)) { Set-WtMarkdownText $script:ui.MdView ([string]$m.body) }
         }
     } finally { $script:loading = $false }
     $script:ui.Editor.IsEnabled = [bool]$m
     $script:ui.Delete.IsEnabled = [bool]$m
     $script:ui.Delete.ToolTip = if ($m) { '이 메모 삭제' } else { '메모를 먼저 고르세요' }
+    $script:listUpdating = $true
+    try { $script:ui.List.SelectedItem = $script:ui.List.Items | Where-Object Id -eq $script:currentId | Select-Object -First 1 }
+    finally { $script:listUpdating = $false }
     Set-WtMemoStatus $(if ($m) { 'saved' } else { '' })
 }
 
@@ -6583,11 +6802,11 @@ function Show-WtMemo([string]$Id) {
 function Update-WtMemoMode {
     $edit = [string](Get-WtSetting 'memo.mode') -eq 'edit'
     if (-not $edit) {
-        Save-WtMemoNow
+        if (-not (Save-WtMemoNow)) { return }
         $m = Get-WtMemoById $script:currentId
         if ($m) {
             $script:ui.TitleText.Text = $m.title
-            Set-WtMarkdownText $script:ui.MdView ([string]$m.body)
+            if ($script:ui.MdView.Tag.Text -cne [string]$m.body -or $script:ui.MdView.Tag.Error) { Set-WtMarkdownText $script:ui.MdView ([string]$m.body) }
         }
     }
     $script:ui.Editor.Visibility = if ($edit) { 'Visible' } else { 'Collapsed' }
@@ -6598,6 +6817,7 @@ function Update-WtMemoMode {
 }
 
 function Switch-WtMemoMode {
+    if (-not (Save-WtMemoNow)) { return }
     Set-WtSetting 'memo.mode' $(if ([string](Get-WtSetting 'memo.mode') -eq 'edit') { 'preview' } else { 'edit' })
     Update-WtMemoMode
 }
@@ -6630,19 +6850,23 @@ function Set-WtMemoStatus([string]$State, [string]$Detail = '') {
 # 고친 내용이 있으면 바로 저장한다. 저장 시각 · 목록도 고친다
 function Save-WtMemoNow {
     if ($script:saveTimer) { $script:saveTimer.Stop() }
-    if (-not $script:dirty) { return }
+    if (-not $script:dirty) { return $true }
     $m = Get-WtMemoById $script:currentId
-    if (-not $m) { $script:dirty = $false; return }
+    if (-not $m) { Set-WtMemoStatus 'error' '편집 중인 메모를 찾을 수 없습니다.'; return $false }
     try {
-        [void](Set-WtMemoContent $m $script:ui.TitleBox.Text $script:ui.BodyBox.Text)
-        Save-WtMemoItems $script:items
+        $candidate = $m.PSObject.Copy()
+        [void](Set-WtMemoContent $candidate $script:ui.TitleBox.Text $script:ui.BodyBox.Text)
+        $next = @(foreach ($item in $script:items) { if ($item.id -eq $m.id) { $candidate } else { $item } })
+        Save-WtMemoItems $next
         $script:dirty = $false
-        $script:items = @(Get-WtMemoSorted $script:items)
-        $script:ui.Meta.Text = '만든 날 {0} · 고친 날 {1}' -f $m.created, $m.updated
+        $script:items = @(Get-WtMemoSorted $next)
+        $script:ui.Meta.Text = '만든 날 {0} · 고친 날 {1}' -f $candidate.created, $candidate.updated
         Update-WtMemoList -KeepCurrent
         Set-WtMemoStatus 'saved'
+        return $true
     } catch {
         Set-WtMemoStatus 'error' $_.Exception.Message
+        return $false
     }
 }
 
@@ -6655,10 +6879,11 @@ function Set-WtMemoDirty {
 }
 
 function Add-WtMemo {
-    Save-WtMemoNow
+    if (-not (Save-WtMemoNow)) { return }
     $m = New-WtMemo
-    $script:items = @($m) + @($script:items)
-    try { Save-WtMemoItems $script:items } catch { Show-WtError $_ '새 메모 저장'; return }
+    $next = @($m) + @($script:items)
+    try { Save-WtMemoItems $next } catch { Show-WtError $_ '새 메모 저장'; return }
+    $script:items = $next
     if ($script:ui.Search.Text) { $script:ui.Search.Text = '' }
     $script:currentId = $null
     Update-WtMemoList
@@ -6668,13 +6893,16 @@ function Add-WtMemo {
 }
 
 function Remove-WtMemoCurrent {
+    if (-not (Save-WtMemoNow)) { return }
     $m = Get-WtMemoById $script:currentId
     if (-not $m) { return }
     $script:dirty = $false
     $script:saveTimer.Stop()
     $index = [array]::IndexOf(@($script:items), $m)
-    $script:items = @($script:items | Where-Object { $_.id -ne $m.id })
-    try { Save-WtMemoItems $script:items } catch { Show-WtError $_ '메모 삭제'; return }
+    $next = @($script:items | Where-Object { $_.id -ne $m.id })
+    try { Save-WtMemoItems $next } catch { Show-WtError $_ '메모 삭제'; return }
+    $script:items = $next
+    $script:rowCache.Remove($m.id)
     $script:lastDeleted = @{ Memo = $m; Index = $index }
     $script:currentId = $null
     Update-WtMemoList
@@ -6686,13 +6914,15 @@ function Remove-WtMemoCurrent {
 }
 
 function Restore-WtMemoDeleted {
+    if (-not (Save-WtMemoNow)) { return }
     $d = $script:lastDeleted
     if (-not $d) { return }
     $list = [System.Collections.Generic.List[object]]::new()
     foreach ($x in $script:items) { $list.Add($x) }
     $list.Insert([Math]::Min([Math]::Max(0, $d.Index), $list.Count), $d.Memo)
-    $script:items = @(Get-WtMemoSorted $list.ToArray())
-    try { Save-WtMemoItems $script:items } catch { Show-WtError $_ '삭제 실행 취소'; return }
+    $next = @(Get-WtMemoSorted $list.ToArray())
+    try { Save-WtMemoItems $next } catch { Show-WtError $_ '삭제 실행 취소'; return }
+    $script:items = $next
     $script:lastDeleted = $null
     $script:ui.UndoBar.Visibility = 'Collapsed'
     Update-WtMemoList
@@ -6720,35 +6950,36 @@ function Invoke-WtMemoLink($Link) {
 # 목록에서 메모 하나를 고른다. 검색에 걸러져 안 보이면 검색을 비운다
 function Select-WtMemoItem([string]$Id) {
     $list = $script:ui.List
-    $li = $list.Items | Where-Object { [string]$_.Tag -eq $Id } | Select-Object -First 1
+    $li = $list.Items | Where-Object { [string]$_.Id -eq $Id } | Select-Object -First 1
     if (-not $li) {
         $script:ui.Search.Text = ''
-        $li = $list.Items | Where-Object { [string]$_.Tag -eq $Id } | Select-Object -First 1
+        $li = $list.Items | Where-Object { [string]$_.Id -eq $Id } | Select-Object -First 1
     }
     if ($li) {
         $list.SelectedItem = $li
-        $li.BringIntoView()
+        $list.ScrollIntoView($li)
     }
 }
 
 # 목록을 다시 그린다. 열려 있는 메모는 그대로 골라 두고 오른쪽 칸은 다시 채우지 않는다 (편집 중 글자 위치 유지)
 function Update-WtMemoList([switch]$KeepCurrent) {
+    if ($script:listUpdating) { return }
+    if (-not $KeepCurrent -and -not (Save-WtMemoNow)) { return }
     $list = $script:ui.List
     $keep = $script:currentId
-    $list.Items.Clear()
     # 저장한 뒤 다시 그릴 때는 열려 있는 메모가 검색어에서 빠져도 남긴다 (고치는 중에 사라지지 않게)
     $shown = @(Find-WtMemo $script:items $script:ui.Search.Text)
     if ($KeepCurrent -and $keep -and -not ($shown | Where-Object { $_.id -eq $keep })) {
         $shown = @($script:items | Where-Object { $_.id -eq $keep -or $shown -contains $_ })
     }
-    foreach ($m in $shown) {
-        $li = New-WtMemoListItem $m
-        [void]$list.Items.Add($li)
-        if ($m.id -eq $keep) { $li.IsSelected = $true }
-    }
-    if (-not $list.SelectedItem) {
-        if ($list.Items.Count) { $list.SelectedIndex = 0 } else { Show-WtMemo '' }
-    }
+    $script:listUpdating = $true
+    try {
+        $list.ItemsSource = @(foreach ($m in $shown) { New-WtMemoListItem $m })
+        $list.SelectedItem = $list.Items | Where-Object Id -eq $keep | Select-Object -First 1
+        if (-not $list.SelectedItem -and $list.Items.Count) { $list.SelectedIndex = 0 }
+    } finally { $script:listUpdating = $false }
+    $selectedId = if ($list.SelectedItem) { $list.SelectedItem.Id } else { '' }
+    if ($selectedId -ne $script:currentId) { Show-WtMemo $selectedId }
 }
 
 function New-WtMemoView {
@@ -6756,7 +6987,7 @@ function New-WtMemoView {
     if (-not $script:saveTimer) {
         $script:saveTimer = [System.Windows.Threading.DispatcherTimer]::new()
         $script:saveTimer.Interval = [TimeSpan]::FromMilliseconds(800)
-        $script:saveTimer.Add_Tick({ Save-WtMemoNow })
+        $script:saveTimer.Add_Tick({ [void](Save-WtMemoNow) })
         $script:undoTimer = [System.Windows.Threading.DispatcherTimer]::new()
         $script:undoTimer.Interval = [TimeSpan]::FromSeconds(10)
         $script:undoTimer.Add_Tick({ param($s, $e) $s.Stop(); $script:ui.UndoBar.Visibility = 'Collapsed'; $script:lastDeleted = $null })
@@ -6790,12 +7021,15 @@ function New-WtMemoView {
     [System.Windows.Controls.DockPanel]::SetDock($sb.Root, 'Top')
     [void]$ldock.Children.Add($sb.Root)
     $list = [System.Windows.Controls.ListBox]::new()
-    Set-WtStyle $list 'List'
+    Set-WtStyle $list 'Memo.List'
     $list.Add_SelectionChanged({
             param($s, $e)
-            if (-not $s.SelectedItem) { return }
-            $id = [string]$s.SelectedItem.Tag
-            if ($id -ne $script:currentId) { Show-WtMemo $id }
+            if ($script:listUpdating -or -not $s.SelectedItem) { return }
+            $id = [string]$s.SelectedItem.Id
+            if ($id -ne $script:currentId) {
+                if (Save-WtMemoNow) { Show-WtMemo $id }
+                else { $script:listUpdating = $true; try { Select-WtMemoItem $script:currentId } finally { $script:listUpdating = $false } }
+            }
         })
     [void]$ldock.Children.Add($list)
     $left.Child = $ldock
@@ -6817,6 +7051,7 @@ function New-WtMemoView {
     [void]$top.Children.Add($status)
     $mode = New-WtSegmented @(@('edit', '편집'), @('preview', '미리보기')) ([string](Get-WtSetting 'memo.mode')) 'WtMemoMode' {
         param($value)
+        if (-not (Save-WtMemoNow)) { Update-WtMemoMode; return }
         Set-WtSetting 'memo.mode' $value
         Update-WtMemoMode
     }
@@ -6874,8 +7109,8 @@ function New-WtMemoView {
     Set-WtStyle $bodyBox 'Editor'
     $bodyBox.ToolTip = $null
     $bodyBox.Add_TextChanged({ Set-WtMemoDirty })
-    $bodyBox.Add_LostKeyboardFocus({ Save-WtMemoNow })
-    $titleBox.Add_LostKeyboardFocus({ Save-WtMemoNow })
+    $bodyBox.Add_LostKeyboardFocus({ [void](Save-WtMemoNow) })
+    $titleBox.Add_LostKeyboardFocus({ [void](Save-WtMemoNow) })
     [void]$body.Children.Add($mdView)
     [void]$body.Children.Add($bodyBox)
     [void]$rdock.Children.Add($body)
@@ -6891,7 +7126,7 @@ function New-WtMemoView {
             if (-not $ctrl) { return }
             switch ($e.Key) {
                 'N' { Add-WtMemo; $e.Handled = $true }
-                'S' { Save-WtMemoNow; $e.Handled = $true }
+                'S' { [void](Save-WtMemoNow); $e.Handled = $true }
                 'E' { Switch-WtMemoMode; $e.Handled = $true }
             }
         })
@@ -6907,8 +7142,11 @@ function New-WtMemoView {
 }
 
 function Update-WtMemoView {
-    Save-WtMemoNow
+    if (-not (Save-WtMemoNow)) { return }
     $script:items = @(Get-WtMemoSorted (Get-WtMemoItems))
+    $present = @{}
+    foreach ($item in $script:items) { $present[$item.id] = $true }
+    foreach ($id in @($script:rowCache.Keys)) { if (-not $present.ContainsKey($id)) { $script:rowCache.Remove($id) } }
     $script:currentId = $null
     Update-WtMemoList
 }
@@ -6941,7 +7179,8 @@ Register-WtAddon -Id 'memo' -Title '메모' -Icon 0xE70B -Order 40 `
     -Refresh { param($view) Update-WtMemoView } `
     -HomeCard { New-WtMemoHomeCard } `
     -ImportLegacy { param($folder) Import-WtMemoLegacy $folder } `
-    -OnExit { if ($script:ui.Count) { Save-WtMemoNow } }
+    -SavePending { if ($script:ui.Count) { Save-WtMemoNow } else { $true } } `
+    -OnExit { if ($script:ui.Count) { [void](Save-WtMemoNow) }; if ($script:saveTimer) { $script:saveTimer.Stop() }; if ($script:undoTimer) { $script:undoTimer.Stop() } }
 
 Export-ModuleMember -Function Get-WtMemoItems, Get-WtMemoSorted, Find-WtMemo, Format-WtMemoTime, Import-WtMemoLegacy,
     New-WtMemo, Get-WtMemoTags, Set-WtMemoContent, Save-WtMemoItems

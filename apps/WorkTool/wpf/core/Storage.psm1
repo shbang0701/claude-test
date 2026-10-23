@@ -18,6 +18,15 @@ function Set-WtAppRoot([string]$Path) {
 
 function Get-WtAppRoot { $script:appRoot }
 
+# 데이터 폴더마다 하나의 앱만 쓴다. 빈 잠금 파일은 남겨 두고 핸들만 해제한다.
+function Open-WtDataLock {
+    try {
+        [System.IO.File]::Open((Join-Path (Get-WtDataRoot) '.worktool.lock'), 'OpenOrCreate', 'ReadWrite', 'None')
+    } catch {
+        throw '같은 데이터 폴더를 사용하는 WorkTool이 실행 중이거나 폴더를 잠글 수 없습니다. 기존 창·트레이를 확인하세요.'
+    }
+}
+
 # 데이터 폴더. 앱 폴더에 datapath.txt가 있으면 그 첫 줄의 경로, 없으면 문서\WorkTool
 function Get-WtDataRoot {
     if ($script:dataRoot) { return $script:dataRoot }
@@ -144,6 +153,6 @@ function Import-WtLegacyCsv([string]$Folder, [string]$Name) {
     , @(Import-Csv -LiteralPath $path -Encoding utf8)
 }
 
-Export-ModuleMember -Function Set-WtAppRoot, Get-WtAppRoot, Get-WtDataRoot, Read-WtJsonFile, Write-WtJsonFile,
+Export-ModuleMember -Function Set-WtAppRoot, Get-WtAppRoot, Get-WtDataRoot, Open-WtDataLock, Read-WtJsonFile, Write-WtJsonFile,
     Get-WtStorePath, Test-WtStore, Read-WtStore, Get-WtStoreItems, Write-WtStore, New-WtId,
     Find-WtLegacyFolder, Import-WtLegacyCsv

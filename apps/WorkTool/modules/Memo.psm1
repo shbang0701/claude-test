@@ -288,7 +288,10 @@ function New-MemoView {
     $view.add_HandleCreated({
         $form = $this.FindForm()
         if ($form -and -not $script:closeHooked) {
-            $form.add_FormClosing({ if ($script:dirty) { [void](Save-CurrentMemo) } })
+            $form.add_FormClosing({
+                param($sender, $event)
+                if ($script:dirty -and -not (Save-CurrentMemo)) { $event.Cancel = $true }
+            })
             $script:closeHooked = $true
         }
     })

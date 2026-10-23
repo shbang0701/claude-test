@@ -14,6 +14,8 @@
 - **[apps/WorkTool/](apps/WorkTool/)** — 업무 통합 GUI 앱 (메모 · 근태 · 일정·알람, 트레이 상주)
   - [design/](apps/WorkTool/design/) — 새 화면 시안 (WPF 전환 기준)
     - [활성 작업 목업](apps/WorkTool/design/README.md#활성-작업-목업) — 프로그램별 창·브라우저 탭 표, 선택 닫기. 폰용 확대본·자동 새로 고침 설정·가짜 데이터·목업 생성 스크립트 포함
+    - [사용자 구성 업무 목업](docs/plans/workflows-preview.md) — 요청 처리·자료 작성·서버 점검의 구성 → 사용 → 모의 결과. 설정 변경 비교, 가짜 JSON, 내부 API·알람 연동 제안 포함. 앱 기능은 미구현
+    - [직접 조작하는 업무 체험 HTML](apps/WorkTool/design/workflows-playground.html) — 파일 하나로 폼·단계·값 연결을 편집하고 모의 실행·취소·알람·이력을 확인합니다. [입력 이미지](apps/WorkTool/design/workflows-playground-use.jpg) · [결과 이미지](apps/WorkTool/design/workflows-playground-result.jpg) 포함. 기존 앱과 연결하지 않습니다
   - [wpf/](apps/WorkTool/wpf/) — 새 버전(WPF): 마크다운 메모 · 문서 · **활성 작업**(창·Chrome/Edge/웨일 탭 조회, 선택 닫기, 분 단위 자동 새로 고침). 코어 검사에 활성 작업 검사가 포함됩니다. 파일 하나 버전은 `apps/WorkTool/dist/WorkTool-WPF.ps1`
     - [저장·조회 회귀 검사](apps/WorkTool/wpf/tests/Test-Reliability.ps1) — 임시 데이터로 저장 실패, 중복 실행 차단, 문서 조회 취소와 목록 가상화를 검사합니다. 코어 검사에 포함됩니다.
 - **[docs/guides/](docs/guides/)** — 읽는 가이드
@@ -21,6 +23,8 @@
     - [갤럭시 S26 울트라 앱별 키보드 가이드](docs/guides/productivity/galaxy-s26-ultra-app-keyboard-guide.md)
     - [PowerShell 7 · Solarized Light 다듬기 가이드](docs/guides/productivity/powershell-solarized-light-guide.md)
   - ops/ — 운영 노하우·장애 대응 (아직 없음)
+- **[docs/plans/](docs/plans/)** — 설계 메모·제안서
+  - [업무 탭 사용법과 결과 미리보기](docs/plans/workflows-preview.md) — 관련 그림은 `apps/WorkTool/design/workflows-*.svg`·`.png`, 원본은 `workflows-sample.json`, 결과는 `workflows-results.json`, 생성기는 `build-workflows-mockups.ps1`
 - **[docs/templates/](docs/templates/)** — 받아서 쓰는 Office 양식
   - [infra-kit/](docs/templates/infra-kit/) — IT 인프라 문서 세트: 장비 도면(Excel), PPT 구성 요소, 아이콘 60종
   - [rhel-config/](docs/templates/rhel-config/) — RHEL 계열 7·8·9 서버 구성표

@@ -1,0 +1,97 @@
+{
+  "isMock": true,
+  "mockSchema": 1,
+  "clock": "2026-10-23T09:00:00+09:00",
+  "notice": "검토용 가짜 데이터. 실행 가능한 업무 정의 형식이 아닙니다.",
+  "apis": [
+    {"id":"path.compose","version":1,"title":"경로 조합","inputs":["folder: string","name: string"],"returns":["path: string"],"effect":"없음","availability":"모의 계산"},
+    {"id":"content.render","version":1,"title":"본문 구성","inputs":["template: string"],"returns":["text: string"],"effect":"없음","availability":"모의 계산"},
+    {"id":"file.create","version":1,"title":"새 파일 생성","inputs":["path: string","text: string"],"returns":["path: string","text: string","state: string"],"effect":"실제 구현 시 새 파일 저장","availability":"모의 계산"},
+    {"id":"record.append","version":1,"title":"기록 추가","inputs":["collection: string","values: object"],"returns":["recordId: string","collection: string","values: object"],"effect":"실제 구현 시 로컬 기록 저장","availability":"모의 계산"},
+    {"id":"network.ping","version":1,"title":"서버 ping 검사","inputs":["targets: string[]","timeoutMs: integer"],"returns":["rows: object[]","failedCount: integer"],"effect":"실제 구현 시 지정 대상에 ICMP 요청","availability":"고정 응답표 계산"},
+    {"id":"alarm.schedule","version":1,"title":"알람 예약","inputs":["at: datetime-offset","title: string","message: string","taskId: string"],"returns":["alarmId: string","state: string","at: datetime-offset","title: string","message: string","taskId: string"],"effect":"실제 구현 시 공통 알람 예약","availability":"모의 계산 · WPF 미구현"}
+  ],
+  "workflows": [
+    {
+      "id":"request", "version":1, "title":"요청 처리", "folder":"일반 업무",
+      "description":"대여 가능 여부와 반납 시각을 확인하세요. 처리 뒤 지정한 시각에 후속 확인을 알립니다.",
+      "windowMode":"modeless", "helpVisible":true,
+      "fields":[
+        {"id":"requestNo","label":"요청 번호","type":"text","required":true},
+        {"id":"title","label":"요청 제목","type":"text","required":true},
+        {"id":"item","label":"물품","type":"choice","required":true,"choices":["프로젝터","케이블","기타"]},
+        {"id":"quantity","label":"수량","type":"integer","required":true,"min":1},
+        {"id":"followupAt","label":"후속 확인 시각","type":"datetime-offset","required":true},
+        {"id":"availableChecked","label":"대여 가능 확인","type":"checkbox","required":true},
+        {"id":"returnChecked","label":"반납 시각 확인","type":"checkbox","required":true}
+      ],
+      "settings":{},
+      "steps":[
+        {"id":"record","action":"record.append","version":1,"args":{"collection":"requests","values":{"requestNo":"${input.requestNo}","title":"${input.title}","item":"${input.item}","quantity":"${input.quantity}","availableChecked":"${input.availableChecked}","returnChecked":"${input.returnChecked}"}}},
+        {"id":"remind","action":"alarm.schedule","version":1,"args":{"at":"${input.followupAt}","title":"${input.title}","message":"요청 ${input.requestNo} 후속 확인","taskId":"${context.instanceId}"}}
+      ],
+      "presentation":{
+        "setup":["가상 폴더: 일반 업무 / 요청 처리","폼: 요청 번호 · 제목 · 물품 · 수량 · 확인 시각","선택지와 필수 여부도 사용자가 편집","단계: 기록 추가 → 알람 예약","새 창: 메인과 함께 사용"],
+        "usage":["[새 업무 시작] → 요청 내용을 입력합니다.","대여 가능·반납 시각을 확인하고 체크합니다.","후속 확인 시각을 정하고 [실행]합니다."],
+        "change":"입력값 변경 · 케이블 2개 / 후속 확인 15:30",
+        "edge":"제목이 비어 있으면 기록·알람을 시작하지 않습니다."
+      }
+    },
+    {
+      "id":"report", "version":1, "title":"자료 작성", "folder":"일반 업무",
+      "description":"작업 폴더, 파일명, 본문 양식을 정하고 결과 미리보기를 확인하세요.",
+      "windowMode":"modal", "helpVisible":true,
+      "fields":[
+        {"id":"title","label":"자료 제목","type":"text","required":true},
+        {"id":"month","label":"기준 월","type":"text","required":true},
+        {"id":"summary","label":"요약","type":"text","required":true}
+      ],
+      "settings":{"root":"작업폴더","folder":"${settings.root}/${input.month}","filename":"${input.title}_${context.date}_${context.sequence}.txt","template":"제목: ${input.title}\n기준 월: ${input.month}\n요약: ${input.summary}"},
+      "steps":[
+        {"id":"path","action":"path.compose","version":1,"args":{"folder":"${settings.folder}","name":"${settings.filename}"}},
+        {"id":"content","action":"content.render","version":1,"args":{"template":"${settings.template}"}},
+        {"id":"save","action":"file.create","version":1,"args":{"path":"${steps.path.path}","text":"${steps.content.text}"}},
+        {"id":"record","action":"record.append","version":1,"args":{"collection":"outputs","values":{"path":"${steps.save.path}","title":"${input.title}"}}}
+      ],
+      "presentation":{
+        "setup":["작업 위치: 선택한 폴더를 ‘작업폴더’로 표시","하위 폴더: 작업 폴더 / 기준 월","파일명: 제목_날짜_순번.txt","본문: 제목 · 기준 월 · 요약","단계: 경로 → 본문 → 새 파일 → 기록","새 창: 입력 완료까지 메인 대기"],
+        "usage":["[구성 편집]에서 경로·파일명·본문을 정합니다.","[새 업무 시작] → 제목·기준 월·요약 입력.","[결과 미리보기]를 확인하고 [실행]합니다."],
+        "change":"구성 2판 · 작업 위치 / 하위 폴더 / 이름 / 본문 변경",
+        "edge":"저장 실패 시 다음 생성 기록을 실행하지 않습니다."
+      }
+    },
+    {
+      "id":"check", "version":1, "title":"서버 점검", "folder":"점검",
+      "description":"서버 목록과 제한 시간을 입력하세요. 실패한 대상이 있으면 재확인 알람을 연결합니다.",
+      "windowMode":"modeless", "helpVisible":false,
+      "fields":[
+        {"id":"targets","label":"서버 목록","type":"list","required":true},
+        {"id":"timeoutMs","label":"제한 시간(ms)","type":"integer","required":true,"min":1},
+        {"id":"followupAt","label":"재확인 시각","type":"datetime-offset","required":true}
+      ],
+      "settings":{},
+      "steps":[
+        {"id":"probe","action":"network.ping","version":1,"args":{"targets":"${input.targets}","timeoutMs":"${input.timeoutMs}"}},
+        {"id":"record","action":"record.append","version":1,"args":{"collection":"checks","values":{"rows":"${steps.probe.rows}","failedCount":"${steps.probe.failedCount}"}}},
+        {"id":"remind","action":"alarm.schedule","version":1,"when":{"ref":"steps.probe.failedCount","operator":"gt","value":0},"args":{"at":"${input.followupAt}","title":"서버 점검 재확인","message":"실패 ${steps.probe.failedCount}건 확인","taskId":"${context.instanceId}"}}
+      ],
+      "presentation":{
+        "setup":["가상 폴더: 점검 / 서버 점검","폼: 서버 목록 · 제한 시간 · 재확인 시각","단계: ping 검사 → 기록 → 조건부 알람","알람 조건: 실패 개수 > 0","가짜 응답표만 사용 · 실제 통신 없음"],
+        "usage":["서버 두 개와 제한 시간 1000ms를 입력합니다.","재확인 시각을 09:10으로 정합니다.","[실행] → 대상별 결과를 확인합니다."],
+        "change":"입력값 변경 · 제한 시간 1000ms → 2000ms",
+        "edge":"검사 뒤 취소하면 다음 기록·알람을 시작하지 않습니다."
+      }
+    }
+  ],
+  "cases":[
+    {"id":"request-base","workflowId":"request","kind":"base","sequence":"001","input":{"requestNo":"DEMO-001","title":"회의실 장비 대여","item":"프로젝터","quantity":1,"followupAt":"2026-10-23T14:00:00+09:00","availableChecked":true,"returnChecked":true},"expect":{"status":"succeeded","stepCount":2,"values":{"steps.record.values.quantity":1,"steps.remind.at":"2026-10-23T14:00:00+09:00"}}},
+    {"id":"request-changed","workflowId":"request","kind":"changed","sequence":"002","input":{"requestNo":"DEMO-002","title":"연결 케이블 대여","item":"케이블","quantity":2,"followupAt":"2026-10-23T15:30:00+09:00","availableChecked":true,"returnChecked":true},"expect":{"status":"succeeded","stepCount":2,"values":{"steps.record.values.quantity":2,"steps.remind.at":"2026-10-23T15:30:00+09:00"}}},
+    {"id":"request-invalid","workflowId":"request","kind":"edge","sequence":"003","input":{"requestNo":"DEMO-003","title":"","item":"프로젝터","quantity":1,"followupAt":"2026-10-23T14:00:00+09:00","availableChecked":true,"returnChecked":true},"expect":{"status":"failed","stepCount":0,"errorCode":"INPUT_REQUIRED"}},
+    {"id":"report-base","workflowId":"report","kind":"base","sequence":"001","input":{"title":"월간 정리","month":"2026-10","summary":"가상 요청 3건 처리"},"expect":{"status":"succeeded","stepCount":4,"values":{"steps.save.path":"작업폴더/2026-10/월간 정리_20261023_001.txt","steps.save.text":"제목: 월간 정리\n기준 월: 2026-10\n요약: 가상 요청 3건 처리"}}},
+    {"id":"report-changed","workflowId":"report","kind":"changed","sequence":"002","definitionVersion":2,"settingsOverride":{"root":"다른작업폴더","folder":"${settings.root}/완료/${input.month}","filename":"${context.date}_${input.title}_${context.sequence}.txt","template":"[${input.month}] ${input.title}\n처리 내용: ${input.summary}"},"input":{"title":"월간 정리","month":"2026-10","summary":"가상 요청 3건 처리"},"expect":{"status":"succeeded","stepCount":4,"values":{"steps.save.path":"다른작업폴더/완료/2026-10/20261023_월간 정리_002.txt","steps.save.text":"[2026-10] 월간 정리\n처리 내용: 가상 요청 3건 처리"}}},
+    {"id":"report-failed","workflowId":"report","kind":"edge","sequence":"003","failAt":"save","input":{"title":"월간 정리","month":"2026-10","summary":"가상 요청 3건 처리"},"expect":{"status":"failed","stepCount":3,"errorCode":"MOCK_WRITE_DENIED"}},
+    {"id":"check-base","workflowId":"check","kind":"base","sequence":"001","input":{"targets":["10.0.0.10","10.0.0.11"],"timeoutMs":1000,"followupAt":"2026-10-23T09:10:00+09:00"},"mockResponses":{"10.0.0.10":12,"10.0.0.11":1500},"expect":{"status":"succeeded","stepCount":3,"values":{"steps.probe.failedCount":1,"steps.remind.at":"2026-10-23T09:10:00+09:00"}}},
+    {"id":"check-changed","workflowId":"check","kind":"changed","sequence":"002","input":{"targets":["10.0.0.10","10.0.0.11"],"timeoutMs":2000,"followupAt":"2026-10-23T09:10:00+09:00"},"mockResponses":{"10.0.0.10":12,"10.0.0.11":1500},"expect":{"status":"succeeded","stepCount":3,"lastStepStatus":"skipped","values":{"steps.probe.failedCount":0}}},
+    {"id":"check-cancelled","workflowId":"check","kind":"edge","sequence":"003","cancelBefore":"record","input":{"targets":["10.0.0.10","10.0.0.11"],"timeoutMs":1000,"followupAt":"2026-10-23T09:10:00+09:00"},"mockResponses":{"10.0.0.10":12,"10.0.0.11":1500},"expect":{"status":"cancelled","stepCount":1,"values":{"steps.probe.failedCount":1}}}
+  ]
+}

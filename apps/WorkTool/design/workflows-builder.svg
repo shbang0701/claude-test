@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg width="1280" height="672" viewBox="0 0 1280 672" role="img" aria-labelledby="title desc" font-family="Noto Sans KR, 'Noto Sans KR', 'Malgun Gothic', sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title id="title">WorkTool 사용자 구성 업무 목업</title>
+  <desc id="desc">가짜 데이터로 계산한 구성, 사용, 모의 결과와 변경 비교. 실제 파일 생성, 알람, 서버 검사 없음.</desc>
+  <rect fill="#F5F8FC" height="672" rx="0" stroke="none" width="1280" x="0" y="0" />
+  <rect fill="#EDF3FA" height="608" rx="0" stroke="none" width="68" x="0" y="40" />
+  <rect fill="#2370C2" height="24" rx="8" stroke="none" width="24" x="12" y="8" />
+  <text fill="#FFFFFF" font-size="16" font-weight="600" x="17" y="26.560000000000002">W</text>
+  <text fill="#1D2B3A" font-size="16" font-weight="600" x="48" y="28.560000000000002">WorkTool</text>
+  <text fill="#56667A" font-size="12.5" font-weight="400" x="976" y="26.5">검토용 목업 · 실제 실행 없음</text>
+  <text fill="#56667A" font-size="14" font-weight="400" x="20" y="88.24000000000001">홈</text>
+  <text fill="#56667A" font-size="14" font-weight="400" x="14" y="148.24">일정</text>
+  <text fill="#56667A" font-size="14" font-weight="400" x="14" y="208.24">메모</text>
+  <rect fill="#E0EBF7" height="48" rx="8" stroke="none" width="52" x="8" y="244" />
+  <rect fill="#2370C2" height="24" rx="0" stroke="none" width="3" x="8" y="256" />
+  <text fill="#1C5A9B" font-size="14" font-weight="600" x="14" y="274.24">업무</text>
+  <text fill="#56667A" font-size="14" font-weight="400" x="14" y="616.24">설정</text>
+  <rect fill="#FFFFFF" height="608" rx="0" stroke="#DCE3EC" width="252" x="68" y="40" />
+  <text fill="#1D2B3A" font-size="20" font-weight="600" x="92" y="83.2">내 업무</text>
+  <rect fill="#F5F8FC" height="40" rx="8" stroke="#7F8C9C" width="204" x="92" y="100" />
+  <text fill="#56667A" font-size="14" font-weight="400" x="104" y="126.24000000000001">업무 찾기</text>
+  <text fill="#56667A" font-size="14" font-weight="600" x="92" y="184.24">⌄ 일반 업무</text>
+  <rect fill="#E0EBF7" height="40" rx="8" stroke="none" width="228" x="80" y="248" />
+  <rect fill="#2370C2" height="16" rx="0" stroke="none" width="3" x="80" y="260" />
+  <text fill="#1D2B3A" font-size="14" font-weight="400" x="112" y="226.24">요청 처리</text>
+  <text fill="#1C5A9B" font-size="14" font-weight="600" x="112" y="274.24">자료 작성</text>
+  <text fill="#56667A" font-size="14" font-weight="600" x="92" y="330.24">⌄ 점검</text>
+  <text fill="#1D2B3A" font-size="14" font-weight="400" x="112" y="378.24">서버 점검</text>
+  <text fill="#56667A" font-size="12.5" font-weight="400" x="92" y="454.5">분류용 가상 폴더</text>
+  <text fill="#56667A" font-size="12.5" font-weight="400" x="92" y="478.5">실제 폴더는 만들지 않습니다.</text>
+  <rect fill="#FFFFFF" height="40" rx="8" stroke="#C4CEDA" width="204" x="92" y="532" />
+  <text fill="#1D2B3A" font-size="14" font-weight="400" x="104" y="558.24">폴더 추가</text>
+  <rect fill="#FFFFFF" height="40" rx="8" stroke="#C4CEDA" width="204" x="92" y="584" />
+  <text fill="#1D2B3A" font-size="14" font-weight="400" x="104" y="610.24">업무 만들기</text>
+  <rect fill="#EDF3FA" height="24" rx="0" stroke="none" width="1212" x="68" y="648" />
+  <text fill="#1D2B3A" font-size="20" font-weight="600" x="344" y="81.2">자료 작성 / 구성 편집</text>
+  <rect fill="#FFFFFF" height="492" rx="0" stroke="#DCE3EC" width="640" x="320" y="156" />
+  <rect fill="#FFFFFF" height="608" rx="0" stroke="#DCE3EC" width="320" x="960" y="40" />
+  <text fill="#56667A" font-size="12.5" font-weight="400" x="84" y="665.5">가짜 데이터 · 자료 작성 1판 · 실제 파일 생성 없음</text>
+  <rect fill="#FFFFFF" height="40" rx="8" stroke="#C4CEDA" width="144" x="344" y="100" />
+  <text fill="#1D2B3A" font-size="14" font-weight="400" x="356" y="126.24000000000001">입력 항목</text>
+  <rect fill="#FFFFFF" height="40" rx="8" stroke="#C4CEDA" width="144" x="500" y="100" />
+  <text fill="#1D2B3A" font-size="14" font-weight="400" x="512" y="126.24000000000001">출력 규칙</text>
+  <rect fill="#2370C2" height="3" rx="0" stroke="none" width="120" x="512" y="142" />
+  <rect fill="#FFFFFF" height="40" rx="8" stroke="#C4CEDA" width="144" x="656" y="100" />
+  <text fill="#1D2B3A" font-size="14" font-weight="400" x="668" y="126.24000000000001">창·설명</text>
+  <text fill="#1D2B3A" font-size="20" font-weight="600" x="344" y="195.2">출력 규칙</text>
+  <text fill="#56667A" font-size="12.5" font-weight="400" x="344" y="226.5">작업 폴더</text>
+  <rect fill="#FFFFFF" height="40" rx="8" stroke="#7F8C9C" width="436" x="344" y="236" />
+  <text fill="#1D2B3A" font-size="14" font-weight="400" x="356" y="262.24">작업폴더 (선택한 경로의 예시)</text>
+  <rect fill="#FFFFFF" height="40" rx="8" stroke="#C4CEDA" width="144" x="792" y="236" />
+  <text fill="#1D2B3A" font-size="14" font-weight="400" x="804" y="262.24">폴더 선택</text>
+  <text fill="#56667A" font-size="12.5" font-weight="400" x="344" y="302.5">하위 폴더</text>
+  <rect fill="#FFFFFF" height="40" rx="8" stroke="#7F8C9C" width="592" x="344" y="312" />
+  <text fill="#1D2B3A" font-size="14" font-weight="400" x="356" y="338.24">[작업 폴더] / [기준 월]</text>
+  <text fill="#56667A" font-size="12.5" font-weight="400" x="344" y="378.5">파일명</text>
+  <rect fill="#FFFFFF" height="40" rx="8" stroke="#7F8C9C" width="592" x="344" y="388" />
+  <text fill="#1D2B3A" font-size="14" font-weight="400" x="356" y="414.24">[자료 제목]_[날짜]_[순번].txt</text>
+  <text fill="#56667A" font-size="12.5" font-weight="400" x="344" y="454.5">본문 양식</text>
+  <rect fill="#FFFFFF" height="100" rx="8" stroke="#7F8C9C" width="592" x="344" y="464" />
+  <text fill="#1D2B3A" font-size="14" font-weight="400" x="356" y="488.24">제목: [자료 제목]</text>
+  <text fill="#1D2B3A" font-size="14" font-weight="400" x="356" y="512.24">기준 월: [기준 월]</text>
+  <text fill="#1D2B3A" font-size="14" font-weight="400" x="356" y="536.24">요약: [요약]</text>
+  <rect fill="#FFFFFF" height="40" rx="8" stroke="#C4CEDA" width="144" x="344" y="584" />
+  <text fill="#1D2B3A" font-size="14" font-weight="400" x="356" y="610.24">값 연결</text>
+  <rect fill="#FFFFFF" height="40" rx="8" stroke="#C4CEDA" width="144" x="500" y="584" />
+  <text fill="#1D2B3A" font-size="14" font-weight="400" x="512" y="610.24">미리보기</text>
+  <rect fill="#2370C2" height="40" rx="8" stroke="#C4CEDA" width="144" x="792" y="584" />
+  <text fill="#FFFFFF" font-size="14" font-weight="400" x="804" y="610.24">구성 저장</text>
+  <text fill="#1D2B3A" font-size="20" font-weight="600" x="984" y="83.2">단계 연결</text>
+  <text fill="#1D2B3A" font-size="14" font-weight="400" x="984" y="132.24">1. 경로 조합</text>
+  <text fill="#1D2B3A" font-size="14" font-weight="400" x="984" y="172.24">2. 본문 구성</text>
+  <rect fill="#E0EBF7" height="40" rx="8" stroke="none" width="288" x="976" y="196" />
+  <text fill="#1C5A9B" font-size="14" font-weight="600" x="984" y="222.24">3. 새 파일 생성</text>
+  <text fill="#1D2B3A" font-size="14" font-weight="400" x="984" y="272.24">4. 기록 추가</text>
+  <rect fill="#FFFFFF" height="40" rx="8" stroke="#C4CEDA" width="272" x="984" y="308" />
+  <text fill="#1D2B3A" font-size="14" font-weight="400" x="996" y="334.24">단계 추가</text>
+  <text fill="#1D2B3A" font-size="16" font-weight="600" x="984" y="394.56">선택한 기능의 입력</text>
+  <text fill="#1D2B3A" font-size="14" font-weight="400" x="984" y="436.24">저장 경로 ← 경로 조합 / 경로</text>
+  <text fill="#1D2B3A" font-size="14" font-weight="400" x="984" y="460.24">본문 ← 본문 구성 / 텍스트</text>
+  <text fill="#56667A" font-size="12.5" font-weight="400" x="984" y="534.5">앞 단계 결과를 골라 연결합니다. 이름과 규칙은</text>
+  <text fill="#56667A" font-size="12.5" font-weight="400" x="984" y="558.5">사용자가 바꿉니다.</text>
+</svg>

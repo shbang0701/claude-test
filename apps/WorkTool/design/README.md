@@ -84,6 +84,20 @@ WPF로 옮길 때 기준으로 삼는 화면 시안과 구현된 화면을 모�
 
 업무를 구성하는 사람과 실제 사용하는 사람의 흐름을 함께 확인하는 시안입니다. 모든 이름·입력·결과는 가짜이며, 알람 예약·파일 생성·ping도 시뮬레이션입니다.
 
+**직접 눌러 보기:** [workflows-playground.html](workflows-playground.html). 파일 하나를 내려받아 브라우저에서 엽니다. 구성 → 사용 → 결과를 오가며 폼·단계·변수 연결을 바꿀 수 있습니다. 외부 리소스·설치·서버가 필요 없습니다. 변경과 이력은 현재 탭의 메모리에만 있고 새로고침하면 초기화됩니다.
+
+체험 HTML은 WPF 구현이 아닙니다. 기존 샘플 세 가지에 업무 시작 예시를 더한 독립 체험 데이터가 HTML 안에 있습니다. 아래 정적 그림과 JSON의 생성 방식은 그대로 유지합니다.
+
+HTML 배치 기준: 기존 색·본문 14·제목 26·카드 제목 16·보조 12.5, 입력 최소 높이 40을 사용합니다. 업무 목록 폭 232, 설명 폭 280, 본문 최소 폭 360, 최대 전체 폭 1600입니다. 1008 미만은 설명을 본문 아래로, 640 미만은 업무 목록을 위로 배치합니다. 브라우저 기본 포커스·대화상자 동작을 살리고 줄바꿈으로 작은 화면을 지원합니다. 이 값은 체험 열람용이며 WPF UI 토큰을 바꾸지 않습니다.
+
+직접 조작한 화면: `apps/WorkTool/design/workflows-playground-use.jpg` · [휴대폰 폭 입력·미리보기](workflows-playground-use.jpg), `apps/WorkTool/design/workflows-playground-result.jpg` · [사용 결과 화면 일부](workflows-playground-result.jpg). 가짜 입력만 있는 로컬 HTML 화면입니다.
+
+![제목을 바꾸면 예정 경로와 본문이 함께 바뀌는 체험 화면](workflows-playground-use.jpg)
+
+![모의 실행 후 파일 내용과 처리 기록을 확인하는 화면 일부](workflows-playground-result.jpg)
+
+검수: 모의 실행기의 20개 검사를 통과했습니다. 브라우저에서 폼 항목·선택지 추가, 폴더 변수 연결, 실행 결과, 알람 표시·다시 알림·연결 업무, 가상 URL 탭, 모달·함께 쓰는 창, 500개 모의 대상 취소를 확인했습니다. 잘못된 참조·순서, 저장 실패, 대소문자 파일 충돌, 과도한 문자열 증가와 오래된 보조 폼을 방어합니다. 휴대폰 폭 390에서 문서 가로 넘침과 중복 ID가 없었습니다. 실제 WPF 성능·복구·알람 서비스 검증은 아닙니다.
+
 - [사용법과 결과 비교](../../../docs/plans/workflows-preview.md) — 세 가지 업무, 설정 변경 전후, 내부 API 제안, 현재 구현과의 차이
 - 전체 화면: `apps/WorkTool/design/workflows-overview.svg` · [SVG](workflows-overview.svg) · [PNG](workflows-overview.png)
 - 구성 편집: `apps/WorkTool/design/workflows-builder.svg` · [SVG](workflows-builder.svg) · [PNG](workflows-builder.png)

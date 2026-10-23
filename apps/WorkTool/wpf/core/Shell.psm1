@@ -328,12 +328,12 @@ function Update-WtAppIcon {
     # 아이콘 해석기로 읽은 그림을 주면 WPF가 그 안에서 제목 줄 · 작업 표시줄에 맞는 크기를 고른다
     $dec = [System.Windows.Media.Imaging.IconBitmapDecoder]::new([System.IO.MemoryStream]::new($bytes),
         [System.Windows.Media.Imaging.BitmapCreateOptions]::None, [System.Windows.Media.Imaging.BitmapCacheOption]::OnLoad)
-    $script:window.Icon = $dec.Frames[0]
-    # 작업 표시줄 단추는 pwsh 아이콘으로 묶인다 (창마다 아이콘을 따로 주려면 P/Invoke가 필요해서 쓰지 않는다).
-    # 대신 그 단추 위에 작은 W 배지를 얹고, 마우스를 올리면 WorkTool이라고 보이게 한다
+    # 창이 생성된 뒤에도 다시 설정해 Windows가 창의 정식 아이콘을 갱신하게 한다.
+    $script:window.Icon = $null
+    $script:window.Icon = ($dec.Frames | Where-Object PixelWidth -eq 32 | Select-Object -First 1)
     if (-not $script:window.TaskbarItemInfo) { $script:window.TaskbarItemInfo = [System.Windows.Shell.TaskbarItemInfo]::new() }
     $script:window.TaskbarItemInfo.Description = 'WorkTool'
-    $script:window.TaskbarItemInfo.Overlay = ($dec.Frames | Where-Object { $_.PixelWidth -eq 16 } | Select-Object -First 1)
+    $script:window.TaskbarItemInfo.Overlay = $null
     if ($script:notify) { $script:notify.Icon = $script:icon }
     if ($old) { $old.Dispose() }
 }
@@ -446,6 +446,7 @@ function Start-WtApp {
     $w.Resources.MergedDictionaries.Add((Get-WtStyleDictionary))
 
     Update-WtAppIcon
+    $w.Add_ContentRendered({ Update-WtAppIcon })
     $script:ui.TodayText.Text = Format-WtDate (Get-Date) 'yyyy년 M월 d일 dddd'
 
     # 제목 줄 · 메뉴 아래 버튼

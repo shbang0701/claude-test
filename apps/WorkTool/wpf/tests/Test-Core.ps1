@@ -426,4 +426,5 @@ pie
 if ($script:failed) { Write-Host "실패 $script:failed 건" -ForegroundColor Red; exit 1 }
 & (Join-Path $PSScriptRoot 'Test-ActiveTasks.ps1')
 & (Join-Path $PSScriptRoot 'Test-Reliability.ps1')
+& (Join-Path $PSScriptRoot 'Test-Launcher.ps1')
 Write-Host '모두 통과' -ForegroundColor Green

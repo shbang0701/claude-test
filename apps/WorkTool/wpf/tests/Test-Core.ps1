@@ -27,6 +27,16 @@ function Assert-Wt([string]$Name, [bool]$Ok, $Detail = '') {
     if ($Ok) { Write-Host "PASS $Name" } else { Write-Host "FAIL $Name $Detail" -ForegroundColor Red; $script:failed++ }
 }
 
+function Wait-WtDocTest {
+    $watch = [Diagnostics.Stopwatch]::StartNew()
+    $docsModule = Get-Module Docs
+    do {
+        & $docsModule { Complete-WtDocJobs; Complete-WtDocTreeBatch }
+        if ($watch.Elapsed.TotalSeconds -gt 15) { throw '문서 테스트 조회 시간 초과' }
+        Start-Sleep -Milliseconds 10
+    } while (& $docsModule { $script:jobs.Count -or $script:pending.Count -or $script:treeBatches.Count })
+}
+
 $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('wt-test-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
 $app = (New-Item -ItemType Directory -Path (Join-Path $tmp 'app')).FullName
 $dataDir = Join-Path $tmp 'data'
@@ -377,7 +387,7 @@ pie
         $saved = Get-WtMemoItems
         $new = $saved | Where-Object title -eq '새 제목'
         Assert-Wt 'WPF 메모: 새 메모를 쓰고 저장' ($saved.Count -eq $before + 1 -and $new.body -eq '본문 #새태그' -and @($new.tags)[0] -eq '새태그')
-        Assert-Wt 'WPF 메모: 저장 상태 표시 · 목록 맨 위' ((& $mod { $script:ui.Status.Visibility }) -eq 'Visible' -and (& $mod { [string]$script:ui.List.Items[0].Tag }) -eq $new.id)
+        Assert-Wt 'WPF 메모: 저장 상태 표시 · 목록 맨 위' ((& $mod { $script:ui.Status.Visibility }) -eq 'Visible' -and (& $mod { [string]$script:ui.List.Items[0].Id }) -eq $new.id)
         & $mod { Remove-WtMemoCurrent }
         Assert-Wt 'WPF 메모: 삭제' ((Get-WtMemoItems).Count -eq $before -and (& $mod { $script:ui.UndoBar.Visibility }) -eq 'Visible')
         & $mod { Restore-WtMemoDeleted }
@@ -392,8 +402,10 @@ pie
         $dv.Resources.MergedDictionaries.Add((New-WtThemeDictionary)); $dv.Resources.MergedDictionaries.Add($styles)
         [void](& $docAddon.Refresh $dv)
         $dmod = Get-Module Docs
+        Wait-WtDocTest
         Assert-Wt 'WPF 문서: 맨 위 폴더를 연다' ((& $dmod { $script:current }) -eq $docRoot -and (& $dmod { $script:ui.List.Items.Count }) -eq 4) "(cur=$(& $dmod { $script:current }) err=$(& $dmod { $script:ui.Error }))"
         & $dmod { Open-WtDocEntry ($script:entries | Where-Object Name -eq '운영') }
+        Wait-WtDocTest
         Assert-Wt 'WPF 문서: 폴더로 들어가면 트리도 따라간다' ((& $dmod { $script:current }) -like '*\운영' -and (& $dmod { $script:ui.Tree.SelectedItem.Tag.Path }) -like '*\운영' -and (& $dmod { $script:ui.PathText.Text }) -eq '문서 루트 › 운영')
         & $dmod { $script:ui.List.SelectedIndex = 0; $script:ui.Pin.RaiseEvent([System.Windows.RoutedEventArgs]::new([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent)) }
         Assert-Wt 'WPF 문서: 즐겨찾기 버튼' (@(Get-WtSetting 'docs.pins').Count -eq 1 -and @(Get-WtSetting 'docs.pins')[0] -like '*\운영\점검')
@@ -401,13 +413,17 @@ pie
 
         $after = Get-WtMemoItems
         Assert-Wt 'WPF 메모: 끝내기 전에 저장' (($after | Where-Object id -eq $new.id).body -eq '고치는 중')
+        & $dmod { Stop-WtDocs }
     } else {
         Write-Host 'SKIP WPF로 그리기 (Windows STA에서만)'
     }
 } finally {
-    Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+    $safe = [IO.Path]::GetFullPath($tmp)
+    if ((Split-Path $safe -Leaf) -notmatch '^wt-test-[a-f0-9]{8}$' -or -not $safe.StartsWith([IO.Path]::GetFullPath([IO.Path]::GetTempPath()), [StringComparison]::OrdinalIgnoreCase)) { throw '임시 경로 검증 실패' }
+    Remove-Item -LiteralPath $safe -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 if ($script:failed) { Write-Host "실패 $script:failed 건" -ForegroundColor Red; exit 1 }
 & (Join-Path $PSScriptRoot 'Test-ActiveTasks.ps1')
+& (Join-Path $PSScriptRoot 'Test-Reliability.ps1')
 Write-Host '모두 통과' -ForegroundColor Green

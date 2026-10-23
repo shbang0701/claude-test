@@ -41,14 +41,16 @@ function Test-WtSameValue($A, $B) {
 # 값을 바꾸고 저장한 뒤, 등록된 처리기에 알린다
 function Set-WtSetting([string]$Key, $Value) {
     if ($null -eq $script:values) { Initialize-WtSettings }
+    $next = $script:values.Clone()
     if ($script:defaults.ContainsKey($Key) -and (Test-WtSameValue $script:defaults[$Key] $Value)) {
-        [void]$script:values.Remove($Key)
+        [void]$next.Remove($Key)
     } else {
-        $script:values[$Key] = $Value
+        $next[$Key] = $Value
     }
     $sorted = [ordered]@{}
-    foreach ($k in ($script:values.Keys | Sort-Object)) { $sorted[$k] = $script:values[$k] }
+    foreach ($k in ($next.Keys | Sort-Object)) { $sorted[$k] = $next[$k] }
     Write-WtJsonFile (Get-WtSettingsPath) ([ordered]@{ schema = 1; values = $sorted })
+    $script:values = $next
     foreach ($h in @($script:handlers)) { & $h $Key $Value }
 }
 

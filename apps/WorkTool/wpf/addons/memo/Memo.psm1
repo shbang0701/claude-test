@@ -16,6 +16,8 @@ $script:lastDeleted = $null  # 실행 취소용
 $script:ui = @{}
 $script:saveTimer = $null
 $script:undoTimer = $null
+$script:listUpdating = $false
+$script:rowCache = @{}
 
 Register-WtSettingDefault 'memo.mode' 'preview'   # 오른쪽 칸: preview(미리보기) | edit(편집)
 
@@ -106,30 +108,17 @@ function Import-WtMemoLegacy([string]$Folder) {
 function Get-WtMemoById([string]$Id) { $script:items | Where-Object { $_.id -eq $Id } | Select-Object -First 1 }
 
 function New-WtMemoListItem($Memo) {
-    $li = [System.Windows.Controls.ListBoxItem]::new()
-    $li.Tag = $Memo.id
-    $col = New-WtStack Vertical 2
-    $head = [System.Windows.Controls.DockPanel]::new()
-    $when = New-WtText (Format-WtMemoTime $Memo.updated) 'T.Sub'
-    [System.Windows.Controls.DockPanel]::SetDock($when, 'Right')
-    $when.Margin = [System.Windows.Thickness]::new(8, 0, 0, 0)
-    [void]$head.Children.Add($when)
-    $name = New-WtText $Memo.title 'T.Strong'
-    $name.TextWrapping = 'NoWrap'
-    $name.TextTrimming = 'CharacterEllipsis'
-    [void]$head.Children.Add($name)
-    [void](Add-WtChild $col $head)
-    $snippet = New-WtText (Get-WtMarkdownSnippet ([string]$Memo.body)) 'T.Sub'
-    $snippet.TextWrapping = 'NoWrap'
-    $snippet.TextTrimming = 'CharacterEllipsis'
-    [void](Add-WtChild $col $snippet)
-    $li.Content = $col
-    $li
+    $cached = $script:rowCache[$Memo.id]
+    if ($cached -and $cached.Day -eq [datetime]::Today -and $cached.Body -ceq $Memo.body -and $cached.Title -ceq $Memo.title -and $cached.Updated -eq $Memo.updated) { return $cached.Row }
+    $snippet = if ($cached -and $cached.Body -ceq $Memo.body) { $cached.Row.Snippet } else { Get-WtMarkdownSnippet ([string]$Memo.body) }
+    $row = [pscustomobject]@{ Id = $Memo.id; Title = $Memo.title; Stamp = Format-WtMemoTime $Memo.updated; Snippet = $snippet }
+    $script:rowCache[$Memo.id] = @{ Body = $Memo.body; Title = $Memo.title; Updated = $Memo.updated; Day = [datetime]::Today; Row = $row }
+    $row
 }
 
 # 오른쪽 칸에 메모 하나를 연다 (없으면 빈 화면 안내)
 function Show-WtMemo([string]$Id) {
-    Save-WtMemoNow
+    if (-not (Save-WtMemoNow)) { return }
     $m = if ($Id) { Get-WtMemoById $Id } else { $null }
     $script:currentId = if ($m) { $m.id } else { $null }
     $script:loading = $true
@@ -146,12 +135,15 @@ function Show-WtMemo([string]$Id) {
             $script:ui.TitleBox.Text = $m.title
             $script:ui.Meta.Text = '만든 날 {0} · 고친 날 {1}' -f $m.created, $m.updated
             $script:ui.BodyBox.Text = [string]$m.body
-            Set-WtMarkdownText $script:ui.MdView ([string]$m.body)
+            if ([string](Get-WtSetting 'memo.mode') -ne 'edit' -and ($script:ui.MdView.Tag.Text -cne [string]$m.body -or $script:ui.MdView.Tag.Error)) { Set-WtMarkdownText $script:ui.MdView ([string]$m.body) }
         }
     } finally { $script:loading = $false }
     $script:ui.Editor.IsEnabled = [bool]$m
     $script:ui.Delete.IsEnabled = [bool]$m
     $script:ui.Delete.ToolTip = if ($m) { '이 메모 삭제' } else { '메모를 먼저 고르세요' }
+    $script:listUpdating = $true
+    try { $script:ui.List.SelectedItem = $script:ui.List.Items | Where-Object Id -eq $script:currentId | Select-Object -First 1 }
+    finally { $script:listUpdating = $false }
     Set-WtMemoStatus $(if ($m) { 'saved' } else { '' })
 }
 
@@ -159,11 +151,11 @@ function Show-WtMemo([string]$Id) {
 function Update-WtMemoMode {
     $edit = [string](Get-WtSetting 'memo.mode') -eq 'edit'
     if (-not $edit) {
-        Save-WtMemoNow
+        if (-not (Save-WtMemoNow)) { return }
         $m = Get-WtMemoById $script:currentId
         if ($m) {
             $script:ui.TitleText.Text = $m.title
-            Set-WtMarkdownText $script:ui.MdView ([string]$m.body)
+            if ($script:ui.MdView.Tag.Text -cne [string]$m.body -or $script:ui.MdView.Tag.Error) { Set-WtMarkdownText $script:ui.MdView ([string]$m.body) }
         }
     }
     $script:ui.Editor.Visibility = if ($edit) { 'Visible' } else { 'Collapsed' }
@@ -174,6 +166,7 @@ function Update-WtMemoMode {
 }
 
 function Switch-WtMemoMode {
+    if (-not (Save-WtMemoNow)) { return }
     Set-WtSetting 'memo.mode' $(if ([string](Get-WtSetting 'memo.mode') -eq 'edit') { 'preview' } else { 'edit' })
     Update-WtMemoMode
 }
@@ -206,19 +199,23 @@ function Set-WtMemoStatus([string]$State, [string]$Detail = '') {
 # 고친 내용이 있으면 바로 저장한다. 저장 시각 · 목록도 고친다
 function Save-WtMemoNow {
     if ($script:saveTimer) { $script:saveTimer.Stop() }
-    if (-not $script:dirty) { return }
+    if (-not $script:dirty) { return $true }
     $m = Get-WtMemoById $script:currentId
-    if (-not $m) { $script:dirty = $false; return }
+    if (-not $m) { Set-WtMemoStatus 'error' '편집 중인 메모를 찾을 수 없습니다.'; return $false }
     try {
-        [void](Set-WtMemoContent $m $script:ui.TitleBox.Text $script:ui.BodyBox.Text)
-        Save-WtMemoItems $script:items
+        $candidate = $m.PSObject.Copy()
+        [void](Set-WtMemoContent $candidate $script:ui.TitleBox.Text $script:ui.BodyBox.Text)
+        $next = @(foreach ($item in $script:items) { if ($item.id -eq $m.id) { $candidate } else { $item } })
+        Save-WtMemoItems $next
         $script:dirty = $false
-        $script:items = @(Get-WtMemoSorted $script:items)
-        $script:ui.Meta.Text = '만든 날 {0} · 고친 날 {1}' -f $m.created, $m.updated
+        $script:items = @(Get-WtMemoSorted $next)
+        $script:ui.Meta.Text = '만든 날 {0} · 고친 날 {1}' -f $candidate.created, $candidate.updated
         Update-WtMemoList -KeepCurrent
         Set-WtMemoStatus 'saved'
+        return $true
     } catch {
         Set-WtMemoStatus 'error' $_.Exception.Message
+        return $false
     }
 }
 
@@ -231,10 +228,11 @@ function Set-WtMemoDirty {
 }
 
 function Add-WtMemo {
-    Save-WtMemoNow
+    if (-not (Save-WtMemoNow)) { return }
     $m = New-WtMemo
-    $script:items = @($m) + @($script:items)
-    try { Save-WtMemoItems $script:items } catch { Show-WtError $_ '새 메모 저장'; return }
+    $next = @($m) + @($script:items)
+    try { Save-WtMemoItems $next } catch { Show-WtError $_ '새 메모 저장'; return }
+    $script:items = $next
     if ($script:ui.Search.Text) { $script:ui.Search.Text = '' }
     $script:currentId = $null
     Update-WtMemoList
@@ -244,13 +242,16 @@ function Add-WtMemo {
 }
 
 function Remove-WtMemoCurrent {
+    if (-not (Save-WtMemoNow)) { return }
     $m = Get-WtMemoById $script:currentId
     if (-not $m) { return }
     $script:dirty = $false
     $script:saveTimer.Stop()
     $index = [array]::IndexOf(@($script:items), $m)
-    $script:items = @($script:items | Where-Object { $_.id -ne $m.id })
-    try { Save-WtMemoItems $script:items } catch { Show-WtError $_ '메모 삭제'; return }
+    $next = @($script:items | Where-Object { $_.id -ne $m.id })
+    try { Save-WtMemoItems $next } catch { Show-WtError $_ '메모 삭제'; return }
+    $script:items = $next
+    $script:rowCache.Remove($m.id)
     $script:lastDeleted = @{ Memo = $m; Index = $index }
     $script:currentId = $null
     Update-WtMemoList
@@ -262,13 +263,15 @@ function Remove-WtMemoCurrent {
 }
 
 function Restore-WtMemoDeleted {
+    if (-not (Save-WtMemoNow)) { return }
     $d = $script:lastDeleted
     if (-not $d) { return }
     $list = [System.Collections.Generic.List[object]]::new()
     foreach ($x in $script:items) { $list.Add($x) }
     $list.Insert([Math]::Min([Math]::Max(0, $d.Index), $list.Count), $d.Memo)
-    $script:items = @(Get-WtMemoSorted $list.ToArray())
-    try { Save-WtMemoItems $script:items } catch { Show-WtError $_ '삭제 실행 취소'; return }
+    $next = @(Get-WtMemoSorted $list.ToArray())
+    try { Save-WtMemoItems $next } catch { Show-WtError $_ '삭제 실행 취소'; return }
+    $script:items = $next
     $script:lastDeleted = $null
     $script:ui.UndoBar.Visibility = 'Collapsed'
     Update-WtMemoList
@@ -296,35 +299,36 @@ function Invoke-WtMemoLink($Link) {
 # 목록에서 메모 하나를 고른다. 검색에 걸러져 안 보이면 검색을 비운다
 function Select-WtMemoItem([string]$Id) {
     $list = $script:ui.List
-    $li = $list.Items | Where-Object { [string]$_.Tag -eq $Id } | Select-Object -First 1
+    $li = $list.Items | Where-Object { [string]$_.Id -eq $Id } | Select-Object -First 1
     if (-not $li) {
         $script:ui.Search.Text = ''
-        $li = $list.Items | Where-Object { [string]$_.Tag -eq $Id } | Select-Object -First 1
+        $li = $list.Items | Where-Object { [string]$_.Id -eq $Id } | Select-Object -First 1
     }
     if ($li) {
         $list.SelectedItem = $li
-        $li.BringIntoView()
+        $list.ScrollIntoView($li)
     }
 }
 
 # 목록을 다시 그린다. 열려 있는 메모는 그대로 골라 두고 오른쪽 칸은 다시 채우지 않는다 (편집 중 글자 위치 유지)
 function Update-WtMemoList([switch]$KeepCurrent) {
+    if ($script:listUpdating) { return }
+    if (-not $KeepCurrent -and -not (Save-WtMemoNow)) { return }
     $list = $script:ui.List
     $keep = $script:currentId
-    $list.Items.Clear()
     # 저장한 뒤 다시 그릴 때는 열려 있는 메모가 검색어에서 빠져도 남긴다 (고치는 중에 사라지지 않게)
     $shown = @(Find-WtMemo $script:items $script:ui.Search.Text)
     if ($KeepCurrent -and $keep -and -not ($shown | Where-Object { $_.id -eq $keep })) {
         $shown = @($script:items | Where-Object { $_.id -eq $keep -or $shown -contains $_ })
     }
-    foreach ($m in $shown) {
-        $li = New-WtMemoListItem $m
-        [void]$list.Items.Add($li)
-        if ($m.id -eq $keep) { $li.IsSelected = $true }
-    }
-    if (-not $list.SelectedItem) {
-        if ($list.Items.Count) { $list.SelectedIndex = 0 } else { Show-WtMemo '' }
-    }
+    $script:listUpdating = $true
+    try {
+        $list.ItemsSource = @(foreach ($m in $shown) { New-WtMemoListItem $m })
+        $list.SelectedItem = $list.Items | Where-Object Id -eq $keep | Select-Object -First 1
+        if (-not $list.SelectedItem -and $list.Items.Count) { $list.SelectedIndex = 0 }
+    } finally { $script:listUpdating = $false }
+    $selectedId = if ($list.SelectedItem) { $list.SelectedItem.Id } else { '' }
+    if ($selectedId -ne $script:currentId) { Show-WtMemo $selectedId }
 }
 
 function New-WtMemoView {
@@ -332,7 +336,7 @@ function New-WtMemoView {
     if (-not $script:saveTimer) {
         $script:saveTimer = [System.Windows.Threading.DispatcherTimer]::new()
         $script:saveTimer.Interval = [TimeSpan]::FromMilliseconds(800)
-        $script:saveTimer.Add_Tick({ Save-WtMemoNow })
+        $script:saveTimer.Add_Tick({ [void](Save-WtMemoNow) })
         $script:undoTimer = [System.Windows.Threading.DispatcherTimer]::new()
         $script:undoTimer.Interval = [TimeSpan]::FromSeconds(10)
         $script:undoTimer.Add_Tick({ param($s, $e) $s.Stop(); $script:ui.UndoBar.Visibility = 'Collapsed'; $script:lastDeleted = $null })
@@ -366,12 +370,15 @@ function New-WtMemoView {
     [System.Windows.Controls.DockPanel]::SetDock($sb.Root, 'Top')
     [void]$ldock.Children.Add($sb.Root)
     $list = [System.Windows.Controls.ListBox]::new()
-    Set-WtStyle $list 'List'
+    Set-WtStyle $list 'Memo.List'
     $list.Add_SelectionChanged({
             param($s, $e)
-            if (-not $s.SelectedItem) { return }
-            $id = [string]$s.SelectedItem.Tag
-            if ($id -ne $script:currentId) { Show-WtMemo $id }
+            if ($script:listUpdating -or -not $s.SelectedItem) { return }
+            $id = [string]$s.SelectedItem.Id
+            if ($id -ne $script:currentId) {
+                if (Save-WtMemoNow) { Show-WtMemo $id }
+                else { $script:listUpdating = $true; try { Select-WtMemoItem $script:currentId } finally { $script:listUpdating = $false } }
+            }
         })
     [void]$ldock.Children.Add($list)
     $left.Child = $ldock
@@ -393,6 +400,7 @@ function New-WtMemoView {
     [void]$top.Children.Add($status)
     $mode = New-WtSegmented @(@('edit', '편집'), @('preview', '미리보기')) ([string](Get-WtSetting 'memo.mode')) 'WtMemoMode' {
         param($value)
+        if (-not (Save-WtMemoNow)) { Update-WtMemoMode; return }
         Set-WtSetting 'memo.mode' $value
         Update-WtMemoMode
     }
@@ -450,8 +458,8 @@ function New-WtMemoView {
     Set-WtStyle $bodyBox 'Editor'
     $bodyBox.ToolTip = $null
     $bodyBox.Add_TextChanged({ Set-WtMemoDirty })
-    $bodyBox.Add_LostKeyboardFocus({ Save-WtMemoNow })
-    $titleBox.Add_LostKeyboardFocus({ Save-WtMemoNow })
+    $bodyBox.Add_LostKeyboardFocus({ [void](Save-WtMemoNow) })
+    $titleBox.Add_LostKeyboardFocus({ [void](Save-WtMemoNow) })
     [void]$body.Children.Add($mdView)
     [void]$body.Children.Add($bodyBox)
     [void]$rdock.Children.Add($body)
@@ -467,7 +475,7 @@ function New-WtMemoView {
             if (-not $ctrl) { return }
             switch ($e.Key) {
                 'N' { Add-WtMemo; $e.Handled = $true }
-                'S' { Save-WtMemoNow; $e.Handled = $true }
+                'S' { [void](Save-WtMemoNow); $e.Handled = $true }
                 'E' { Switch-WtMemoMode; $e.Handled = $true }
             }
         })
@@ -483,8 +491,11 @@ function New-WtMemoView {
 }
 
 function Update-WtMemoView {
-    Save-WtMemoNow
+    if (-not (Save-WtMemoNow)) { return }
     $script:items = @(Get-WtMemoSorted (Get-WtMemoItems))
+    $present = @{}
+    foreach ($item in $script:items) { $present[$item.id] = $true }
+    foreach ($id in @($script:rowCache.Keys)) { if (-not $present.ContainsKey($id)) { $script:rowCache.Remove($id) } }
     $script:currentId = $null
     Update-WtMemoList
 }
@@ -517,7 +528,8 @@ Register-WtAddon -Id 'memo' -Title '메모' -Icon 0xE70B -Order 40 `
     -Refresh { param($view) Update-WtMemoView } `
     -HomeCard { New-WtMemoHomeCard } `
     -ImportLegacy { param($folder) Import-WtMemoLegacy $folder } `
-    -OnExit { if ($script:ui.Count) { Save-WtMemoNow } }
+    -SavePending { if ($script:ui.Count) { Save-WtMemoNow } else { $true } } `
+    -OnExit { if ($script:ui.Count) { [void](Save-WtMemoNow) }; if ($script:saveTimer) { $script:saveTimer.Stop() }; if ($script:undoTimer) { $script:undoTimer.Stop() } }
 
 Export-ModuleMember -Function Get-WtMemoItems, Get-WtMemoSorted, Find-WtMemo, Format-WtMemoTime, Import-WtMemoLegacy,
     New-WtMemo, Get-WtMemoTags, Set-WtMemoContent, Save-WtMemoItems

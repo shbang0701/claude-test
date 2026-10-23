@@ -13,6 +13,7 @@
   - [design/](apps/WorkTool/design/) — 새 화면 시안 (WPF 전환 기준)
     - [활성 작업 목업](apps/WorkTool/design/README.md#활성-작업-목업) — 프로그램별 창·브라우저 탭 표, 선택 닫기. 폰용 확대본·자동 새로 고침 설정·가짜 데이터·목업 생성 스크립트 포함
   - [wpf/](apps/WorkTool/wpf/) — 새 버전(WPF): 마크다운 메모 · 문서 · **활성 작업**(창·Chrome/Edge 탭 조회, 선택 닫기, 분 단위 자동 새로 고침). 코어 검사에 활성 작업 검사가 포함됩니다. 파일 하나 버전은 `apps/WorkTool/dist/WorkTool-WPF.ps1`
+    - [저장·조회 회귀 검사](apps/WorkTool/wpf/tests/Test-Reliability.ps1) — 임시 데이터로 저장 실패, 중복 실행 차단, 문서 조회 취소와 목록 가상화를 검사합니다. 코어 검사에 포함됩니다.
 - **[docs/guides/](docs/guides/)** — 읽는 가이드
   - [productivity/](docs/guides/productivity/) — 업무 효율·작업 환경
     - [갤럭시 S26 울트라 앱별 키보드 가이드](docs/guides/productivity/galaxy-s26-ultra-app-keyboard-guide.md)

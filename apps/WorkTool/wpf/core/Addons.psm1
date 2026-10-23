@@ -16,7 +16,8 @@ $script:addons = [System.Collections.Generic.List[hashtable]]::new()
   Refresh      { param($view) } → 화면을 열 때마다 부른다 (선택)
   HomeCard     { } → 홈에 놓을 카드 요소(여러 개 가능)를 돌려준다 (선택)
   ImportLegacy { param($folder) } → 예전 WorkTool data 폴더에서 이 탭 데이터를 가져와 저장한다. 가져온 개수를 돌려준다 (선택)
-  OnExit       { } → 앱이 끝나기 직전에 부른다. 저장하지 않은 것을 저장한다 (선택)
+  OnExit       { } → 모든 SavePending 성공 뒤 타이머·조회 등 실행 자원을 정리한다 (선택)
+  SavePending  { } → 화면 전환·종료 전 저장. 실패하면 $false를 돌려줘 전환을 막는다 (선택)
 #>
 function Register-WtAddon {
     param(
@@ -30,6 +31,7 @@ function Register-WtAddon {
         [scriptblock]$HomeCard,
         [scriptblock]$ImportLegacy,
         [scriptblock]$OnExit,
+        [scriptblock]$SavePending,
         [string]$Description = ''
     )
     for ($i = $script:addons.Count - 1; $i -ge 0; $i--) {
@@ -39,6 +41,7 @@ function Register-WtAddon {
             Id = $Id; Title = $Title; Icon = $Icon; Order = $Order; Required = [bool]$Required
             NewView = $NewView; Refresh = $Refresh; HomeCard = $HomeCard; ImportLegacy = $ImportLegacy; OnExit = $OnExit
             Description = $Description
+            SavePending = $SavePending
         })
 }
 

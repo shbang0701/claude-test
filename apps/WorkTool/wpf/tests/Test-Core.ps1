@@ -320,6 +320,9 @@ pie
         }
     }
     Assert-Wt '탭 모아 보기: 모듈끼리 내보낸 함수 이름이 겹치지 않는다' (-not $dupes) ($dupes -join ', ')
+    # ReuseThread 실행 공간은 버리기(Dispose) 전까지 스레드가 남는다. 끝낼 때 응답 없는 작업이라 못 버리면 창을 닫아도 앱 프로세스가 끝나지 않는다
+    $reuse = @(Get-ChildItem $root -Filter '*.psm1' -Recurse | Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match 'ThreadOptions\s*=\s*\S*ReuseThread' } | ForEach-Object Name)
+    Assert-Wt '탭 모아 보기: 실행 공간을 ReuseThread로 만들지 않는다 (앱 프로세스가 끝나지 않는다)' (-not $reuse.Count) ($reuse -join ', ')
     if ($wpf) {
         $texts = @(Get-WtTestTexts (New-WtHelpPage))
         $missing = @(foreach ($a in @(Get-WtAddon)) { foreach ($line in @($a.Help)) { if ($texts -notcontains $line) { "$($a.Id): $line" } } })

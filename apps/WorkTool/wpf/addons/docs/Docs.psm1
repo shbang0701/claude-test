@@ -229,7 +229,8 @@ function Start-WtDocJobs {
             $state.Commands.Add([System.Management.Automation.Runspaces.SessionStateFunctionEntry]::new($name, (Get-Command $name).Definition))
         }
         $runspace = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace($state)
-        $runspace.ApartmentState = 'MTA'; $runspace.ThreadOptions = 'ReuseThread'
+        # 작업마다 새 스레드. ReuseThread는 실행 공간을 버리기 전까지 스레드가 남아, 끝낼 때 응답 없는 조회가 있으면 앱 프로세스가 끝나지 않는다
+        $runspace.ApartmentState = 'MTA'; $runspace.ThreadOptions = 'UseNewThread'
         $ps = [powershell]::Create()
         try {
             $runspace.Open(); $ps.Runspace = $runspace

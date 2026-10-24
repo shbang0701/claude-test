@@ -44,19 +44,44 @@ function Wait-WtTestRun($Run, [int]$Seconds = 30) {
     Complete-WtFlowRun $Run
 }
 
-# 금지 명령 (AGENTS.md 「코드 규칙」 4번): 구문을 읽어서 찾는다
+# 금지 동작 (AGENTS.md 「코드 규칙」 4번)을 구문으로 찾는다. 줄인 매개변수 이름 · 별칭 · 여러 줄 문자열도 본다
+$script:bannedCommands = @{
+    'Invoke-Expression' = '문자열을 코드로 실행'; 'iex' = '문자열을 코드로 실행'; 'Set-ExecutionPolicy' = '실행 정책 변경'
+    'Invoke-WebRequest' = '외부 통신'; 'iwr' = '외부 통신'; 'curl' = '외부 통신'; 'wget' = '외부 통신'
+    'Invoke-RestMethod' = '외부 통신'; 'irm' = '외부 통신'; 'Start-BitsTransfer' = '외부 통신'; 'Send-MailMessage' = '메일 발송'
+    'Register-ScheduledTask' = '자동 실행 등록'; 'New-ScheduledTask' = '자동 실행 등록'; 'schtasks' = '자동 실행 등록'; 'schtasks.exe' = '자동 실행 등록'
+}
+# 규칙 하나 = @(정규식, 이유). 앞의 쉼표가 없으면 규칙들이 한 줄로 펴진다
+$script:bannedText = @(
+    , @('(?i)(^|\s)-(ep|ex|exe|exec\w*|executionpolicy)\s+["'']?(bypass|unrestricted)', '실행 정책 우회')
+    , @('(?i)(^|\s|["''])-(e|ec|en|enc\w*|encodedcommand)["'']?[\s,]+["'']?[A-Za-z0-9+/=]{16,}', '감춘(인코딩한) 명령')
+    , @('(?i)DllImport|\bextern\s+static\b', '네이티브 호출(P/Invoke)')
+    , @('(?i)Net\.WebClient|Net\.Http\.HttpClient|Net\.Mail\.SmtpClient|Net\.Sockets\.UdpClient', '외부 통신')
+    , @('(?i)CurrentVersion\\Run(Once)?\b', '자동 실행 등록(Run 키)')
+)
 function Get-WtBannedUse([string]$Path) {
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($Path, [ref]$null, [ref]$null)
     foreach ($cmd in $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.CommandAst] }, $true)) {
         $name = $cmd.GetCommandName()
-        if ($name -in 'Invoke-Expression', 'iex') { "$name ($($cmd.Extent.StartLineNumber)번째 줄)" }
-        if ($name -eq 'Add-Type' -and ($cmd.CommandElements | Where-Object { $_ -is [System.Management.Automation.Language.CommandParameterAst] -and $_.ParameterName -in 'TypeDefinition', 'MemberDefinition' })) {
-            "Add-Type 인라인 코드 ($($cmd.Extent.StartLineNumber)번째 줄)"
+        $at = "$($cmd.Extent.StartLineNumber)번째 줄"
+        if ($name -and $script:bannedCommands.ContainsKey($name)) { "$name`: $($script:bannedCommands[$name]) ($at)" }
+        # Add-Type은 -AssemblyName(기본 어셈블리 불러오기)만 쓴다. 위치 인수 · -TypeDef 등은 인라인 코드다
+        if ($name -eq 'Add-Type' -and -not @($cmd.CommandElements | Where-Object { $_ -is [System.Management.Automation.Language.CommandParameterAst] -and 'AssemblyName' -like "$($_.ParameterName)*" }).Count) {
+            "Add-Type: -AssemblyName 말고는 쓰지 않습니다 ($at)"
         }
+        foreach ($rule in $script:bannedText) { if ($cmd.Extent.Text -match $rule[0]) { "$($rule[1]) ($at)" } }
     }
-    foreach ($s in $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.StringConstantExpressionAst] -or $args[0] -is [System.Management.Automation.Language.CommandParameterAst] }, $true)) {
-        $text = if ($s -is [System.Management.Automation.Language.CommandParameterAst]) { "-$($s.ParameterName)" } else { $s.Value }
-        if ($text -match '(?i)-EncodedCommand|-ExecutionPolicy\b|DllImport') { "$($text.Trim()) ($($s.Extent.StartLineNumber)번째 줄)" }
+    foreach ($node in $ast.FindAll({
+                $args[0] -is [System.Management.Automation.Language.StringConstantExpressionAst] -or $args[0] -is [System.Management.Automation.Language.ExpandableStringExpressionAst] -or
+                $args[0] -is [System.Management.Automation.Language.TypeExpressionAst] -or $args[0] -is [System.Management.Automation.Language.TypeConstraintAst] }, $true)) {
+        if ($node.Parent -is [System.Management.Automation.Language.CommandAst]) { continue }   # 명령 줄 전체는 위에서 봤다
+        $text = if ($node.PSObject.Properties['TypeName']) { $node.TypeName.FullName } else { $node.Value }
+        foreach ($rule in $script:bannedText) { if ($text -match $rule[0]) { "$($rule[1]) ($($node.Extent.StartLineNumber)번째 줄)" } }
+    }
+    foreach ($m in $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.InvokeMemberExpressionAst] }, $true)) {
+        if ($m.Expression -is [System.Management.Automation.Language.TypeExpressionAst] -and $m.Expression.TypeName.Name -match '(?i)^(System\.Management\.Automation\.)?scriptblock$' -and $m.Member.Value -eq 'Create') {
+            "[scriptblock]::Create: 문자열을 코드로 실행 ($($m.Extent.StartLineNumber)번째 줄)"
+        }
     }
 }
 
@@ -124,7 +149,8 @@ exit $ExitWith
     Assert-WtTest '업무: 칸 설명은 .PARAMETER, 없으면 param 줄 끝 주석' ($byName.Target.Help -eq '대상 이름 (도움말에 적은 설명)' -and $byName.Mode.Help -eq '확인 방식' -and $byName.Loud.Help -eq '크게 말하기')
     Assert-WtTest '업무: 폼에 넣을 수 없는 종류는 따로 알린다' (@($info.Skipped).Count -eq 1 -and $info.Skipped[0].Name -eq 'Names' -and $info.Skipped[0].TypeName -eq 'string[]')
     Assert-WtTest '업무: 구문 오류는 실행할 수 없다고 알린다' ((Read-WtFlowScript (Join-Path $scriptsRoot 'Bad-Syntax.ps1')).Error -like '구문 오류*')
-    Assert-WtTest '업무: 폼에 넣을 수 없는 필수 값이 있으면 실행할 수 없다' ((Read-WtFlowScript (Join-Path $scriptsRoot 'Needs-Array.ps1')).Error -like '폼에서 넣을 수 없는 필수 값*')
+    $needs = Read-WtFlowScript (Join-Path $scriptsRoot 'Needs-Array.ps1')
+    Assert-WtTest '업무: 폼에 넣을 수 없는 필수 값이 있으면 콘솔 창에서만 실행한다 (PowerShell이 직접 물음)' (-not $needs.Error -and ($needs.NeedsConsole -join ',') -eq 'Names')
     $noHelp = Read-WtFlowScript (Join-Path $scriptsRoot 'NoHelp-Script.ps1')
     Assert-WtTest '업무: 도움말 · param이 없어도 실행할 수 있다 (도움말 없음만 알림)' (-not $noHelp.Error -and $noHelp.Warning -and $noHelp.Fields.Count -eq 0)
     Assert-WtTest '업무: 없는 파일' ((Read-WtFlowScript (Join-Path $scriptsRoot '없음.ps1')).Error -eq '스크립트 파일이 없습니다.')
@@ -136,6 +162,13 @@ exit $ExitWith
     $argList = @(Get-WtFlowArgs $info @{ Target = ' SRV 01 '; Mode = ''; Count = '5'; Loud = $true; Ratio = ''; ListFile = 'C:\목록 폴더\a.txt' } -WhatIf)
     Assert-WtTest '업무: 인수는 -이름:값 하나씩, 비운 칸 · 끈 스위치는 넘기지 않는다' (($argList -join '|') -eq '-Target:SRV 01|-Count:5|-ListFile:C:\목록 폴더\a.txt|-Loud|-WhatIf') ($argList -join '|')
     Assert-WtTest '업무: -로 시작하는 값도 값으로 넘긴다' ((@(Get-WtFlowArgs $info @{ Target = '-x' }) -join '|') -eq '-Target:-x')
+    # 비밀 값 · 이름 끝의 대소문자 · 기본값이 켜진 스위치 · 출력 문자 코드
+    $sec = Read-WtFlowScript (Write-WtTestScript 'more\Secret-Param.ps1' "<#`n.SYNOPSIS`n    비밀 값 시험`n#>`nparam([string]`$ApiToken, [string]`$Profile, [switch]`$Keep = `$true, [Parameter(Mandatory)][string]`$AdminPassword)`n'ok'")
+    Assert-WtTest '업무: 비밀 값은 폼에 넣지 않고, 필수이면 콘솔 창에서만 실행한다' (@($sec.Skipped | Where-Object Secret).Count -eq 2 -and -not @($sec.Fields | Where-Object { $_.Name -match 'Token|Password' }).Count -and ($sec.NeedsConsole -join ',') -eq 'AdminPassword')
+    Assert-WtTest '업무: 이름 끝은 대소문자까지 본다 (Profile은 파일 칸이 아님)' (($sec.Fields | Where-Object Name -eq 'Profile').Kind -eq 'text')
+    Assert-WtTest '업무: 기본값이 켜진 스위치는 끌 때만 -이름:$false로 넘긴다' ((@(Get-WtFlowArgs $sec @{ Keep = $false }) -join '|') -eq '-Keep:$false' -and -not @(Get-WtFlowArgs $sec @{ Keep = $true }).Count)
+    $oem = [int](Get-ItemPropertyValue -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Control\Nls\CodePage' -Name 'OEMCP')
+    Assert-WtTest '업무: 출력은 시스템 OEM 코드 페이지로 읽는다 (사용자 형식이 아니라)' ((Get-WtFlowEncoding).CodePage -eq $oem) "($((Get-WtFlowEncoding).CodePage) · $oem)"
     $start = New-WtFlowStartInfo $info @{ Target = 'SRV 01' } 'app'
     $startArgs = @($start.ArgumentList)
     Assert-WtTest '업무: 앱 안 실행은 창 없이 · 입력을 닫고 · 색 코드 없이' ($start.CreateNoWindow -and -not $start.UseShellExecute -and $start.RedirectStandardInput -and $start.RedirectStandardOutput -and $start.Environment['NO_COLOR'] -eq '1' -and $startArgs -contains '-NonInteractive' -and $startArgs[-1] -eq '-Target:SRV 01' -and $start.WorkingDirectory -eq (Split-Path $sample -Parent))
@@ -186,6 +219,85 @@ exit $ExitWith
     Stop-WtFlowProcess $run
     $status = Wait-WtTestRun $run 10
     Assert-WtTest '업무: [취소]는 프로세스를 끝내고 취소로 기록한다' ($status -eq 'cancelled' -and $run.Process -and @($run.Lines) -contains '시작' -and @($run.Lines) -notcontains '끝')
+    # 출력이 많아도 읽기가 스크립트를 붙잡지 않는다 (20,000줄 · 약 1.8MB)
+    $manyInfo = Read-WtFlowScript (Write-WtTestScript 'more\Many-Lines.ps1' "<#`n.SYNOPSIS`n    출력을 많이 낸다`n#>`n1..20000 | ForEach-Object { ('line {0:d5} ' -f `$_) + ('x' * 80) }")
+    $run = Start-WtFlowProcess (New-WtFlowStartInfo $manyInfo @{} 'app') (New-WtFlowRecord $manyInfo @{} 'app' $false '')
+    $running.Add($run)
+    $watch = [System.Diagnostics.Stopwatch]::StartNew()
+    $status = Wait-WtTestRun $run 90
+    Assert-WtTest '업무: 출력이 많아도 늦지 않게 끝까지 읽고, 메모리에는 최근 줄만 둔다' ($status -eq 'success' -and $watch.Elapsed.TotalSeconds -lt 20 -and @($run.Lines)[-1] -like 'line 20000 *' -and @($run.Lines).Count -le 2500) "($([Math]::Round($watch.Elapsed.TotalSeconds, 1))초 · 마지막 $(@($run.Lines)[-1].Substring(0, 10)))"
+    # 화면이 밀린 경우: 프로세스가 끝나고 2초가 넘도록 꺼내지 않은 출력이 있어도, 다 꺼낸 뒤에 끝낸다
+    $backlogInfo = Read-WtFlowScript (Write-WtTestScript 'more\Backlog.ps1' "<#`n.SYNOPSIS`n    출력을 한꺼번에 낸다`n#>`n1..8000 | ForEach-Object { 'line {0:d4}' -f `$_ }")
+    $run = Start-WtFlowProcess (New-WtFlowStartInfo $backlogInfo @{} 'app') (New-WtFlowRecord $backlogInfo @{} 'app' $false '')
+    $running.Add($run)
+    $watch = [System.Diagnostics.Stopwatch]::StartNew()
+    while (-not ($run.Process.HasExited -and $run.Async.IsCompleted) -and $watch.Elapsed.TotalSeconds -lt 30) { Start-Sleep -Milliseconds 100 }
+    [void](Test-WtFlowRunDone $run)   # 끝난 시각을 적는다
+    Start-Sleep -Milliseconds 2300
+    $early = Test-WtFlowRunDone $run
+    $status = Wait-WtTestRun $run 30
+    Assert-WtTest '업무: 화면이 밀려도 이미 읽어 둔 출력은 다 꺼낸 뒤에 끝낸다' (-not $early -and $status -eq 'success' -and @($run.Lines)[-1] -eq 'line 8000') "(일찍 끝냄 $early · 마지막 $(@($run.Lines)[-1]))"
+    # 끝난 스크립트가 남긴 자식(Start-Process -NoNewWindow)은 출력 통로를 붙잡는다
+    $leaveChild = Write-WtTestScript 'more\Leave-Child.ps1' "<#`n.SYNOPSIS`n    자식을 남기고 끝난다`n#>`nStart-Process -FilePath (Join-Path `$PSHOME 'pwsh.exe') -ArgumentList '-NoProfile', '-Command', 'Start-Sleep -Seconds 25' -NoNewWindow`n'부모 끝'"
+    $leaveInfo = Read-WtFlowScript $leaveChild
+    # 스크립트는 끝났지만 통로가 열려 있을 때 [취소]를 누르면, 남은 자식을 찾아 끝내서 통로가 닫힌다
+    $run = Start-WtFlowProcess (New-WtFlowStartInfo $leaveInfo @{} 'app') (New-WtFlowRecord $leaveInfo @{} 'app' $false '')
+    $running.Add($run)
+    $watch = [System.Diagnostics.Stopwatch]::StartNew()
+    while (-not $run.Process.HasExited -and $watch.Elapsed.TotalSeconds -lt 30) { [void](Read-WtFlowOutput $run); Start-Sleep -Milliseconds 50 }
+    $run.Cancelled = $true
+    Stop-WtFlowProcess $run
+    $status = Wait-WtTestRun $run 15
+    $left = @(Get-CimInstance -ClassName Win32_Process -Filter "ParentProcessId = $($run.Id)" | Where-Object { $_.CreationDate -ge $run.Started.AddSeconds(-1) })
+    Assert-WtTest '업무: 스크립트가 끝난 뒤 [취소]하면 남은 자식을 찾아 끝낸다' ($status -eq 'cancelled' -and $run.Open -notcontains $true -and -not $left.Count -and @($run.Lines) -contains '부모 끝') "($status · 통로 열림 $($run.Open -contains $true) · 남은 프로세스 $($left.Count)개)"
+    # 통로가 붙잡힌 채로 실행을 끝내도 앱 프로세스는 끝나야 한다 (실행 공간 스레드가 남으면 창을 닫아도 프로세스가 남는다).
+    # 이 검사가 멈추지 않게 따로 띄운 pwsh에서 돌리고, 그 pwsh가 제때 끝나는지 본다. 출력은 받지 않는다 (남은 자식이 그 통로도 붙잡는다)
+    $probe = Join-Path $test.Root 'Probe-LeaveChild.ps1'
+    $probeOut = Join-Path $test.Root 'probe-result.txt'
+    [System.IO.File]::WriteAllText($probe, @'
+param([string]$Kit, [string]$Module, [string]$Script, [string]$Out)
+$ErrorActionPreference = 'Stop'
+. $Kit
+Import-WtTestCore
+Import-Module $Module -Force -DisableNameChecking
+$t = New-WtTestData 'workflows-probe'
+$run = $null
+try {
+    $info = Read-WtFlowScript $Script
+    $run = Start-WtFlowProcess (New-WtFlowStartInfo $info @{} 'app') (New-WtFlowRecord $info @{} 'app' $false '')
+    $watch = [System.Diagnostics.Stopwatch]::StartNew()
+    while (-not (Test-WtFlowRunDone $run)) {
+        [void](Read-WtFlowOutput $run)
+        if ($watch.Elapsed.TotalSeconds -gt 30) { throw '제때 끝나지 않았습니다.' }
+        Start-Sleep -Milliseconds 50
+    }
+    $held = $run.Open -contains $true
+    $secs = [Math]::Round($watch.Elapsed.TotalSeconds, 1)
+    [void](Read-WtFlowOutput $run)
+    $status = Complete-WtFlowRun $run
+    "$status|$held|$secs|$(@($run.Lines) -contains '부모 끝')" | Set-Content -LiteralPath $Out -Encoding utf8
+} finally {
+    # 남은 자식은 검사가 치운다 (앱은 끄지 않는다)
+    if ($run) {
+        foreach ($c in @(Get-CimInstance -ClassName Win32_Process -Filter "ParentProcessId = $($run.Id)")) {
+            if ($c.CreationDate -ge $run.Started.AddSeconds(-1)) { Stop-Process -Id $c.ProcessId -Force -ErrorAction SilentlyContinue }
+        }
+    }
+    Remove-WtTestData $t
+}
+'@, [System.Text.UTF8Encoding]::new($false))
+    $start = [System.Diagnostics.ProcessStartInfo]::new((Join-Path $PSHOME 'pwsh.exe'))
+    $kit = Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'tests/TestKit.ps1'
+    foreach ($a in '-NoLogo', '-NoProfile', '-NonInteractive', '-File', $probe, '-Kit', $kit, '-Module', (Join-Path $PSScriptRoot 'Workflows.psm1'), '-Script', $leaveChild, '-Out', $probeOut) { $start.ArgumentList.Add($a) }
+    $start.UseShellExecute = $false
+    $start.CreateNoWindow = $true
+    $probeProcess = [System.Diagnostics.Process]::Start($start)
+    $running.Add(@{ Process = $probeProcess })
+    $probeExited = $probeProcess.WaitForExit(60000)
+    $probeResult = if (Test-Path -LiteralPath $probeOut) { (Get-Content -LiteralPath $probeOut -Raw).Trim() } else { '(결과 없음)' }
+    $parts = $probeResult.Split('|')
+    Assert-WtTest '업무: 끝난 스크립트가 남긴 자식이 출력 통로를 붙잡아도 2초쯤 뒤에 끝낸다' ($parts.Count -eq 4 -and $parts[0] -eq 'success' -and $parts[1] -eq 'True' -and [double]$parts[2] -lt 20 -and $parts[3] -eq 'True') "(결과 · 붙잡음 · 초 · 마지막 줄: $probeResult)"
+    Assert-WtTest '업무: 그렇게 끝낸 뒤에도 앱 프로세스가 끝난다 (실행 공간 스레드가 남지 않는다)' $probeExited
 
     # ---- 기록 · 업무 저장 ----
     $many = foreach ($i in 1..105) {
@@ -202,6 +314,32 @@ exit $ExitWith
     Assert-WtTest '업무: 저장한 업무를 다시 읽는다' ($back.title -eq 'PM 점검' -and $back.mode -eq 'console' -and $values.Target -eq 'SRV-01' -and $values.Loud -eq $true)
     Assert-WtTest '업무: 스크립트에 없는 값을 알아본다' ((@(Get-WtFlowStaleNames $info $values) -join ',') -eq 'Gone')
     Assert-WtTest '업무: 결과 표시는 글자 · 아이콘 · 색을 함께' ((Get-WtFlowStatusLook 'failed' $false).Text -eq '실패' -and (Get-WtFlowStatusLook 'failed' $false).Icon -and (Get-WtFlowStatusLook 'success' $true).Text -eq '미리보기 · 성공' -and (Format-WtFlowSpan ([timespan]::FromSeconds(65))) -eq '1분 5초')
+
+    # ---- 금지 동작 검사가 제대로 잡는지 (가짜 파일) ----
+    $bannedDir = Join-Path $test.Root '금지 검사'
+    [void][System.IO.Directory]::CreateDirectory($bannedDir)
+    $badSamples = [ordered]@{
+        'Iex.ps1' = "Invoke-Expression 'Get-Date'"
+        'AddTypeInline.ps1' = "Add-Type @'`npublic class A {}`n'@"
+        'AddTypeShort.ps1' = "Add-Type -TypeDef 'public class B {}'"
+        'PolicyShort.ps1' = 'pwsh -ep bypass -File x.ps1'
+        'Encoded.ps1' = "Start-Process pwsh -ArgumentList '-enc', 'SQBFAFgAIAAoAEcAZQB0AC0ARABhAHQAZQApAA=='"
+        'WebClient.ps1' = '$c = New-Object Net.WebClient'
+        'HttpClient.ps1' = '[System.Net.Http.HttpClient]::new()'
+        'RestAlias.ps1' = 'irm https://example.com'
+        'Task.ps1' = 'Register-ScheduledTask -TaskName x'
+        'RunKey.ps1' = 'Set-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name x -Value y'
+        'ScriptBlock.ps1' = "[scriptblock]::Create('Get-Date')"
+    }
+    $missed = foreach ($k in $badSamples.Keys) {
+        $path = Join-Path $bannedDir $k
+        [System.IO.File]::WriteAllText($path, $badSamples[$k], [System.Text.UTF8Encoding]::new($false))
+        if (-not @(Get-WtBannedUse $path).Count) { $k }
+    }
+    $okPath = Join-Path $bannedDir 'Allowed.ps1'
+    [System.IO.File]::WriteAllText($okPath, "Add-Type -AssemblyName System.Windows.Forms`n`$p = [System.Net.NetworkInformation.Ping]::new()`n`$t = [System.Net.Sockets.TcpClient]::new()`n`"-e 쓰는 글`"", [System.Text.UTF8Encoding]::new($false))
+    $wrong = @(Get-WtBannedUse $okPath)
+    Assert-WtTest '업무: 금지 동작 검사는 줄인 이름 · 별칭 · 위치 인수까지 잡고, 허용한 것(ping · TCP · -AssemblyName)은 넘긴다' (-not @($missed).Count -and -not $wrong.Count) "(놓침: $(@($missed) -join ', ') · 잘못 잡음: $($wrong -join ', '))"
 
     # ---- 저장소 scripts/가 약속을 지키는지 ----
     $repoScripts = Join-Path (Split-Path (Split-Path (Split-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) -Parent) -Parent) -Parent) 'scripts'
@@ -262,6 +400,14 @@ exit $ExitWith
     & $mod { Save-WtFlowFromForm }
     $flowState = & $mod { @{ Flow = $script:flow; Title = $script:ui.Title.Text; Saved = @($script:ui.Tree.Items[0].Items | ForEach-Object { $_.Header.Children[1].Text }) } }
     Assert-WtTest 'WPF 업무: 업무로 저장하면 저장한 업무에 생기고 그 업무를 고른다' ($flowState.Flow.title -eq '가짜 업무' -and $flowState.Title -eq '가짜 업무' -and $flowState.Saved -contains '가짜 업무' -and $flowState.Flow.mode -eq 'app' -and $flowState.Flow.values.Target -eq 'SRV 02')
+    Assert-WtTest 'WPF 업무: 저장한 뒤에도 방금 실행한 출력이 남는다' ((& $mod { $script:ui.Output.Text }) -like '*끝 · 성공*')
+    # 스크립트에 지금 없는 칸의 값은 [업무 저장]해도 지우지 않는다 (param 이름이 잠깐 바뀌어도 잃지 않게)
+    $stored = @(Get-WtFlows)
+    $stored[0].values | Add-Member -NotePropertyName Gone -NotePropertyValue '옛 값' -Force
+    Save-WtFlows $stored
+    & $mod { param($id) $script:pendingFlow = $id; Update-WtFlowsView; ($script:fields | Where-Object { $_.Field.Name -eq 'Target' }).Input.Text = 'SRV 03'; Save-WtFlowFromForm } $stored[0].id
+    $merged = @(Get-WtFlows)[0].values
+    Assert-WtTest 'WPF 업무: [업무 저장]은 지금 칸 값만 덮어쓰고 없는 칸의 값은 남긴다' ($merged.Target -eq 'SRV 03' -and $merged.Gone -eq '옛 값')
     & $mod { ($script:fields | Where-Object { $_.Field.Name -eq 'Target' }).Input.Text = '고치는 중' }
     [void](& $addon.Refresh $view)
     Assert-WtTest 'WPF 업무: 다른 탭에 다녀와도 고치던 칸 값을 지킨다' ((& $mod { ($script:fields | Where-Object { $_.Field.Name -eq 'Target' }).Input.Text }) -eq '고치는 중' -and (& $mod { $script:flow.title }) -eq '가짜 업무')
@@ -269,16 +415,36 @@ exit $ExitWith
     Assert-WtTest 'WPF 업무: 업무 삭제 뒤 실행 취소가 보인다' (@(Get-WtFlows).Count -eq 0 -and (& $mod { $script:ui.Undo.Visibility }) -eq 'Visible')
     & $mod { Restore-WtFlowDeleted }
     Assert-WtTest 'WPF 업무: 실행 취소로 업무를 되살린다' (@(Get-WtFlows).Count -eq 1 -and (& $mod { $script:flow.title }) -eq '가짜 업무')
+    & $mod { param($p) Select-WtFlowNode @{ Kind = 'script'; Path = $p } } (Join-Path $scriptsRoot 'NoHelp-Script.ps1')
+    Assert-WtTest 'WPF 업무: 다른 스크립트를 고르면 앞 실행의 출력 · 결과를 비운다' (-not (& $mod { $script:ui.Output.Text }) -and (& $mod { $script:ui.OutputHint.Visibility }) -eq 'Visible' -and (& $mod { $script:ui.Status.Visibility }) -eq 'Collapsed')
+    $broken = New-WtFlow '망가진 업무' (Join-Path $scriptsRoot 'Bad-Syntax.ps1') @{ X = '1' } 'app'
+    Save-WtFlows (@(Get-WtFlows) + [pscustomobject]$broken)
+    & $mod { param($id) $script:pendingFlow = $id; Update-WtFlowsView } $broken.id
+    $brokenState = & $mod { @{ Save = $script:ui.SaveFlow.IsEnabled; Tip = [string]$script:ui.SaveFlow.ToolTip; Run = $script:ui.RunButton.IsEnabled } }
+    Assert-WtTest 'WPF 업무: 스크립트를 읽지 못하면 [업무 저장]을 막아 저장한 값을 지킨다' (-not $brokenState.Save -and $brokenState.Tip -like '*읽지 못해서*' -and -not $brokenState.Run)
     $lost = New-WtFlow '옮겨진 업무' (Join-Path $scriptsRoot '옮겨짐.ps1') @{} 'app'
     Save-WtFlows (@(Get-WtFlows) + [pscustomobject]$lost)
     & $mod { param($id) $script:pendingFlow = $id; Update-WtFlowsView } $lost.id
     $lostState = & $mod { @{ Sub = $script:ui.Sub.Text; Repick = $script:ui.Repick.Visibility; Run = $script:ui.RunButton.IsEnabled; Save = $script:ui.SaveFlow.IsEnabled } }
     Assert-WtTest 'WPF 업무: 스크립트가 없어진 업무는 [스크립트 다시 고르기]를 보이고 실행을 막는다' ($lostState.Sub -eq '스크립트 파일이 없습니다.' -and $lostState.Repick -eq 'Visible' -and -not $lostState.Run -and -not $lostState.Save)
     Assert-WtTest 'WPF 업무: 홈 카드에 저장한 업무가 보인다' (@(& $addon.HomeCard | Where-Object { $_ -is [System.Windows.UIElement] }).Count -eq 1)
-    # 앱을 끄면 앱 안 실행은 멈추고 기록한다
+    # 실행 중: 고른 것이 없어져도 [취소] · 출력은 보이고, 콘솔 창 실행은 따로 띄울 수 있다
     & $mod { param($p) Select-WtFlowNode @{ Kind = 'script'; Path = $p }; foreach ($rb in $script:ui.ModeButtons) { $rb.IsChecked = ($rb.Tag.Value -eq 'app') }; Invoke-WtFlowRun } $sleeper
     $proc = & $mod { $script:run.Process }
     $running.Add(@{ Process = $proc })
+    & $mod { Clear-WtFlowSelection }
+    $busyState = & $mod { @{ Commands = $script:ui.Commands.Visibility; Out = $script:ui.OutArea.Visibility; Cancel = $script:ui.Cancel.IsEnabled } }
+    Assert-WtTest 'WPF 업무: 실행 중에 고른 것이 없어져도 [취소]와 출력은 계속 보인다' ($busyState.Commands -eq 'Visible' -and $busyState.Out -eq 'Visible' -and $busyState.Cancel)
+    $modeState = & $mod {
+        param($p)
+        Select-WtFlowNode @{ Kind = 'script'; Path = $p }
+        foreach ($rb in $script:ui.ModeButtons) { $rb.IsChecked = ($rb.Tag.Value -eq 'console') }
+        $console = $script:ui.RunButton.IsEnabled
+        foreach ($rb in $script:ui.ModeButtons) { $rb.IsChecked = ($rb.Tag.Value -eq 'app') }
+        @{ Console = $console; App = $script:ui.RunButton.IsEnabled; Why = [string]$script:ui.RunButton.ToolTip }
+    } $sample
+    Assert-WtTest 'WPF 업무: 앱 안 실행 중에도 콘솔 창 실행은 할 수 있고, 앱 안 실행은 이유와 함께 막는다' ($modeState.Console -and -not $modeState.App -and $modeState.Why -like '*실행 중*')
+    # 앱을 끄면 앱 안 실행은 멈추고 기록한다
     & $addon.OnExit
     Assert-WtTest 'WPF 업무: 앱을 끄면 앱 안 실행을 멈추고 멈춤으로 기록한다' (-not (& $mod { $script:run }) -and @(Get-WtFlowRuns)[0].status -eq 'stopped')
 } finally {

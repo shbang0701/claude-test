@@ -5536,7 +5536,8 @@ function Start-WtTaskJob([string]$Action, [object[]]$Targets = @()) {
     if ($script:job) { return }
     $cancel = [hashtable]::Synchronized(@{ Value = $false })
     $runspace = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
-    $runspace.ApartmentState = 'MTA'; $runspace.ThreadOptions = 'ReuseThread'; $runspace.Open()
+    # 작업마다 새 스레드. ReuseThread는 실행 공간을 버리기 전까지 스레드가 남아, 끝낼 때 응답 없는 작업이 있으면 앱 프로세스가 끝나지 않는다
+    $runspace.ApartmentState = 'MTA'; $runspace.ThreadOptions = 'UseNewThread'; $runspace.Open()
     $ps = [powershell]::Create(); $ps.Runspace = $runspace
     [void]$ps.AddScript($script:worker.ToString()).AddArgument(@{ Action = $Action; Targets = $Targets; SelfProcessId = $PID; HostProcessIds = @(Get-WtTaskHostIds); Cancel = $cancel })
     try {
@@ -6272,7 +6273,8 @@ function Start-WtDocJobs {
             $state.Commands.Add([System.Management.Automation.Runspaces.SessionStateFunctionEntry]::new($name, (Get-Command $name).Definition))
         }
         $runspace = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace($state)
-        $runspace.ApartmentState = 'MTA'; $runspace.ThreadOptions = 'ReuseThread'
+        # 작업마다 새 스레드. ReuseThread는 실행 공간을 버리기 전까지 스레드가 남아, 끝낼 때 응답 없는 조회가 있으면 앱 프로세스가 끝나지 않는다
+        $runspace.ApartmentState = 'MTA'; $runspace.ThreadOptions = 'UseNewThread'
         $ps = [powershell]::Create()
         try {
             $runspace.Open(); $ps.Runspace = $runspace
@@ -7657,6 +7659,9 @@ $script:timer = $null
 $script:pendingFlow = $null  # 홈 카드에서 고른 업무 (화면을 열 때 고른다)
 $script:lastDeleted = $null  # 지운 업무 (실행 취소용)
 $script:filling = $false     # 코드로 트리를 고르는 중
+$script:outputKey = $null    # 출력 칸에 보이는 것이 어느 스크립트 · 업무의 것인지 ('script:경로' | 'flow:id')
+$script:shown = 0            # 출력 칸에 붙인 줄 수 (화면에 안 보여도 직접 센다)
+$script:encoding = $null     # 출력 문자 코드 (Get-WtFlowEncoding)
 
 Register-WtSettingDefault 'workflows.roots' @()   # 스크립트 폴더 목록
 Register-WtSettingDefault 'workflows.help' $true  # 오른쪽 설명 패널을 펼침
@@ -7686,7 +7691,7 @@ function ConvertTo-WtFlowField($Param, $HelpInfo, $Tokens) {
     $name = $Param.Name.VariablePath.UserPath
     $field = [ordered]@{
         Name = $name; Kind = ''; TypeName = 'object'; Mandatory = $false; Choices = @()
-        Min = $null; Max = $null; Integer = $false; Default = $null; Help = ''
+        Min = $null; Max = $null; Integer = $false; Default = $null; Help = ''; Secret = $false
     }
     foreach ($attr in $Param.Attributes) {
         if ($attr -is [System.Management.Automation.Language.TypeConstraintAst]) { $field.TypeName = $attr.TypeName.FullName; continue }
@@ -7705,11 +7710,19 @@ function ConvertTo-WtFlowField($Param, $HelpInfo, $Tokens) {
     $type = $Param.StaticType
     if ($type -eq [System.Management.Automation.SwitchParameter]) { $field.Kind = 'switch' }
     elseif ($type -eq [string] -or $type -eq [object]) {
-        $field.Kind = if ($field.Choices.Count) { 'choice' } elseif ($name -match 'Folder$') { 'folder' } elseif ($name -match 'File$') { 'file' } else { 'text' }
+        # 이름 끝은 대소문자까지 본다 ($Profile 같은 이름에 [찾아보기]가 붙지 않게)
+        $field.Kind = if ($field.Choices.Count) { 'choice' } elseif ($name -cmatch 'Folder$') { 'folder' } elseif ($name -cmatch 'File$') { 'file' } else { 'text' }
     } elseif ($type -in [int], [long], [int16], [byte]) { $field.Kind = 'number'; $field.Integer = $true }
     elseif ($type -in [double], [single], [decimal]) { $field.Kind = 'number' }
-    # 기본값은 글자 · 숫자 그대로일 때만 칸에 채운다
+    # 비밀 값은 폼에 넣지 않는다. 저장한 업무 · 실행 기록 · 명령줄에 남지 않게 하려는 것이다
+    if ($type -eq [securestring] -or $type -eq [pscredential] -or $name -match 'password|passwd|pwd|secret|token|apikey|credential') {
+        $field.Kind = ''; $field.Secret = $true
+    }
+    # 기본값은 글자 · 숫자 · $true/$false 그대로일 때만 칸에 채운다
     if ($Param.DefaultValue -is [System.Management.Automation.Language.ConstantExpressionAst]) { $field.Default = $Param.DefaultValue.Value }
+    elseif ($Param.DefaultValue -is [System.Management.Automation.Language.VariableExpressionAst] -and $Param.DefaultValue.VariablePath.UserPath -in 'true', 'false') {
+        $field.Default = $Param.DefaultValue.VariablePath.UserPath -eq 'true'
+    }
     # 칸 설명: .PARAMETER → 없으면 param 줄 끝 주석
     $text = $null
     if ($HelpInfo -and $HelpInfo.Parameters) {
@@ -7730,7 +7743,7 @@ function Read-WtFlowScript([string]$Path) {
     $info = [pscustomobject]@{
         Path = $Path; Name = [System.IO.Path]::GetFileNameWithoutExtension($Path)
         Synopsis = ''; Description = ''; Examples = @(); Notes = ''
-        Fields = @(); Skipped = @(); WhatIf = $false; Console = $false; Error = ''; Warning = ''
+        Fields = @(); Skipped = @(); WhatIf = $false; Console = $false; NeedsConsole = @(); Error = ''; Warning = ''
     }
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { $info.Error = '스크립트 파일이 없습니다.'; return $info }
     $tokens = $null; $parseErrors = $null
@@ -7756,10 +7769,8 @@ function Read-WtFlowScript([string]$Path) {
         $all = @(foreach ($p in $ast.ParamBlock.Parameters) { ConvertTo-WtFlowField $p $helpInfo $tokens })
         $info.Fields = @($all | Where-Object Kind)
         $info.Skipped = @($all | Where-Object { -not $_.Kind })
-        $blocked = @($info.Skipped | Where-Object Mandatory)
-        if ($blocked.Count) {
-            $info.Error = "폼에서 넣을 수 없는 필수 값이 있어서 실행할 수 없습니다: $(($blocked | ForEach-Object { "$($_.Name)($($_.TypeName))" }) -join ', ')"
-        }
+        # 폼에 넣을 수 없는 필수 값은 콘솔 창에서 PowerShell이 직접 묻는다. 그래서 그 스크립트는 콘솔 창에서만 실행한다
+        $info.NeedsConsole = @($info.Skipped | Where-Object Mandatory | ForEach-Object Name)
     }
     $info
 }
@@ -7783,7 +7794,8 @@ function Find-WtFlowScripts([string[]]$Roots) {
 # 저장한 값(JSON에서 읽으면 PSCustomObject)을 해시 테이블로
 function ConvertTo-WtFlowValues($Values) {
     $table = @{}
-    if ($Values -is [System.Collections.IDictionary]) { foreach ($k in $Values.Keys) { $table[[string]$k] = $Values[$k] } }
+    # .Keys 대신 get_Keys(): param 이름이 Keys인 값이 있으면 .Keys가 그 값을 돌려준다
+    if ($Values -is [System.Collections.IDictionary]) { foreach ($k in $Values.get_Keys()) { $table[[string]$k] = $Values[$k] } }
     elseif ($Values) { foreach ($p in $Values.PSObject.Properties) { $table[$p.Name] = $p.Value } }
     $table
 }
@@ -7817,7 +7829,11 @@ function Get-WtFlowArgs($Info, [hashtable]$Values, [switch]$WhatIf) {
     $list = [System.Collections.Generic.List[string]]::new()
     foreach ($f in $Info.Fields) {
         if ($f.Kind -eq 'switch') {
-            if ($Values[$f.Name] -eq $true) { $list.Add("-$($f.Name)") }
+            # 기본값이 켜짐인 스위치는 끌 때만 -이름:$false로 넘긴다
+            if (-not $Values.ContainsKey($f.Name)) { continue }
+            $on = $Values[$f.Name] -eq $true
+            if ($on -and $f.Default -ne $true) { $list.Add("-$($f.Name)") }
+            elseif (-not $on -and $f.Default -eq $true) { $list.Add("-$($f.Name):`$false") }
             continue
         }
         $text = ([string]$Values[$f.Name]).Trim()
@@ -7830,7 +7846,7 @@ function Get-WtFlowArgs($Info, [hashtable]$Values, [switch]$WhatIf) {
 # 저장한 업무의 값 중 지금 스크립트에 없는 칸 이름
 function Get-WtFlowStaleNames($Info, [hashtable]$Values) {
     $names = @($Info.Fields | ForEach-Object Name)
-    @($Values.Keys | Where-Object { $names -notcontains $_ } | Sort-Object)
+    @($Values.get_Keys() | Where-Object { $names -notcontains $_ } | Sort-Object)
 }
 
 # 명령줄 인수 하나를 Windows 규칙대로 감싼다. 콘솔 창 실행은 인수를 글자 한 줄로 넘겨야 해서 쓴다
@@ -7848,8 +7864,17 @@ function ConvertTo-WtFlowCommandArg([string]$Arg) {
     $sb.ToString()
 }
 
-# 출력은 업무 PC 콘솔의 문자 코드(한국어 Windows는 CP949)로 나온다
-function Get-WtFlowEncoding { [System.Text.Encoding]::GetEncoding([System.Globalization.CultureInfo]::CurrentCulture.TextInfo.OEMCodePage) }
+# 출력은 콘솔의 문자 코드로 나온다. 창 없는 콘솔은 사용자 형식(문화권)이 아니라 시스템의 OEM 코드 페이지를 쓴다
+# (한국어 Windows는 949, 「UTF-8 사용」을 켜면 65001). 레지스트리에서 읽기만 하고, 못 읽으면 문화권 값을 쓴다
+function Get-WtFlowEncoding {
+    if (-not $script:encoding) {
+        $cp = 0
+        try { $cp = [int](Get-ItemPropertyValue -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Control\Nls\CodePage' -Name 'OEMCP') } catch { }
+        if (-not $cp) { $cp = [System.Globalization.CultureInfo]::CurrentCulture.TextInfo.OEMCodePage }
+        $script:encoding = [System.Text.Encoding]::GetEncoding($cp)
+    }
+    $script:encoding
+}
 
 # 실행할 프로세스 정보. 실행 정책은 바꾸지 않고, 입력값으로 명령 문자열을 조립하지 않는다
 function New-WtFlowStartInfo($Info, [hashtable]$Values, [ValidateSet('app', 'console')][string]$Mode = 'app', [switch]$WhatIf) {
@@ -7876,42 +7901,88 @@ function New-WtFlowStartInfo($Info, [hashtable]$Values, [ValidateSet('app', 'con
 
 # ---- 실행 상태 (WPF 없이) -----------------------------------------------------------------------
 
+# 출력 퍼 오기: 별도 실행 공간(MTA)에서 표준 출력 · 오류 통로를 쉬지 않고 읽어 큐에 넣는다.
+# 화면 타이머가 읽으면 그 사이 통로(4KB)가 차서 스크립트가 기다리므로, 읽기는 화면과 떼어 둔다 (문서 탭의 조회와 같은 방식).
+# 큐에는 @(통로 번호, 글자 덩어리)를 넣고, 통로가 끝나면 @(번호, $null)을 넣는다. 읽기를 오래 기다리지 않고 0.2초마다 그만둘지 본다
+$script:pumpWork = {
+    param($Readers, $Queue, $Stop)
+    $buffers = @([char[]]::new(65536), [char[]]::new(65536))
+    $tasks = @($Readers[0].ReadAsync($buffers[0], 0, 65536), $Readers[1].ReadAsync($buffers[1], 0, 65536))
+    $open = @($true, $true)
+    while (($open[0] -or $open[1]) -and -not $Stop.Value) {
+        $any = $false
+        for ($k = 0; $k -lt 2; $k++) {
+            if (-not $open[$k] -or -not $tasks[$k].IsCompleted) { continue }
+            $any = $true
+            $n = if ($tasks[$k].IsFaulted -or $tasks[$k].IsCanceled) { 0 } else { $tasks[$k].Result }
+            if ($n -le 0) { $open[$k] = $false; $Queue.Enqueue(@($k, $null)); continue }
+            $Queue.Enqueue(@($k, [string]::new($buffers[$k], 0, $n)))
+            $tasks[$k] = $Readers[$k].ReadAsync($buffers[$k], 0, 65536)
+        }
+        if (-not $any) {
+            $pending = [System.Threading.Tasks.Task[]]@(for ($k = 0; $k -lt 2; $k++) { if ($open[$k]) { $tasks[$k] } })
+            if ($pending.Count) { [void][System.Threading.Tasks.Task]::WaitAny($pending, 200) }
+        }
+    }
+}
+
 # 앱 안 실행을 시작한다. 입력은 바로 닫아서, 입력을 기다리는 스크립트도 멈추지 않고 오류로 끝나게 한다
 function Start-WtFlowProcess($StartInfo, $Record) {
     $p = [System.Diagnostics.Process]::Start($StartInfo)
     $p.StandardInput.Close()
+    $enc = Get-WtFlowEncoding
+    $readers = @(foreach ($stream in @($p.StandardOutput.BaseStream, $p.StandardError.BaseStream)) { [System.IO.StreamReader]::new($stream, $enc, $false, 65536) })
+    $queue = [System.Collections.Concurrent.ConcurrentQueue[object]]::new()
+    $stop = [hashtable]::Synchronized(@{ Value = $false })
+    $rs = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
+    $rs.ApartmentState = 'MTA'
+    $rs.ThreadOptions = 'UseNewThread'   # ReuseThread는 실행 공간을 버리기 전까지 스레드가 남아 앱 프로세스가 끝나지 않는다
+    $rs.Open()
+    $ps = [powershell]::Create()
+    $ps.Runspace = $rs
+    [void]$ps.AddScript($script:pumpWork.ToString()).AddArgument($readers).AddArgument($queue).AddArgument($stop)
     [pscustomobject]@{
-        Process = $p; Record = $Record; Started = Get-Date; ExitedAt = $null; Cancelled = $false; Stopped = $false
-        Readers = @(
-            @{ Reader = $p.StandardOutput; Task = $p.StandardOutput.ReadLineAsync(); Done = $false }
-            @{ Reader = $p.StandardError; Task = $p.StandardError.ReadLineAsync(); Done = $false })
+        Process = $p; Id = $p.Id; Record = $Record; Started = Get-Date; ExitedAt = $null; Cancelled = $false; Stopped = $false
+        Readers = $readers; Queue = $queue; Stop = $stop; Shell = $ps; Runspace = $rs; Async = $ps.BeginInvoke()
+        Partial = @('', ''); Open = @($true, $true)
         Lines = [System.Collections.Generic.List[string]]::new()
     }
 }
 
-# 다 읽힌 줄을 꺼낸다. UI 타이머에서 부르고, 아직 안 끝난 읽기는 기다리지 않는다.
-# 한 번에 $Max줄까지만 꺼낸다 (출력이 한꺼번에 쏟아져도 화면이 멈추지 않게. 남은 줄은 다음 차례에)
-function Read-WtFlowOutput($Run, [int]$Max = 1000) {
+# 큐에 쌓인 출력을 줄로 꺼낸다. UI 타이머에서 부르며, 기다리지 않는다. 한 번에 $Max줄까지
+function Read-WtFlowOutput($Run, [int]$Max = 5000) {
     $fresh = [System.Collections.Generic.List[string]]::new()
-    foreach ($r in $Run.Readers) {
-        while (-not $r.Done -and $r.Task.IsCompleted -and $fresh.Count -lt $Max) {
-            $line = if ($r.Task.IsFaulted -or $r.Task.IsCanceled) { $null } else { $r.Task.Result }
-            if ($null -eq $line) { $r.Done = $true; break }
-            $line = $line -replace "`e\[[0-9;?]*[ -/]*[@-~]", ''   # 남은 색 코드 정리
-            $fresh.Add($line)
-            $Run.Lines.Add($line)
-            $r.Task = $r.Reader.ReadLineAsync()
+    $item = $null
+    while ($fresh.Count -lt $Max -and $Run.Queue.TryDequeue([ref]$item)) {
+        $k = [int]$item[0]
+        if ($null -eq $item[1]) {
+            # 통로 끝: 줄바꿈 없이 남은 마지막 조각도 한 줄로 낸다
+            if ($Run.Partial[$k]) { $fresh.Add($Run.Partial[$k]); $Run.Lines.Add($Run.Partial[$k]); $Run.Partial[$k] = '' }
+            $Run.Open[$k] = $false
+            continue
+        }
+        $text = $Run.Partial[$k] + [string]$item[1]
+        if ($text.IndexOf([char]27) -ge 0) { $text = [regex]::Replace($text, "`e\[[0-9;?]*[ -/]*[@-~]", '') }   # 남은 색 코드 정리
+        $parts = $text.Replace("`r", '').Split("`n")
+        $Run.Partial[$k] = $parts[-1]
+        if ($parts.Count -gt 1) {
+            $whole = [string[]]$parts[0..($parts.Count - 2)]
+            $fresh.AddRange($whole)
+            $Run.Lines.AddRange($whole)
         }
     }
     if ($Run.Lines.Count -gt $script:maxLines + 500) { $Run.Lines.RemoveRange(0, $Run.Lines.Count - $script:maxLines) }
     $fresh.ToArray()
 }
 
-# 프로세스가 끝나고 출력도 다 읽었으면 $true. 끝난 프로세스가 남긴 자식이 출력을 붙잡고 있어도 2초 뒤에는 끝으로 본다
+# 프로세스가 끝나고 출력도 다 읽었으면 $true.
+# 이미 읽어 둔 출력은 화면이 밀려 있어도 다 꺼낸 뒤에 끝낸다 (마지막 줄이 보통 결과다).
+# 끝난 프로세스가 남긴 자식이 출력 통로를 붙잡고 있으면, 2초 뒤에는 끝으로 본다 (자식은 끄지 않는다)
 function Test-WtFlowRunDone($Run) {
     if (-not $Run.Process.HasExited) { return $false }
     if (-not $Run.ExitedAt) { $Run.ExitedAt = Get-Date }
-    -not @($Run.Readers | Where-Object { -not $_.Done }).Count -or ((Get-Date) - $Run.ExitedAt).TotalSeconds -gt 2
+    if (-not $Run.Queue.IsEmpty) { return $false }
+    $Run.Open -notcontains $true -or ((Get-Date) - $Run.ExitedAt).TotalSeconds -gt 2
 }
 
 # 실행을 끝내고 기록을 저장한다. 결과(success · failed · cancelled · stopped)를 돌려준다.
@@ -7925,14 +7996,33 @@ function Complete-WtFlowRun($Run) {
     $rec.status = $status
     $rec.exitCode = $code
     $rec.tail = @($Run.Lines | Select-Object -Last $script:tailLines)
+    # 퍼 오기를 멈추고 실행 공간을 버린 뒤 읽기 통로를 닫는다. 퍼 오기는 0.2초마다 그만둘지 보므로 오래 기다리지 않는다.
+    # 남은 자식이 통로를 붙잡고 있어도 통로가 끝나기를 기다리지는 않는다
+    $Run.Stop.Value = $true
+    try { [void]$Run.Async.AsyncWaitHandle.WaitOne(2000) } catch { }
+    try { $Run.Shell.Dispose() } catch { }
+    try { $Run.Runspace.Dispose() } catch { }
+    foreach ($r in $Run.Readers) { try { $r.Dispose() } catch { } }
     try { $Run.Process.Dispose() } catch { }
     try { Save-WtFlowRun $rec } catch { $Run | Add-Member -NotePropertyName SaveError -NotePropertyValue $_.Exception.Message -Force }
     $status
 }
 
-# 실행 중인 것을 끝낸다 (자식 프로세스까지). 이때 스크립트의 finally는 돌지 않을 수 있다
+# 실행 중인 것을 끝낸다 (자식 프로세스까지). 이때 스크립트의 finally는 돌지 않을 수 있다.
+# 스크립트는 이미 끝났는데 남은 자식이 출력을 붙잡고 있으면, 그 자식을 찾아 끝낸다 (이 실행이 시작한 뒤에 생긴 것만)
 function Stop-WtFlowProcess($Run) {
-    try { if (-not $Run.Process.HasExited) { $Run.Process.Kill($true) } } catch { }
+    $exited = $true
+    try { $exited = $Run.Process.HasExited } catch { }
+    if (-not $exited) {
+        try { $Run.Process.Kill($true) } catch { }
+        return
+    }
+    try {
+        foreach ($c in @(Get-CimInstance -ClassName Win32_Process -Filter "ParentProcessId = $($Run.Id)" -ErrorAction Stop)) {
+            if ($c.CreationDate -lt $Run.Started.AddSeconds(-1)) { continue }
+            try { $child = [System.Diagnostics.Process]::GetProcessById([int]$c.ProcessId); $child.Kill($true); $child.Dispose() } catch { }
+        }
+    } catch { }
 }
 
 # ---- 저장 (WPF 없이) ----------------------------------------------------------------------------
@@ -7963,15 +8053,16 @@ function Save-WtFlowRun($Record) {
     Write-WtStore -Name 'workflow-runs' -Schema $script:schema -Items $all
 }
 
-function New-WtFlowRecord($Info, [hashtable]$Values, [string]$Mode, [bool]$WhatIf, [string]$FlowTitle) {
+# 실행 기록 하나. 넘긴 값만 남긴다 (스위치는 기본값과 다를 때만). 업무는 이름이 아니라 id로 가리킨다
+function New-WtFlowRecord($Info, [hashtable]$Values, [string]$Mode, [bool]$WhatIf, [string]$FlowTitle, [string]$FlowId = '') {
     $kept = [ordered]@{}
     foreach ($f in $Info.Fields) {
         $v = $Values[$f.Name]
-        if ($f.Kind -eq 'switch') { if ($v -eq $true) { $kept[$f.Name] = $true } }
+        if ($f.Kind -eq 'switch') { if ($Values.ContainsKey($f.Name) -and ($v -eq $true) -ne ($f.Default -eq $true)) { $kept[$f.Name] = ($v -eq $true) } }
         elseif (([string]$v).Trim()) { $kept[$f.Name] = ([string]$v).Trim() }
     }
     [ordered]@{
-        id = New-WtId; script = $Info.Path; name = $Info.Name; flow = $FlowTitle; mode = $Mode; whatIf = $WhatIf; values = $kept
+        id = New-WtId; script = $Info.Path; name = $Info.Name; flow = $FlowTitle; flowId = $FlowId; mode = $Mode; whatIf = $WhatIf; values = $kept
         started = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss'); ended = ''; status = $(if ($Mode -eq 'console') { 'console' } else { 'running' })
         exitCode = $null; tail = @()
     }
@@ -8087,6 +8178,7 @@ function Update-WtFlowTree {
             [void]$tree.Items.Add($rootNode)
         }
         if ($found) { $found.IsSelected = $true; $found.BringIntoView() }
+        $script:ui.RemoveRoot.IsEnabled = $false   # 다시 만든 목록에서는 고른 폴더가 없다
     } finally { $script:filling = $false }
     if ($found) {
         Select-WtFlowNode $found.Tag
@@ -8125,11 +8217,25 @@ function Clear-WtFlowSelection {
     $script:info = $null
     $script:flow = $null
     $script:fields = @()
+    if ($script:ui.Count) { $script:ui.RemoveRoot.IsEnabled = $false }
     Update-WtFlowCenter
+}
+
+# 출력 칸 · 결과를 비운다. 다른 스크립트를 고르면 앞 실행의 출력을 남기지 않는다 (실행 중이면 그대로 둔다)
+function Reset-WtFlowOutput([string]$Key) {
+    if ($script:run -or $Key -eq $script:outputKey) { return }
+    $u = $script:ui
+    $u.Output.Clear()
+    $u.OutputHint.Visibility = 'Visible'
+    $u.Status.Visibility = 'Collapsed'
+    $u.RunStatus.Child = $null
+    $script:outputKey = $null
 }
 
 function Select-WtFlowNode($Tag) {
     $script:ui.RemoveRoot.IsEnabled = ($Tag.Kind -eq 'root')
+    if ($Tag.Kind -eq 'script') { Reset-WtFlowOutput "script:$($Tag.Path)" }
+    elseif ($Tag.Kind -eq 'flow') { Reset-WtFlowOutput "flow:$($Tag.Id)" }
     switch ($Tag.Kind) {
         'script' {
             $script:flow = $null
@@ -8158,8 +8264,13 @@ function Update-WtFlowCenter {
         $u.Sub.Text = if ($hasRoots -or (Get-WtFlows).Count) { '왼쪽에서 스크립트나 저장한 업무를 고르세요.' } else { '스크립트 폴더를 더하면 그 안의 스크립트를 폼으로 실행합니다.' }
         Set-WtResource $u.Sub 'Foreground' 'B.SubText'
         $u.Title.ToolTip = $null
-        $u.Empty.Visibility = if ($hasRoots) { 'Collapsed' } else { 'Visible' }
-        foreach ($x in @($u.Commands, $u.SaveFlow, $u.DeleteFlow, $u.Repick, $u.OutArea)) { $x.Visibility = 'Collapsed' }
+        $u.Empty.Visibility = if ($hasRoots -or $script:run) { 'Collapsed' } else { 'Visible' }
+        foreach ($x in @($u.SaveFlow, $u.DeleteFlow, $u.Repick)) { $x.Visibility = 'Collapsed' }
+        # 실행 중에는 고른 것이 없어져도 [취소]와 출력은 계속 보인다
+        $keep = if ($script:run) { 'Visible' } else { 'Collapsed' }
+        $u.Commands.Visibility = $keep
+        $u.OutArea.Visibility = $keep
+        Update-WtFlowCommands
         Update-WtFlowHelp
         return
     }
@@ -8184,14 +8295,27 @@ function Update-WtFlowCenter {
     }
     foreach ($f in $info.Fields) { New-WtFlowField $f $values }
     if (-not $info.Fields.Count -and -not $info.Error) { [void](Add-WtChild $u.Form (New-WtText '넣을 값이 없는 스크립트입니다. [실행]을 누르면 바로 실행합니다.' 'T.Sub')) }
-    if ($info.Skipped.Count) {
-        $names = ($info.Skipped | ForEach-Object { "$($_.Name)($($_.TypeName))" }) -join ', '
-        $skip = New-WtText "폼에서 넣을 수 없는 값 $($info.Skipped.Count)개는 스크립트 기본값을 씁니다: $names" 'T.Sub'
+    $plain = @($info.Skipped | Where-Object { -not $_.Secret })
+    $secret = @($info.Skipped | Where-Object Secret)
+    if ($plain.Count) {
+        $names = ($plain | ForEach-Object { "$($_.Name)($($_.TypeName))" }) -join ', '
+        $skip = New-WtText "폼에서 넣을 수 없는 값 $($plain.Count)개는 스크립트 기본값을 씁니다: $names" 'T.Sub'
         $skip.TextWrapping = 'Wrap'
         [void](Add-WtChild $u.Form $skip)
     }
-    # 실행 방식: 업무에 저장한 것 → 스크립트가 정한 것(.NOTES의 WorkTool: 콘솔) → 앱 안
-    $mode = if ($script:flow -and $script:flow.mode) { [string]$script:flow.mode } elseif ($info.Console) { 'console' } else { 'app' }
+    if ($secret.Count) {
+        $skip = New-WtText "비밀 값은 폼에 넣지 않습니다(저장한 업무 · 기록에 남지 않게): $(($secret | ForEach-Object Name) -join ', ')" 'T.Sub'
+        $skip.TextWrapping = 'Wrap'
+        [void](Add-WtChild $u.Form $skip)
+    }
+    if ($info.NeedsConsole.Count) {
+        $need = New-WtText "필수 값 $($info.NeedsConsole -join ', ')은(는) 폼에 넣을 수 없어서 콘솔 창에서만 실행합니다. 창에서 PowerShell이 직접 묻습니다." 'T.Sub'
+        Set-WtResource $need 'Foreground' 'B.Warn'
+        $need.TextWrapping = 'Wrap'
+        [void](Add-WtChild $u.Form $need)
+    }
+    # 실행 방식: 업무에 저장한 것 → 스크립트가 정한 것(.NOTES의 WorkTool: 콘솔, 폼에 못 넣는 필수 값) → 앱 안
+    $mode = if ($script:flow -and $script:flow.mode) { [string]$script:flow.mode } elseif ($info.Console -or $info.NeedsConsole.Count) { 'console' } else { 'app' }
     foreach ($rb in $u.ModeButtons) { $rb.IsChecked = ($rb.Tag.Value -eq $mode) }
     $u.SaveFlow.Content = New-WtButtonContent $(if ($script:flow) { '업무 저장' } else { '업무로 저장' }) 0xE74E
     $u.SaveFlow.ToolTip = if ($script:flow) { '지금 값과 실행 방식을 이 업무에 저장합니다' } else { '지금 값과 실행 방식을 업무로 저장해 왼쪽 목록에 둡니다' }
@@ -8330,7 +8454,13 @@ function Update-WtFlowCommands {
     $u = $script:ui
     if (-not $u.Count) { return }
     $running = [bool]$script:run
-    $why = if (-not $script:info) { '스크립트를 먼저 고르세요' } elseif ($script:info.Error) { $script:info.Error } elseif ($running) { '다른 스크립트가 앱 안에서 실행 중입니다. 끝나거나 [취소]한 뒤에 실행하세요' } else { '' }
+    $app = (Get-WtFlowMode) -eq 'app'
+    # 앱 안 실행은 한 번에 하나. 콘솔 창은 따로 도는 창이라 앱 안 실행 중에도 띄울 수 있다
+    $why = if (-not $script:info) { '스크립트를 먼저 고르세요' }
+    elseif ($script:info.Error) { $script:info.Error }
+    elseif ($app -and $script:info.NeedsConsole.Count) { "필수 값 $($script:info.NeedsConsole -join ', ')은(는) 폼에 넣을 수 없어서 콘솔 창에서만 실행할 수 있습니다" }
+    elseif ($app -and $running) { '다른 스크립트가 앱 안에서 실행 중입니다. 끝나거나 [취소]한 뒤에 실행하세요 (콘솔 창 실행은 됩니다)' }
+    else { '' }
     $u.RunButton.IsEnabled = -not $why
     $u.RunButton.ToolTip = if ($why) { $why } else { '이 값으로 실행합니다' }
     $previewWhy = if ($why) { $why } elseif (-not $script:info.WhatIf) { '이 스크립트는 미리보기(-WhatIf)를 지원하지 않습니다' } else { '' }
@@ -8338,7 +8468,10 @@ function Update-WtFlowCommands {
     $u.Preview.ToolTip = if ($previewWhy) { $previewWhy } else { '-WhatIf로 할 일만 보여 줍니다. 바꾸는 것은 없습니다' }
     $u.Cancel.IsEnabled = $running
     $u.Cancel.ToolTip = if ($running) { '실행 중인 스크립트를 끝냅니다 (자식 프로세스까지)' } else { '앱 안에서 실행 중일 때만 쓸 수 있습니다' }
-    $u.SaveFlow.IsEnabled = [bool]($script:info -and -not ($script:flow -and -not (Test-Path -LiteralPath $script:info.Path -PathType Leaf)))
+    # 스크립트를 읽지 못하면 칸이 없어서, 저장하면 업무의 값이 비워진다 → 저장을 막는다
+    $saveWhy = if (-not $script:info) { '스크립트를 먼저 고르세요' } elseif ($script:info.Error) { "스크립트를 읽지 못해서 저장할 수 없습니다: $($script:info.Error)" } else { '' }
+    $u.SaveFlow.IsEnabled = -not $saveWhy
+    if ($saveWhy) { $u.SaveFlow.ToolTip = $saveWhy }
 }
 
 function Set-WtFlowNote([string]$Text, [switch]$Undo) {
@@ -8351,7 +8484,9 @@ function Set-WtFlowNote([string]$Text, [switch]$Undo) {
 # ---- 실행 ---------------------------------------------------------------------------------------
 
 function Invoke-WtFlowRun([switch]$WhatIf) {
-    if ($script:run -or -not $script:info -or $script:info.Error) { return }
+    if (-not $script:info -or $script:info.Error) { return }
+    $mode = Get-WtFlowMode
+    if ($mode -eq 'app' -and ($script:run -or $script:info.NeedsConsole.Count)) { return }
     $values = Get-WtFlowFormValues
     $problems = Test-WtFlowValues $script:info $values
     $first = $null
@@ -8361,9 +8496,9 @@ function Invoke-WtFlowRun([switch]$WhatIf) {
         if ($msg -and -not $first) { $first = $x.Input }
     }
     if ($first) { [void]$first.Focus(); Set-WtFlowNote '칸을 고친 뒤 다시 실행하세요.'; return }
-    $mode = Get-WtFlowMode
     $title = if ($script:flow) { [string]$script:flow.title } else { '' }
-    $record = New-WtFlowRecord $script:info $values $mode ([bool]$WhatIf) $title
+    $flowId = if ($script:flow) { [string]$script:flow.id } else { '' }
+    $record = New-WtFlowRecord $script:info $values $mode ([bool]$WhatIf) $title $flowId
     try {
         $start = New-WtFlowStartInfo $script:info $values $mode -WhatIf:$WhatIf
         if ($mode -eq 'console') {
@@ -8382,6 +8517,8 @@ function Invoke-WtFlowRun([switch]$WhatIf) {
         return
     }
     $u = $script:ui
+    $script:outputKey = if ($script:flow) { "flow:$($script:flow.id)" } else { "script:$($script:info.Path)" }
+    $script:shown = 1
     $u.Output.Clear()
     $head = "▶ $($script:info.Name)$(if ($WhatIf) { ' (미리보기)' }) · $((Get-Date).ToString('HH:mm:ss')) 시작"
     $u.Output.AppendText($head)
@@ -8416,16 +8553,24 @@ function Update-WtFlowRunState {
         $u = $script:ui
         if ($script:run) {
             $fresh = Read-WtFlowOutput $script:run
+            # 출력이 들어오는 동안은 자주 비운다 (통로가 차서 스크립트가 기다리지 않게)
+            $script:timer.Interval = [timespan]::FromMilliseconds($(if ($fresh.Count) { 20 } else { 100 }))
             if ($fresh.Count -and $u.Count) {
-                if ($u.Output.LineCount -gt $script:maxLines) {
-                    $u.Output.Text = ((@($script:run.Lines) | Select-Object -Last $script:maxLines) -join "`n")
+                # 맨 아래를 보고 있을 때만 따라 내려간다 (위로 올려 읽거나 고르는 중이면 그대로 둔다)
+                $o = $u.Output
+                $atBottom = $o.VerticalOffset + $o.ViewportHeight -ge $o.ExtentHeight - 2
+                $script:shown += $fresh.Count
+                if ($script:shown -gt $script:maxLines + 500) {
+                    # 화면 칸이 끝없이 커지지 않게 가끔 최근 줄만 남긴다 (탭이 안 보여도 줄 수는 직접 센다)
+                    $o.Text = (@($script:run.Lines) | Select-Object -Last $script:maxLines) -join "`n"
+                    $script:shown = $script:maxLines
                 } else {
-                    $u.Output.AppendText("`n" + ($fresh -join "`n"))
+                    $o.AppendText("`n" + ($fresh -join "`n"))
                 }
-                $u.Output.ScrollToEnd()
+                if ($atBottom) { $o.ScrollToEnd() }
             }
             if ($u.Count) { $u.Elapsed.Text = "실행 중 · $(Format-WtFlowSpan ((Get-Date) - $script:run.Started))" }
-            if ($fresh.Count -lt 1000 -and (Test-WtFlowRunDone $script:run)) {
+            if (Test-WtFlowRunDone $script:run) {
                 $done = $script:run
                 $script:run = $null
                 $status = Complete-WtFlowRun $done
@@ -8463,6 +8608,7 @@ function Show-WtFlowResult($Record, [string]$Status) {
     }
     $u.Output.AppendText("`n■ $((Get-Date).ToString('HH:mm:ss')) 끝 · $($look.Text)")
     $u.Output.ScrollToEnd()
+    Set-WtFlowNote ''   # 「멈추는 중」 같은 알림은 결과가 대신한다
     Update-WtFlowCommands
     Update-WtFlowHelp
 }
@@ -8470,10 +8616,18 @@ function Show-WtFlowResult($Record, [string]$Status) {
 # ---- 화면: 업무 저장 · 삭제 ---------------------------------------------------------------------
 
 function Save-WtFlowFromForm {
-    if (-not $script:info) { return }
-    $values = Get-WtFlowFormValues
-    $kept = @{}
-    foreach ($k in $values.Keys) { if ($values[$k] -eq $true -or ($values[$k] -isnot [bool] -and ([string]$values[$k]).Trim())) { $kept[$k] = $values[$k] } }
+    if (-not $script:info -or $script:info.Error) { return }
+    $form = Get-WtFlowFormValues
+    # 저장한 값 위에 지금 칸 값만 덮어쓴다. 지금 스크립트에 없는 칸의 값은 그대로 둔다 (param 이름이 잠깐 바뀌어도 잃지 않게)
+    $kept = if ($script:flow) { ConvertTo-WtFlowValues $script:flow.values } else { @{} }
+    foreach ($f in $script:info.Fields) {
+        $v = $form[$f.Name]
+        if ($f.Kind -eq 'switch') {
+            # 스위치는 기본값과 다를 때만 남긴다
+            if (($v -eq $true) -ne ($f.Default -eq $true)) { $kept[$f.Name] = ($v -eq $true) } else { [void]$kept.Remove($f.Name) }
+        } elseif (([string]$v).Trim()) { $kept[$f.Name] = ([string]$v).Trim() }
+        else { [void]$kept.Remove($f.Name) }
+    }
     $mode = Get-WtFlowMode
     $items = @(Get-WtFlows)
     if ($script:flow) {
@@ -8490,6 +8644,8 @@ function Save-WtFlowFromForm {
     if (-not $title) { return }
     $new = New-WtFlow $title $script:info.Path $kept $mode
     try { Save-WtFlows (@($items) + [pscustomobject]$new) } catch { Show-WtError $_ '업무 저장'; return }
+    # 방금 실행한 출력은 새 업무를 고른 뒤에도 남긴다
+    if ($script:outputKey -eq "script:$($script:info.Path)") { $script:outputKey = "flow:$($new.id)" }
     $script:pendingFlow = $new.id
     Update-WtFlowTree
     Set-WtFlowNote "업무로 저장했습니다: $title"
@@ -8628,7 +8784,9 @@ function Update-WtFlowHelp {
 function Show-WtFlowRecordTail($Record) {
     if ($script:run) { Set-WtFlowNote '실행 중에는 출력 칸을 바꾸지 않습니다.'; return }
     $u = $script:ui
+    $u.OutArea.Visibility = 'Visible'   # 아무것도 고르지 않은 상태에서 눌러도 보이게
     $u.OutputHint.Visibility = 'Collapsed'
+    $script:outputKey = if ($script:flow) { "flow:$($script:flow.id)" } elseif ($script:info) { "script:$($script:info.Path)" } else { $null }
     $look = Get-WtFlowStatusLook ([string]$Record.status) ([bool]$Record.whatIf)
     $lines = @("── $($Record.name) · $($Record.started) · $($look.Text) (기록: 출력 마지막 $($script:tailLines)줄) ──")
     if ($Record.status -eq 'console') { $lines += '콘솔 창 실행은 출력을 남기지 않습니다. 그 창에서 확인하세요.' }
@@ -8755,7 +8913,7 @@ function New-WtFlowsView {
     $preview.Add_Click({ Invoke-WtFlowRun -WhatIf })
     $cancel = New-WtButton '취소' -Icon 0xE711
     $cancel.Add_Click({ Stop-WtFlowRun })
-    $mode = New-WtSegmented @(@('app', '앱 안에서'), @('console', '콘솔 창에서')) 'app' 'WtFlowMode' { param($value) }
+    $mode = New-WtSegmented @(@('app', '앱 안에서'), @('console', '콘솔 창에서')) 'app' 'WtFlowMode' { param($value) Update-WtFlowCommands }
     $mode.ToolTip = '앱 안: 출력을 아래 칸에 보여 줍니다 · 콘솔 창: 자기 화면이 있거나 키 입력을 받는 스크립트'
     foreach ($b in @($runButton, $preview, $cancel, $mode)) {
         [System.Windows.Controls.ToolTipService]::SetShowOnDisabled($b, $true)
@@ -8879,7 +9037,7 @@ function New-WtFlowsHomeCard {
     $col = New-WtStack Vertical
     [void](Add-WtChild $col (New-WtCardHeader '업무' '' '업무 열기' 'workflows'))
     foreach ($f in $flows) {
-        $last = $runs | Where-Object { $_.flow -eq $f.title -and $_.script -eq $f.script } | Select-Object -First 1
+        $last = $runs | Where-Object { $_.flowId -eq $f.id } | Select-Object -First 1
         $name = New-WtButton ([string]$f.title) -Kind Link
         $name.Tag = [string]$f.id
         $name.HorizontalAlignment = 'Left'
@@ -8921,7 +9079,7 @@ Register-WtAddon -Id 'workflows' -Title '업무' -Icon 0xE756 -Order 70 `
 Export-ModuleMember -Function Read-WtFlowScript, Find-WtFlowScripts, Test-WtFlowValues, Get-WtFlowArgs, Get-WtFlowStaleNames,
     ConvertTo-WtFlowValues, ConvertTo-WtFlowCommandArg, New-WtFlowStartInfo, Start-WtFlowProcess, Read-WtFlowOutput, Test-WtFlowRunDone,
     Complete-WtFlowRun, Stop-WtFlowProcess, Get-WtFlows, Save-WtFlows, New-WtFlow, Get-WtFlowRuns, Save-WtFlowRun, New-WtFlowRecord,
-    Get-WtFlowStatusLook, Format-WtFlowSpan
+    Get-WtFlowStatusLook, Format-WtFlowSpan, Get-WtFlowEncoding
 } | Import-Module -Force -DisableNameChecking
 # ---- addons\workflows\Workflows.psm1 끝 ----
 #endregion

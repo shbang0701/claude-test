@@ -302,7 +302,8 @@ function Start-WtTaskJob([string]$Action, [object[]]$Targets = @()) {
     if ($script:job) { return }
     $cancel = [hashtable]::Synchronized(@{ Value = $false })
     $runspace = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspace()
-    $runspace.ApartmentState = 'MTA'; $runspace.ThreadOptions = 'ReuseThread'; $runspace.Open()
+    # 작업마다 새 스레드. ReuseThread는 실행 공간을 버리기 전까지 스레드가 남아, 끝낼 때 응답 없는 작업이 있으면 앱 프로세스가 끝나지 않는다
+    $runspace.ApartmentState = 'MTA'; $runspace.ThreadOptions = 'UseNewThread'; $runspace.Open()
     $ps = [powershell]::Create(); $ps.Runspace = $runspace
     [void]$ps.AddScript($script:worker.ToString()).AddArgument(@{ Action = $Action; Targets = $Targets; SelfProcessId = $PID; HostProcessIds = @(Get-WtTaskHostIds); Cancel = $cancel })
     try {

@@ -24,6 +24,10 @@
 .EXAMPLE
     .\Watch-MultiPing.ps1 -Rounds 3
     세 번만 확인하고 끝낸다 (목록이 맞는지 먼저 볼 때).
+
+.NOTES
+    WorkTool: 콘솔
+    WorkTool 업무 탭에서는 콘솔 창으로 띄운다. 그 창에서 Q로 끝내야 요약 CSV가 남는다.
 #>
 #Requires -Version 7.2
 [CmdletBinding()]

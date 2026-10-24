@@ -32,6 +32,7 @@
 1. **기본 기능만 쓴다.** PowerShell 내장 명령 + .NET + Office COM만 쓴다. PSGallery 모듈, NuGet, Python 패키지, exe를 내려받지 않는다.
 2. **스크립트 하나 = 파일 하나.** 다른 파일을 불러오지 않고, 한 번 복사로 끝나게 만든다. 여러 파일로 된 앱은 예외로 둔다.
 3. **맨 위 구성:** 주석 도움말(`.SYNOPSIS`, `.EXAMPLE`)을 두고, 그 아래 **설정 블록**에 경로, 시트 이름, 열 위치를 모은다. 사용자가 고칠 곳은 설정 블록뿐이어야 한다. LLM은 실제 문서를 볼 수 없으므로, 문서 구조는 설정 값으로 빼 둔다. `#Requires`는 도움말 블록 아래에 둔다. 위에 두면 `Get-Help`가 도움말을 못 읽는다. 새 스크립트는 `scripts/_template.ps1`을 복사해서 시작한다.
+   - 실행할 때마다 바뀌는 값(대상 목록 파일 · 서버 이름 · 공유 폴더 이름 등)은 `param`으로 받고, `.PARAMETER`나 param 줄 끝 주석으로 설명한다. WorkTool 업무 탭이 이것을 읽어 입력 폼을 만든다. 약속 전체는 `docs/plans/workflows-design.md` 「스크립트 약속」에 있다.
 4. **해명하기 어려운 동작은 쓰지 않는다.**
    - 내려받아 바로 실행(`iwr | iex`), `Invoke-Expression`, `-EncodedCommand`, Base64로 감춘 코드
    - 실행 정책 변경이나 우회(`-ExecutionPolicy Bypass`), 백신·방화벽·UAC 설정 변경, 관리자 권한이 필요한 작업
@@ -60,7 +61,7 @@
 
 작업 주제에 맞는 항목의 문서와 스킬만 쓴다. 세션에 다른 스킬이 보여도 아래 주제에는 쓰지 않는다. 필요한 스킬이 세션에 없으면 흉내 내지 말고 작업 전에 알린다.
 
-- **업무 PC용 스크립트**: `scripts/_template.ps1`, 위 「코드 규칙」
+- **업무 PC용 스크립트**: `scripts/_template.ps1`, 위 「코드 규칙」. 업무 탭에서 실행할 스크립트면 `docs/plans/workflows-design.md` 「스크립트 약속」도 읽는다.
 - **GUI 화면** (만들기 · 고치기 · 검토): `apps/design.md`를 끝까지 읽고, 앱 디자인 문서(WorkTool: `apps/WorkTool/design/README.md`)의 값만 쓴다. 새 값이 필요하면 앱 디자인 문서에 먼저 추가한다. 문서에 없는 것은 Windows 기본 컨트롤(Fluent) 동작을 따르고, 끝내기 전에 `apps/design.md` 「완료 전 점검」을 확인한다.
   - 스킬: `ui-ux-pro-max`(점검 도구로만, 쓰는 범위는 스킬 안 「이 저장소에서 쓸 때」)
   - 쓰지 않음: `dataviz` · `artifact-design` · `frontend-design` · `theme-factory` · `brand-guidelines`, 아티팩트로 만든 시안. 시안은 「목업 · 미리보기」대로 git에 올린다.
@@ -75,10 +76,12 @@
 
 기능을 넣고 빼거나 디자인을 바꿀 때 한 곳만 고치면 되도록 만든다.
 
-- **화면 하나 = 모듈 하나.** 기능 추가·삭제는 모듈 파일 하나와 기능 목록 한 줄로 끝나야 한다.
-- **모양은 공통 UI 모듈에서만 정한다.** 색, 글꼴, 크기, 간격, 컨트롤 모양이 해당한다. 기능 모듈에 색 값이나 글꼴 이름을 직접 쓰지 않는다.
+- **탭(화면) 하나 = 폴더 하나.** 탭의 모듈 · 도움말 · 단축키 · 검사를 탭 폴더(WPF: `apps/WorkTool/wpf/addons/<이름>/`) 하나에 두고, 탭을 더하거나 빼는 코드는 그 폴더로 끝낸다. 코어 · 다른 탭 · 검사 목록 · 묶음 만들기 스크립트는 고치지 않는다(묶음 파일은 다시 만든다).
+- **코어에는 탭 이름을 쓰지 않고, 탭끼리 서로 부르지 않는다.** 탭 사이 연결은 홈 카드 · 도움말처럼 코어의 등록 목록을 거친다. 탭이 필요한 코어 검사는 가짜 탭으로 한다.
+- **업무 탭의 기능은 앱이 아니라 `scripts/`의 스크립트로 더한다.** 기능 하나 = 스크립트 하나다(`docs/plans/workflows-design.md`).
+- **모양은 공통 UI 모듈에서만 정한다.** 색, 글꼴, 크기, 간격, 컨트롤 모양이 해당한다. 기능 모듈에 색 값이나 글꼴 이름을 직접 쓰지 않는다. 탭에 새 모양이 필요하면 공통 UI 모듈에 쓰임새 이름으로 더한다(탭 폴더 하나 규칙의 유일한 예외).
 - **저장은 저장 모듈만 거친다.** 기능 모듈은 파일을 직접 읽고 쓰지 않는다.
-- 사용자 데이터와 로컬 설정(`data/`, `config.json`)은 커밋하지 않는다.
+- 사용자 데이터와 로컬 설정은 커밋하지 않는다. WinForms는 `data/` · `config.json`, WPF는 데이터 폴더(기본 `문서\WorkTool`, 저장소 밖)다.
 - **여러 파일로 된 앱은 복사 한 번으로 가져가도록 파일 하나로 묶은 버전도 둔다.** 원본을 고친 뒤 묶음을 다시 만들어 같은 커밋에 넣는다. 묶음 파일은 직접 고치지 않는다.
   - WorkTool(WinForms): `pwsh apps/WorkTool/build/Build-Bundle.ps1` → `apps/WorkTool/dist/WorkTool.ps1`
   - WorkTool 새 버전(WPF): `pwsh apps/WorkTool/wpf/tests/Test-Core.ps1`이 모두 통과한 뒤 `pwsh apps/WorkTool/wpf/build/Build-Bundle.ps1` → `apps/WorkTool/dist/WorkTool-WPF.ps1` · 맨 위 `worktool.zip`(개인 PC 실행용)

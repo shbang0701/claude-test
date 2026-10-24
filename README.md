@@ -5,8 +5,8 @@
 
 ## 구성
 
-- **[scripts/](scripts/)** — 복사 한 번으로 끝나는 단독 PowerShell 스크립트
-  - 아직 없음. 새로 만들 때는 [scripts/README.md](scripts/README.md)
+- **[scripts/](scripts/)** — 복사 한 번으로 끝나는 단독 PowerShell 스크립트. 새로 만들 때는 [scripts/README.md](scripts/README.md)
+  - [network/Watch-MultiPing.ps1](scripts/network/Watch-MultiPing.ps1) — 여러 서버에 ping(또는 TCP 포트)을 계속 보내 응답 · 끊김을 한 화면에 보고, 바뀐 시각을 CSV로 남김 (점검 · 재부팅 확인용)
 - **[apps/design.md](apps/design.md)** — 모든 GUI 앱의 공통 디자인 원칙 (Windows 디자인 지침 기반)
 - **[worktool.zip](worktool.zip)** — WorkTool 새 버전(WPF)을 바로 실행하는 묶음. 압축을 풀고 `Start-WorkTool.cmd`를 더블클릭 (개인 PC용, 아래 「업무 PC로 가져가기」 참고)
   - 실행 보조 파일 원본: [start-worktool.cmd](apps/WorkTool/wpf/build/start-worktool.cmd) · [start-launcher.ps1](apps/WorkTool/wpf/build/start-launcher.ps1). 시작 뒤 콘솔 창을 남기지 않습니다.

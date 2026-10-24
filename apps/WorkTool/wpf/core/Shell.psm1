@@ -436,7 +436,7 @@ function New-WtTrayIcon([System.Drawing.Icon]$Icon) {
 # 예전 WorkTool(WinForms) data 폴더에서 탭마다 데이터를 가져온다.
 # -Force가 없으면 아직 저장소가 없는 탭만 가져온다 (처음 실행할 때).
 function Import-WtLegacyData([switch]$Force) {
-    if ($Force -and -not (Save-WtPendingChanges)) { throw '저장하지 못한 메모가 있어 가져오기를 취소했습니다.' }
+    if ($Force -and -not (Save-WtPendingChanges)) { throw '저장하지 못한 내용이 있어 가져오기를 취소했습니다.' }
     $folder = Find-WtLegacyFolder
     $result = @{ Folder = $folder; Count = 0; Tabs = @(); At = $null }
     if (-not $folder) { return $result }

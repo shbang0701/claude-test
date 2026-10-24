@@ -82,7 +82,7 @@ WorkTool을 띄운 터미널(Windows Terminal · PowerShell 창 · VS Code 등)�
 - 수집은 창을 복원하거나 탭을 전환하지 않습니다. 브라우저가 정보를 내주지 않으면 `탭 확인 불가` 또는 `일부 탭 확인 불가`로 표시합니다. 브라우저 창 전체 닫기로 대신하지 않습니다.
 - 웨일은 Chrome과 같은 방식으로 탭을 읽습니다. 실제 웨일에서는 아직 확인하지 않았으며, 탭을 못 읽으면 `탭 확인 불가`로 둡니다.
 - 브라우저는 UI Automation으로 탭을 읽으면 접근성 기능을 켜서 메모리를 조금 더 쓸 수 있습니다. 보안 프로그램이 다른 앱 화면을 읽는 동작으로 볼 수도 있으니, 자동 새로 고침은 업무 PC에서 한 번 확인한 뒤 켜세요.
-- `tests/Test-ActiveTasks.ps1`은 임시 데이터와 전용 테스트 창만 씁니다. 코어 검사에 포함되며, Windows STA에서는 실제 그룹 체크·모달·타이머 경로와 UIA 닫기까지 검사합니다.
+- `addons/active-tasks/Test-ActiveTasks.ps1`은 임시 데이터와 전용 테스트 창만 씁니다. 코어 검사가 찾아서 돌리며, Windows STA에서는 실제 그룹 체크·모달·타이머 경로와 UIA 닫기까지 검사합니다.
 - 설치된 브라우저를 추가로 검사하려면 해당 실행 파일을 `-BrowserPath`로 명시합니다. 새 임시 프로필의 가짜 페이지 두 개만 열고 기존 프로필을 사용하지 않습니다. 브라우저 첫 시작 정책으로 테스트 프로필 실행이 막히면 제한을 우회하지 않습니다.
 - 업무 PC의 DRM 앱과 보안 정책은 환경마다 다릅니다. 해당 환경에서도 정상 동작한다고 미리 보장하지 않습니다.
 
@@ -115,32 +115,41 @@ wpf/
     Addons.psm1           탭 목록 (Register-WtAddon)
     Pages.psm1            설정 · 도움말 화면
     Shell.psm1            창 틀 · 메뉴 · 트레이 · 단축키 · 화면 전환
-  addons/
+  addons/                 탭 하나 = 폴더 하나. 모듈과 그 탭의 검사(Test-*.ps1)가 같이 있다
     home/Home.psm1        홈: 다른 탭의 홈 카드를 모아 보여 줌
-    schedule/Schedule.psm1
-    attendance/Attendance.psm1
-    memo/Memo.psm1
-    docs/Docs.psm1        문서: 폴더 트리 + 파일 목록, 원래 프로그램으로 열기 · 즐겨찾기
-    active-tasks/ActiveTasks.psm1  실행 창·탭 표, 선택 닫기, 수동/자동 새로 고침
-  build/Build-Bundle.ps1  파일 하나로 묶기 → ../dist/WorkTool-WPF.ps1
+    schedule/             일정 (Schedule.psm1 · Test-Schedule.ps1)
+    attendance/           근태 (Attendance.psm1 · Test-Attendance.ps1)
+    memo/                 메모 (Memo.psm1 · Test-Memo.ps1: 쓰기 · 화면 · 저장 실패)
+    docs/                 문서: 폴더 트리 + 파일 목록, 원래 프로그램으로 열기 · 즐겨찾기 (Docs.psm1 · Test-Docs.ps1: 조회 취소 · 목록 가상화)
+    active-tasks/         실행 창·탭 표, 선택 닫기, 수동/자동 새로 고침 (ActiveTasks.psm1 · Test-ActiveTasks.ps1: 전용 창 UIA 검사)
+  build/Build-Bundle.ps1  파일 하나로 묶기 → ../dist/WorkTool-WPF.ps1 (탭 폴더의 .psm1만 넣고 검사 파일은 넣지 않는다)
   build/start-worktool.cmd · start-launcher.ps1  개인 PC ZIP의 콘솔 없는 실행 보조 파일 (start-launcher.ps1은 start-dev.cmd도 씀)
-  tests/Test-Core.ps1     창 없이 확인할 수 있는 부분 검사
-  tests/Test-Reliability.ps1  저장 실패·중복 실행·조회 취소·목록 가상화 검사 (임시 데이터만 사용)
+  tests/Test-Core.ps1     전체 검사. 코어를 가짜 탭으로 검사하고, 모든 탭을 함께 불러 겹침을 본 뒤, 탭 폴더의 Test-*.ps1을 찾아서 돌린다
+  tests/TestKit.ps1       검사 공통 준비 (core 불러오기 · 임시 데이터 폴더 · PASS 표시)
+  tests/Test-Reliability.ps1  셸 · 저장: 중복 실행 · 설정 저장 실패 · 저장 실패 때 묻는 흐름 · 예전 버전 종료 저장 (임시 데이터만 사용)
   tests/Test-Launcher.ps1 실행 보조 종료·콘솔 없는 GUI·전체 아이콘·시작 오류·start-dev.cmd 검사 (전용 테스트 창)
-  tests/Test-ActiveTasks.ps1  활성 작업 설정·표·모달·전용 창 UIA 검사 (코어 검사에서도 호출)
 ```
 
 ## 탭(애드온) 더하기 · 빼기
 
-- **더하기**: `addons/<이름>/<이름>.psm1`을 만들고 맨 아래에서 `Register-WtAddon`을 부릅니다. 메뉴 · 홈 카드 · 예전 데이터 가져오기가 저절로 연결됩니다.
+탭 하나를 더하거나 빼는 일은 `addons/<이름>/` 폴더 하나로 끝납니다. 코어 · 다른 탭 · 검사 목록 · 묶음 만들기는 고치지 않습니다.
+
+- **더하기**: `addons/<이름>/<이름>.psm1`을 만들고 맨 아래에서 `Register-WtAddon`을 부릅니다. 메뉴 · 홈 카드 · 도움말 · 예전 데이터 가져오기가 저절로 연결됩니다.
 
   ```powershell
   Register-WtAddon -Id 'files' -Title '문서' -Icon 0xE8B7 -Order 50 `
       -NewView { New-WtFilesView } `
       -Refresh { param($view) Update-WtFilesView } `
-      -HomeCard { New-WtFilesHomeCard }
+      -HomeCard { New-WtFilesHomeCard } `
+      -Help '문서는 고른 폴더의 파일을 보고 원래 프로그램으로 엽니다.' `
+      -Shortcuts @(@('F5', '새로 고침'), @('Ctrl + F', '이름으로 거르기'))
   ```
-- **빼기**: 그 폴더를 지웁니다. 다른 탭과 데이터는 그대로입니다. 잠깐 숨기기만 하려면 설정 → 메뉴에서 끕니다.
+  - `-Help`는 도움말 「이 버전」 문단, `-Shortcuts`는 「단축키」 줄이 됩니다. 키와 설명이 다른 탭과 같으면 `문서 · 활성 작업: 새로 고침`처럼 한 줄로 묶입니다. 키 처리 자체는 탭 화면이 합니다.
+  - 도움말에 카드를 따로 두려면 `-HelpCard { ... }`로 카드 요소를 돌려줍니다 (메모의 마크다운 예시).
+  - 검사는 같은 폴더의 `Test-<이름>.ps1`에 둡니다. 맨 위에서 `tests/TestKit.ps1`을 점 소싱하고 `Import-WtTestCore` → 자기 모듈 불러오기 → `New-WtTestData`로 임시 데이터를 만듭니다. `tests/Test-Core.ps1`이 찾아서 돌리고, 묶음 파일에는 들어가지 않습니다.
+- **빼기**: 그 폴더를 지웁니다. 그 탭의 도움말 · 단축키 · 검사도 같이 빠지고, 다른 탭과 데이터는 그대로입니다. 잠깐 숨기기만 하려면 설정 → 메뉴에서 끕니다.
+- 코어 코드와 코어 검사에는 특정 탭의 이름 · 설명 · 단축키를 쓰지 않습니다. 탭이 필요한 코어 검사는 가짜 탭을 등록해서 합니다.
+  - 예외는 예전 WorkTool(WinForms) 데이터 폴더를 알아보는 CSV 이름(`memo.csv` 등)입니다. 이미 정해진 예전 형식이라서입니다.
 - 화면은 `core/Ui.psm1`의 `New-Wt*` 함수와 스타일 이름만 써서 만듭니다. 색 값이나 글꼴 이름을 직접 쓰지 않습니다.
 - 저장은 `Get-WtStoreItems` · `Write-WtStore`만 씁니다. 형식을 바꿀 때는 `-Schema`를 올리고 `-Migrate`로 변환을 줍니다.
 - 이벤트 처리기 안에서는 `$script:` 변수와 보낸 요소(`$s`)의 `Tag`만 씁니다. 처리기는 나중에 불리므로, 만든 함수의 지역 변수는 보이지 않습니다.

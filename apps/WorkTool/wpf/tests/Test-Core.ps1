@@ -1,10 +1,13 @@
 <#
 .SYNOPSIS
-    WorkTool 새 버전에서 창 없이 확인할 수 있는 부분을 검사한다.
+    WorkTool 새 버전 검사를 모두 돌린다: 코어 검사 → 탭 모아 보기 → 탭 폴더의 검사 → 안정성 · 실행 파일 검사.
 
 .DESCRIPTION
-    저장 · 설정 · 예전 데이터 가져오기 · 일정 반복 · 근태 요약 · 메모 검색 · 테마 색 대비.
-    임시 폴더만 쓰고, 문서\WorkTool 같은 실제 데이터 폴더는 건드리지 않는다. Windows · Linux 모두에서 돈다.
+    - 코어: 코드 검사 · 저장 · 설정 · 탭 목록 · 예전 데이터 가져오기 흐름 · 도움말 · 테마 색 대비 · 마크다운 · 코드 색칠 · Mermaid.
+      탭이 필요한 곳은 가짜 탭을 등록해서 본다. 진짜 탭의 동작은 그 탭 폴더의 검사가 맡는다.
+    - 탭 모아 보기: 앱처럼 모든 탭을 함께 불러와서 ID · 함수 이름이 겹치지 않는지, 도움말이 모든 탭을 싣는지 본다.
+    - 탭 폴더의 검사(addons\<이름>\Test-*.ps1)는 찾아서 돌린다. 탭을 더하거나 빼도 이 파일은 고치지 않는다.
+    임시 폴더만 쓰고, 문서\WorkTool 같은 실제 데이터 폴더는 건드리지 않는다. 화면 검사는 Windows STA에서만 한다.
 
 .EXAMPLE
     pwsh ./apps/WorkTool/wpf/tests/Test-Core.ps1
@@ -15,33 +18,16 @@ param()
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
-foreach ($n in 'Storage', 'Settings', 'Theme', 'Ui', 'Highlight', 'Markdown', 'Mermaid', 'Addons', 'Pages', 'Shell') {
-    Import-Module (Join-Path $root "core/$n.psm1") -Force -DisableNameChecking
-}
-foreach ($f in (Get-ChildItem (Join-Path $root 'addons') -Filter '*.psm1' -Recurse | Sort-Object FullName)) {
-    Import-Module $f.FullName -Force -DisableNameChecking
-}
+. (Join-Path $PSScriptRoot 'TestKit.ps1')
+Import-WtTestCore
 
 $script:failed = 0
 function Assert-Wt([string]$Name, [bool]$Ok, $Detail = '') {
     if ($Ok) { Write-Host "PASS $Name" } else { Write-Host "FAIL $Name $Detail" -ForegroundColor Red; $script:failed++ }
 }
 
-function Wait-WtDocTest {
-    $watch = [Diagnostics.Stopwatch]::StartNew()
-    $docsModule = Get-Module Docs
-    do {
-        & $docsModule { Complete-WtDocJobs; Complete-WtDocTreeBatch }
-        if ($watch.Elapsed.TotalSeconds -gt 15) { throw '문서 테스트 조회 시간 초과' }
-        Start-Sleep -Milliseconds 10
-    } while (& $docsModule { $script:jobs.Count -or $script:pending.Count -or $script:treeBatches.Count })
-}
-
-$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('wt-test-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
-$app = (New-Item -ItemType Directory -Path (Join-Path $tmp 'app')).FullName
-$dataDir = Join-Path $tmp 'data'
-Set-Content -LiteralPath (Join-Path $app 'datapath.txt') -Value $dataDir -Encoding utf8
-Set-WtAppRoot $app
+$test = New-WtTestData 'core'
+$wpf = Test-WtTestWpf
 
 try {
     # ---- 코드 검사 ----
@@ -60,7 +46,7 @@ try {
     Assert-Wt '코드 검사: 함수 안에 대소문자만 다른 변수 이름 없음' (-not $clash) ($clash -join '; ')
 
     # ---- 저장 ----
-    Assert-Wt '데이터 폴더는 datapath.txt를 따른다' ((Get-WtDataRoot) -eq (Resolve-Path $dataDir).ProviderPath)
+    Assert-Wt '데이터 폴더는 datapath.txt를 따른다' ((Get-WtDataRoot) -eq (Resolve-Path $test.Data).ProviderPath)
 
     Write-WtStore -Name 'sample' -Items @([ordered]@{ id = 'x1'; title = '한글 제목'; tags = @() })
     $one = Get-WtStoreItems -Name 'sample'
@@ -88,7 +74,7 @@ try {
     Assert-Wt '설정 기본값' ((Get-WtSetting 'theme.color') -eq 'sky' -and (Get-WtSetting 'ui.opacity') -eq 100)
     Register-WtSettingHandler { param($k, $v) $script:seenKey = $k }
     Set-WtSetting 'theme.color' 'pink'
-    Set-WtSetting 'addons.disabled' @('memo')
+    Set-WtSetting 'addons.disabled' @('test-b')
     Assert-Wt '설정이 바뀌면 처리기를 부른다' ($script:seenKey -eq 'addons.disabled')
     $saved = Get-Content (Get-WtSettingsPath) -Raw | ConvertFrom-Json
     Assert-Wt '바꾼 값만 저장한다' (@($saved.values.PSObject.Properties.Name).Count -eq 2 -and $saved.values.'theme.color' -eq 'pink')
@@ -96,117 +82,52 @@ try {
     $saved = Get-Content (Get-WtSettingsPath) -Raw | ConvertFrom-Json
     Assert-Wt '기본값으로 돌리면 파일에서 빠진다' (-not ($saved.values.PSObject.Properties.Name -contains 'theme.color'))
     Initialize-WtSettings
-    Assert-Wt '배열 설정을 다시 읽는다' (@(Get-WtSetting 'addons.disabled') -contains 'memo')
-    Assert-Wt '끈 탭은 메뉴 목록에서 빠진다' (-not (@(Get-WtAddon | ForEach-Object Id) -contains 'memo') -and (@(Get-WtAddon -All | ForEach-Object Id) -contains 'memo'))
+    Assert-Wt '배열 설정을 다시 읽는다' (@(Get-WtSetting 'addons.disabled') -contains 'test-b')
+
+    # ---- 탭 목록 (가짜 탭) ----
+    Register-WtAddon -Id 'test-b' -Title '나' -Order 20 -NewView { }
+    Register-WtAddon -Id 'test-a' -Title '가' -Order 10 -NewView { }
+    Register-WtAddon -Id 'test-c' -Title '다' -Order 10 -NewView { } -Required
+    Assert-Wt '끈 탭은 메뉴 목록에서 빠진다' (-not (@(Get-WtAddon | ForEach-Object Id) -contains 'test-b') -and (@(Get-WtAddon -All | ForEach-Object Id) -contains 'test-b'))
+    Set-WtSetting 'addons.disabled' @('test-c')
+    Assert-Wt '꼭 있어야 하는 탭은 꺼도 메뉴에 남는다' (@(Get-WtAddon | ForEach-Object Id) -contains 'test-c')
     Set-WtSetting 'addons.disabled' @()
-    Assert-Wt '메뉴 순서: 홈 · 일정 · 근태 · 메모 · 문서 · 활성 작업' ((@(Get-WtAddon | ForEach-Object Id) -join ',') -eq 'home,schedule,attendance,memo,docs,active-tasks')
+    Assert-Wt '메뉴 순서: Order가 같으면 ID 순서' ((@(Get-WtAddon | ForEach-Object Id) -join ',') -eq 'test-a,test-c,test-b') (@(Get-WtAddon | ForEach-Object Id) -join ',')
+    Register-WtAddon -Id 'test-a' -Title '가2' -Order 10 -NewView { }
+    Assert-Wt '같은 ID로 다시 등록하면 바꾼다' (@(Get-WtAddon -All | Where-Object Id -eq 'test-a').Count -eq 1 -and (Get-WtAddon -Id 'test-a').Title -eq '가2')
 
-    # ---- 예전 데이터 ----
-    $legacy = (New-Item -ItemType Directory -Path (Join-Path $app 'data')).FullName
-    $bom = [System.Text.UTF8Encoding]::new($true)
-    [System.IO.File]::WriteAllText((Join-Path $legacy 'memo.csv'), @'
-"Id","Title","Body","Created","Updated"
-"a1","점검","첫 줄
-둘째 줄","2026-10-01 09:00:00","2026-10-21 11:20:00"
-"a2","회의 메모","장비 목록 정리","2026-10-02 10:00:00","2026-10-22 08:00:00"
-'@, $bom)
-    [System.IO.File]::WriteAllText((Join-Path $legacy 'schedule.csv'), @'
-"Id","Date","Time","Title","Note","Alarm","Repeat","LastAlarm","Updated"
-"s1","2026-10-01","09:30","주간 회의","","10","weekly","",""
-"s2","2026-10-01","14:00","백업 확인","","","weekdays","",""
-"s3","2026-10-23","","보안 교육","","","","",""
-"s4","2026-10-20","08:00","매일 점검","","0","daily","",""
-'@, $bom)
-    [System.IO.File]::WriteAllText((Join-Path $legacy 'attendance.csv'), @'
-"Id","Type","StartDate","EndDate","StartTime","EndTime","Place","Detail","Updated"
-"t1","출근","2026-10-21","2026-10-21","08:47","","","",""
-"t2","출근","2026-10-21","2026-10-21","09:00","","","",""
-"t3","업무외시간 근무","2026-10-20","2026-10-20","19:00","21:30","","패치",""
-"t4","업무외시간 근무","2026-10-13","2026-10-13","23:00","01:00","","야간",""
-"t5","출장","2026-10-16","2026-10-17","","","데이터센터","점검",""
-"t6","휴가","2026-10-17","2026-10-17","","","","오후 반차",""
-"t7","휴가","2026-09-30","2026-10-02","","","","연차",""
-"t8","출근","2026-09-30","2026-09-30","08:50","","","",""
-'@, $bom)
+    # ---- 도움말 단축키 (가짜 탭) ----
+    Register-WtAddon -Id 'test-x' -Title '엑스' -Order 30 -NewView { } -Shortcuts @(@('F5', '새로 고침'), @('Enter', '열기'))
+    Register-WtAddon -Id 'test-y' -Title '와이' -Order 40 -NewView { } -Shortcuts (, @('F5', '새로 고침'))
+    Register-WtAddon -Id 'test-one' -Title '하나' -Order 90 -NewView { } -Shortcuts @('F9', '혼자')
+    Assert-Wt '단축키 한 쌍은 쉼표 없이 줘도 한 쌍' (@((Get-WtAddon -Id 'test-one').Shortcuts).Count -eq 1 -and (Get-WtAddon -Id 'test-one').Shortcuts[0][1] -eq '혼자')
+    $threw = $false
+    try { Register-WtAddon -Id 'test-bad' -Title '잘못' -NewView { } -Shortcuts @(@('F5', '새로 고침', '남는 값')) } catch { $threw = $true }
+    Assert-Wt '모양이 틀린 단축키는 등록할 때 알린다' ($threw -and -not (Get-WtAddon -Id 'test-bad'))
+    $keyRows = (@(& (Get-Module Pages) { Get-WtShortcutRows }) | ForEach-Object { "$($_.Key)=$($_.Text)" }) -join '|'
+    Assert-Wt '도움말 단축키: 메뉴 순서로 모으고, 키 · 설명이 같으면 탭 이름을 묶는다' ($keyRows -eq 'F5=엑스 · 와이: 새로 고침|Enter=엑스: 열기|F9=하나: 혼자') $keyRows
+    Set-WtSetting 'addons.disabled' @('test-y')
+    $keyRows = (@(& (Get-Module Pages) { Get-WtShortcutRows }) | ForEach-Object { "$($_.Key)=$($_.Text)" }) -join '|'
+    Assert-Wt '도움말 단축키: 끈 탭은 뺀다' ($keyRows -eq 'F5=엑스: 새로 고침|Enter=엑스: 열기|F9=하나: 혼자') $keyRows
+    Set-WtSetting 'addons.disabled' @()
 
-    Assert-Wt '예전 data 폴더를 찾는다' ((Find-WtLegacyFolder) -eq $legacy)
+    # ---- 예전 데이터 가져오기 흐름 (가짜 탭) ----
+    # 예전 WorkTool(WinForms)의 data 폴더는 정해진 CSV 이름으로 알아본다
+    Write-WtTestLegacyCsv $test 'memo' "`"Id`"`n"
+    Assert-Wt '예전 data 폴더를 찾는다' ((Find-WtLegacyFolder) -eq $test.Legacy) (Find-WtLegacyFolder)
+    $legacyCalls = [pscustomobject]@{ Count = 0 }
+    Register-WtAddon -Id 'test-legacy' -Title '가짜' -NewView { } -ImportLegacy {
+        param($folder)
+        $legacyCalls.Count++
+        Write-WtStore -Name 'test-legacy' -Items @([ordered]@{ id = "n$($legacyCalls.Count)" })
+        3
+    }.GetNewClosure()
     $r = Import-WtLegacyData
-    Assert-Wt '처음 실행: 세 탭을 가져온다' ($r.Count -eq 14 -and $r.Tabs.Count -eq 3) "($($r.Count) / $($r.Tabs -join ', '))"
+    Assert-Wt '처음 실행: 저장소가 없는 탭만 가져온다' ($r.Count -eq 3 -and $r.Tabs -contains '가짜 3' -and $r.Folder -eq $test.Legacy) "($($r.Count) / $($r.Tabs -join ', '))"
     $r2 = Import-WtLegacyData
-    Assert-Wt '두 번째 실행: 이미 가져온 탭은 건너뛴다' ($r2.Count -eq 0)
+    Assert-Wt '두 번째 실행: 이미 가져온 탭은 건너뛴다' ($r2.Count -eq 0 -and $legacyCalls.Count -eq 1)
     $r3 = Import-WtLegacyData -Force
-    Assert-Wt '다시 가져오기는 덮어쓴다' ($r3.Count -eq 14 -and (Test-Path ((Get-WtStorePath 'memo') + '.bak')))
-    Assert-Wt '예전 CSV는 그대로 둔다' ((Get-Content (Join-Path $legacy 'memo.csv') -Raw) -match '"a1","점검"')
-
-    $memos = Get-WtMemoItems
-    $a1 = $memos | Where-Object id -eq 'a1'
-    Assert-Wt '메모: 여러 줄 본문 유지' ($a1.body -eq "첫 줄`n둘째 줄" -or $a1.body -eq "첫 줄`r`n둘째 줄")
-    Assert-Wt '메모: 최근 고친 순서' ((@(Get-WtMemoSorted $memos)[0]).id -eq 'a2')
-    Assert-Wt '메모 검색: 낱말 모두 포함' (@(Find-WtMemo $memos '장비 정리').Count -eq 1 -and @(Find-WtMemo $memos '').Count -eq 2)
-
-    # ---- 메모 쓰기 ----
-    $when = [datetime]'2026-10-22 11:20:05'
-    $nm = New-WtMemo $when
-    Assert-Wt '메모: 새 메모' ($nm.id.Length -eq 12 -and $nm.created -eq '2026-10-22 11:20:05' -and $nm.body -eq '')
-    [void](Set-WtMemoContent $nm '  ' @'
-점검 #서버 #서버
-```
-#코드안
-```
-- 할 일 #주간
-'@ $when)
-    Assert-Wt '메모: 빈 제목은 저장 시각' ($nm.title -eq '2026-10-22 11:20')
-    Assert-Wt '메모: 본문 #태그를 모은다 (코드 안 · 중복 제외)' ((@($nm.tags) -join ',') -eq '서버,주간') (@($nm.tags) -join ',')
-    $legacyMemo = $memos | Where-Object id -eq 'a2'
-    $legacyMemo.PSObject.Properties.Remove('tags')
-    [void](Set-WtMemoContent $legacyMemo '회의 메모' '고침 #회의' $when)
-    Save-WtMemoItems @($memos + $nm)
-    $re = Get-WtMemoItems
-    Assert-Wt '메모: 고친 것 저장 · 다시 읽기 (tags 없던 예전 항목 포함)' ($re.Count -eq 3 -and ($re | Where-Object id -eq 'a2').body -eq '고침 #회의' -and @(($re | Where-Object id -eq 'a2').tags)[0] -eq '회의')
-
-    # ---- 문서 ----
-    $docRoot = (New-Item -ItemType Directory -Path (Join-Path $tmp '문서 루트')).FullName
-    New-Item -ItemType Directory -Path (Join-Path $docRoot '운영\점검') -Force | Out-Null
-    New-Item -ItemType Directory -Path (Join-Path $docRoot '가나다') | Out-Null
-    Set-Content -LiteralPath (Join-Path $docRoot '계정 목록.xlsx') -Value 'x'
-    Set-Content -LiteralPath (Join-Path $docRoot 'readme.md') -Value ('a' * 3000)
-    $hid = New-Item -ItemType File -Path (Join-Path $docRoot 'secret.tmp')
-    $hid.Attributes = 'Hidden'
-    $de = Get-WtDocEntries $docRoot
-    Assert-Wt '문서: 폴더 먼저 · 이름 순 · 숨김 빼기' ((($de | ForEach-Object Name) -join ',') -eq '가나다,운영,계정 목록.xlsx,readme.md') (($de | ForEach-Object Name) -join ',')
-    Assert-Wt '문서: 종류 · 크기' (($de | Where-Object Name -eq '계정 목록.xlsx').Kind -eq 'Excel' -and (Format-WtDocSize 3002) -eq '3 KB' -and (Format-WtDocSize 5MB) -eq '5.0 MB' -and (Get-WtDocKind 'a.abc' $false) -eq 'ABC')
-    Assert-Wt '문서: 하위 폴더' ((@(Get-WtDocSubfolders $docRoot) | ForEach-Object { Split-Path $_ -Leaf }) -join ',' -eq '가나다,운영')
-    $chain = Get-WtDocChain @('D:\x', $docRoot) (Join-Path $docRoot '운영\점검')
-    Assert-Wt '문서: 맨 위 폴더부터 경로 차례' ($chain.Count -eq 3 -and $chain[0] -eq $docRoot -and $chain[2] -like '*\운영\점검') ($chain -join ' > ')
-    Assert-Wt '문서: 맨 위 폴더 밖은 빈 차례' ((Get-WtDocChain @($docRoot) 'Z:\other').Count -eq 0)
-    Assert-Wt '문서: 경로 표시' ((Format-WtDocPathLabel @($docRoot) (Join-Path $docRoot '운영\점검')) -eq '문서 루트 › 운영 › 점검' -and (Format-WtDocPathLabel @($docRoot) 'Z:\a') -eq 'Z:\a')
-    Assert-Wt '문서: 이름 거르기' (@(Find-WtDocEntry $de '계정 목록').Count -eq 1 -and @(Find-WtDocEntry $de '').Count -eq 4)
-    $xl = Join-Path $docRoot '계정 목록.xlsx'
-    Assert-Wt '문서: 즐겨찾기 넣기 · 빼기' ((Switch-WtDocPin $xl) -and (Test-WtDocPinned $xl) -and -not (Switch-WtDocPin $xl) -and -not (Test-WtDocPinned $xl))
-    [void](Switch-WtDocPin 'Z:\없는\파일.xlsx')
-    Assert-Wt '문서: 없어진 즐겨찾기도 보여 준다' (@(Get-WtDocPinEntries | Where-Object Missing).Count -eq 1)
-    Set-WtSetting 'docs.pins' @()
-
-    # ---- 일정 ----
-    $s = Get-WtScheduleItems
-    $byId = @{}; foreach ($i in $s) { $byId[$i.id] = $i }
-    $d = { param($t) [datetime]::ParseExact($t, 'yyyy-MM-dd', $null) }
-    Assert-Wt '일정: 매주(목) 반복' ((Test-WtScheduleOn $byId.s1 (& $d '2026-10-22')) -and -not (Test-WtScheduleOn $byId.s1 (& $d '2026-10-21')))
-    Assert-Wt '일정: 평일 반복' (-not (Test-WtScheduleOn $byId.s2 (& $d '2026-10-24')) -and (Test-WtScheduleOn $byId.s2 (& $d '2026-10-26')))
-    Assert-Wt '일정: 반복 없음' ((Test-WtScheduleOn $byId.s3 (& $d '2026-10-23')) -and -not (Test-WtScheduleOn $byId.s3 (& $d '2026-10-24')))
-    Assert-Wt '일정: 매일 반복은 시작일부터' (-not (Test-WtScheduleOn $byId.s4 (& $d '2026-10-19')) -and (Test-WtScheduleOn $byId.s4 (& $d '2026-10-22')))
-    $order = (@(Get-WtScheduleOn (& $d '2026-10-22') $s) | ForEach-Object id) -join ','
-    Assert-Wt '일정: 하루 일정은 시각 순서' ($order -eq 's4,s1,s2') $order
-    Assert-Wt '일정: 알람 표시' ((Format-WtAlarm 0) -eq '정시' -and (Format-WtAlarm 10) -eq '10분 전' -and (Format-WtAlarm 60) -eq '1시간 전' -and (Format-WtAlarm 1440) -eq '하루 전' -and $null -eq (Format-WtAlarm ''))
-    Assert-Wt '일정: 기간 일정 칸이 있다' ($byId.s1.endDate -eq '2026-10-01' -and $byId.s1.PSObject.Properties.Name -contains 'tags')
-
-    # ---- 근태 ----
-    $sum = Get-WtAttendanceSummary (& $d '2026-10-01') (Get-WtAttendanceItems)
-    Assert-Wt '근태: 출근 일수(같은 날 두 번은 하루)' ($sum.Work -eq 1) $sum.Work
-    Assert-Wt '근태: 업무외 시간(자정 넘김 포함)' ($sum.OverMinutes -eq 270) $sum.OverMinutes
-    Assert-Wt '근태: 출장 건수' ($sum.Trip -eq 1) $sum.Trip
-    Assert-Wt '근태: 휴가 일수(반차 0.5, 달 경계 자름)' ($sum.Leave -eq 2.5) $sum.Leave
-    Assert-Wt '근태: 시간 표시' ((Format-WtHours 270) -eq '4.5' -and (Format-WtHours 120) -eq '2')
+    Assert-Wt '다시 가져오기는 덮어쓰고 .bak을 남긴다' ($r3.Count -eq 3 -and $legacyCalls.Count -eq 2 -and (Test-Path ((Get-WtStorePath 'test-legacy') + '.bak')))
 
     # ---- 테마 색 대비 ----
     $pairs = @(
@@ -348,8 +269,7 @@ flowchart LR
     Assert-Wt 'Mermaid: 모르는 종류는 NotSupported' ($threw -is [System.NotSupportedException])
 
     # ---- WPF로 그리기 (Windows · STA에서만) ----
-    if ($IsWindows -and [System.Threading.Thread]::CurrentThread.GetApartmentState() -eq 'STA') {
-        Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Xaml
+    if ($wpf) {
         $sample = $md + @'
 
 
@@ -375,56 +295,45 @@ pie
         Assert-Wt 'WPF: Mermaid 2개는 그림, 모르는 종류는 코드 블록' ($figs.Count -eq 2 -and $view.Tag.Remeasure)
         Assert-Wt 'WPF: 제목 · 각주 자리' ($view.Tag.Anchors.ContainsKey('제목굵게') -and $view.Tag.Anchors.ContainsKey('fn1'))
 
-        # 메모 화면: 새 메모 → 입력 → 저장 → 삭제 → 실행 취소
-        $styles = Get-WtStyleDictionary
-        $memoAddon = Get-WtAddon -Id 'memo'
-        $mv = @(& $memoAddon.NewView | Where-Object { $_ -is [System.Windows.UIElement] })[-1]
-        $mv.Resources.MergedDictionaries.Add((New-WtThemeDictionary)); $mv.Resources.MergedDictionaries.Add($styles)
-        [void](& $memoAddon.Refresh $mv)
-        $mod = Get-Module Memo
-        $before = (Get-WtMemoItems).Count
-        & $mod { Add-WtMemo; $script:ui.TitleBox.Text = '새 제목'; $script:ui.BodyBox.Text = "본문 #새태그"; Save-WtMemoNow }
-        $saved = Get-WtMemoItems
-        $new = $saved | Where-Object title -eq '새 제목'
-        Assert-Wt 'WPF 메모: 새 메모를 쓰고 저장' ($saved.Count -eq $before + 1 -and $new.body -eq '본문 #새태그' -and @($new.tags)[0] -eq '새태그')
-        Assert-Wt 'WPF 메모: 저장 상태 표시 · 목록 맨 위' ((& $mod { $script:ui.Status.Visibility }) -eq 'Visible' -and (& $mod { [string]$script:ui.List.Items[0].Id }) -eq $new.id)
-        & $mod { Remove-WtMemoCurrent }
-        Assert-Wt 'WPF 메모: 삭제' ((Get-WtMemoItems).Count -eq $before -and (& $mod { $script:ui.UndoBar.Visibility }) -eq 'Visible')
-        & $mod { Restore-WtMemoDeleted }
-        Assert-Wt 'WPF 메모: 삭제 실행 취소' ((Get-WtMemoItems).Count -eq $before + 1 -and (& $mod { $script:currentId }) -eq $new.id)
-        & $mod { $script:ui.BodyBox.Text = '고치는 중' }
-        & $memoAddon.OnExit
-        # 문서 화면: 맨 위 폴더 → 하위 폴더로 들어가기 → 즐겨찾기
-        Set-WtSetting 'docs.roots' @($docRoot)
-        Set-WtSetting 'docs.last' ''
-        $docAddon = Get-WtAddon -Id 'docs'
-        $dv = @(& $docAddon.NewView | Where-Object { $_ -is [System.Windows.UIElement] })[-1]
-        $dv.Resources.MergedDictionaries.Add((New-WtThemeDictionary)); $dv.Resources.MergedDictionaries.Add($styles)
-        [void](& $docAddon.Refresh $dv)
-        $dmod = Get-Module Docs
-        Wait-WtDocTest
-        Assert-Wt 'WPF 문서: 맨 위 폴더를 연다' ((& $dmod { $script:current }) -eq $docRoot -and (& $dmod { $script:ui.List.Items.Count }) -eq 4) "(cur=$(& $dmod { $script:current }) err=$(& $dmod { $script:ui.Error }))"
-        & $dmod { Open-WtDocEntry ($script:entries | Where-Object Name -eq '운영') }
-        Wait-WtDocTest
-        Assert-Wt 'WPF 문서: 폴더로 들어가면 트리도 따라간다' ((& $dmod { $script:current }) -like '*\운영' -and (& $dmod { $script:ui.Tree.SelectedItem.Tag.Path }) -like '*\운영' -and (& $dmod { $script:ui.PathText.Text }) -eq '문서 루트 › 운영')
-        & $dmod { $script:ui.List.SelectedIndex = 0; $script:ui.Pin.RaiseEvent([System.Windows.RoutedEventArgs]::new([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent)) }
-        Assert-Wt 'WPF 문서: 즐겨찾기 버튼' (@(Get-WtSetting 'docs.pins').Count -eq 1 -and @(Get-WtSetting 'docs.pins')[0] -like '*\운영\점검')
-        Set-WtSetting 'docs.pins' @(); Set-WtSetting 'docs.roots' @()
-
-        $after = Get-WtMemoItems
-        Assert-Wt 'WPF 메모: 끝내기 전에 저장' (($after | Where-Object id -eq $new.id).body -eq '고치는 중')
-        & $dmod { Stop-WtDocs }
+        # 도움말: 탭이 등록한 설명 · 카드를 모은다. 카드 하나가 실패해도 도움말은 연다
+        Register-WtAddon -Id 'test-help' -Title '도움' -Order 50 -NewView { } -Help '가짜 탭 설명' -HelpCard { New-WtText '가짜 카드' 'T.Body' }
+        Register-WtAddon -Id 'test-broken' -Title '고장' -Order 60 -NewView { } -HelpCard { throw '일부러 낸 오류' }
+        $texts = @(Get-WtTestTexts (New-WtHelpPage))
+        Assert-Wt 'WPF 도움말: 탭 설명 · 단축키 · 카드를 싣는다' ($texts -contains '가짜 탭 설명' -and $texts -contains '가짜 카드' -and $texts -contains '엑스 · 와이: 새로 고침')
+        Assert-Wt 'WPF 도움말: 실패한 탭 카드는 알리고 나머지는 연다' (@($texts | Where-Object { $_ -like '고장 도움말을 만들지 못했습니다*' }).Count -eq 1)
     } else {
         Write-Host 'SKIP WPF로 그리기 (Windows STA에서만)'
     }
+
+    # ---- 탭 모아 보기: 앱처럼 모든 탭을 함께 불러온다 ----
+    Import-WtTestCore
+    Set-WtAppRoot $test.App
+    Initialize-WtSettings
+    $addonFiles = @(Get-ChildItem (Join-Path $root 'addons') -Filter '*.psm1' -Recurse | Sort-Object FullName)
+    $addonModules = @(foreach ($f in $addonFiles) { Import-Module $f.FullName -Force -DisableNameChecking -PassThru })
+    $ids = @(Get-WtAddon -All | ForEach-Object Id)
+    Assert-Wt '탭 모아 보기: 탭 폴더마다 ID 하나씩 등록한다 (겹치는 ID 없음)' ($ids.Count -eq $addonFiles.Count) "(모듈 $($addonFiles.Count)개 · 등록 $($ids -join ', '))"
+    $owners = @{}
+    $dupes = foreach ($m in @(Get-Module | Where-Object { $_.Path -and $_.Path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) })) {
+        foreach ($fn in $m.ExportedFunctions.Keys) {
+            if ($owners.ContainsKey($fn)) { "$fn ($($owners[$fn]) · $($m.Name))" } else { $owners[$fn] = $m.Name }
+        }
+    }
+    Assert-Wt '탭 모아 보기: 모듈끼리 내보낸 함수 이름이 겹치지 않는다' (-not $dupes) ($dupes -join ', ')
+    if ($wpf) {
+        $texts = @(Get-WtTestTexts (New-WtHelpPage))
+        $missing = @(foreach ($a in @(Get-WtAddon)) { foreach ($line in @($a.Help)) { if ($texts -notcontains $line) { "$($a.Id): $line" } } })
+        $broken = @($texts | Where-Object { $_ -like '* 도움말을 만들지 못했습니다*' })
+        Assert-Wt '탭 모아 보기: 도움말이 모든 탭의 설명을 싣고, 탭 카드도 오류 없이 만든다' (-not $missing.Count -and -not $broken.Count) (($missing + $broken) -join '; ')
+    }
+    $addonModules | Remove-Module -Force
 } finally {
-    $safe = [IO.Path]::GetFullPath($tmp)
-    if ((Split-Path $safe -Leaf) -notmatch '^wt-test-[a-f0-9]{8}$' -or -not $safe.StartsWith([IO.Path]::GetFullPath([IO.Path]::GetTempPath()), [StringComparison]::OrdinalIgnoreCase)) { throw '임시 경로 검증 실패' }
-    Remove-Item -LiteralPath $safe -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-WtTestData $test
 }
 
 if ($script:failed) { Write-Host "실패 $script:failed 건" -ForegroundColor Red; exit 1 }
-& (Join-Path $PSScriptRoot 'Test-ActiveTasks.ps1')
+# 탭 폴더의 검사를 모두 찾아서 돌린다. 하나라도 틀리면 그 자리에서 멈춘다
+foreach ($t in (Get-ChildItem (Join-Path $root 'addons') -Filter 'Test-*.ps1' -Recurse | Sort-Object FullName)) { & $t.FullName }
 & (Join-Path $PSScriptRoot 'Test-Reliability.ps1')
 & (Join-Path $PSScriptRoot 'Test-Launcher.ps1')
 Write-Host '모두 통과' -ForegroundColor Green

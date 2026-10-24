@@ -23,7 +23,11 @@
 
 ## 개인 PC에서 실행하기
 
-저장소 맨 위 `worktool.zip`을 받아 우클릭 → 속성 → 「차단 해제」 체크 → 압축을 풀고 `Start-WorkTool.cmd`를 더블클릭합니다. 실행 보조 창은 바로 닫히고 GUI만 남습니다. `.cmd`의 초기 창이 잠깐 보일 수는 있습니다.
+**저장소를 받아 둔 PC**(`git clone`)는 zip이 필요 없습니다. `apps/WorkTool/wpf/start-dev.cmd`를 더블클릭하면 이 폴더의 원본을 바로 띄우므로, 고친 내용이 바로 보입니다. 바탕 화면에 바로 가기를 만들어 두면 편합니다.
+- 데이터는 zip으로 띄울 때와 같은 곳(문서\WorkTool)을 써서 메모 · 설정이 그대로 보입니다. 둘을 함께 띄우면 나중 것은 중복 실행으로 막힙니다.
+- 작업 중인 브랜치를 미리 보려면 그 브랜치로 바꾼 뒤 띄웁니다.
+
+**저장소가 없는 PC**는 저장소 맨 위 `worktool.zip`을 받아 우클릭 → 속성 → 「차단 해제」 체크 → 압축을 풀고 `Start-WorkTool.cmd`를 더블클릭합니다. 실행 보조 창은 바로 닫히고 GUI만 남습니다. `.cmd`의 초기 창이 잠깐 보일 수는 있습니다.
 - 압축 안의 `WorkTool-WPF.ps1`, `Start-WorkTool.cmd`, `Start-WorkTool-Launcher.ps1` 세 파일을 같은 폴더에 둡니다. 시작 검사에 실패하면 실행 창에 오류를 표시합니다. 실행 정책은 바꾸지 않습니다.
 - 작은 W 배지 대신 창의 전체 아이콘을 적용합니다. Windows 작업 표시줄의 기존 고정 아이콘·PowerShell 묶음은 시스템 설정에 따라 PowerShell 모양으로 남을 수 있습니다.
 zip은 `build/Build-Bundle.ps1`이 묶음 파일과 같이 만듭니다.
@@ -99,6 +103,7 @@ WorkTool을 띄운 터미널(Windows Terminal · PowerShell 창 · VS Code 등)�
 ```
 wpf/
   Start-WorkTool.ps1      진입점. core → addons 순서로 불러오고 창을 띄운다
+  start-dev.cmd           저장소를 받아 둔 PC에서 원본을 콘솔 없이 바로 띄운다 (build/start-launcher.ps1 사용)
   core/
     Storage.psm1          저장 (데이터 폴더, JSON 저장소, schema 변환, 예전 CSV 읽기)
     Settings.psm1         설정 (기본값 + 바꾼 값만 저장, 바뀌면 처리기 호출)
@@ -118,10 +123,10 @@ wpf/
     docs/Docs.psm1        문서: 폴더 트리 + 파일 목록, 원래 프로그램으로 열기 · 즐겨찾기
     active-tasks/ActiveTasks.psm1  실행 창·탭 표, 선택 닫기, 수동/자동 새로 고침
   build/Build-Bundle.ps1  파일 하나로 묶기 → ../dist/WorkTool-WPF.ps1
-  build/start-worktool.cmd · start-launcher.ps1  개인 PC ZIP의 콘솔 없는 실행 보조 파일
+  build/start-worktool.cmd · start-launcher.ps1  개인 PC ZIP의 콘솔 없는 실행 보조 파일 (start-launcher.ps1은 start-dev.cmd도 씀)
   tests/Test-Core.ps1     창 없이 확인할 수 있는 부분 검사
   tests/Test-Reliability.ps1  저장 실패·중복 실행·조회 취소·목록 가상화 검사 (임시 데이터만 사용)
-  tests/Test-Launcher.ps1 실행 보조 종료·콘솔 없는 GUI·전체 아이콘·시작 오류 검사 (전용 테스트 창)
+  tests/Test-Launcher.ps1 실행 보조 종료·콘솔 없는 GUI·전체 아이콘·시작 오류·start-dev.cmd 검사 (전용 테스트 창)
   tests/Test-ActiveTasks.ps1  활성 작업 설정·표·모달·전용 창 UIA 검사 (코어 검사에서도 호출)
 ```
 

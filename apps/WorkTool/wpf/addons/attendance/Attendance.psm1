@@ -188,7 +188,8 @@ Register-WtAddon -Id 'attendance' -Title '근태' -Icon 0xE823 -Order 30 `
     -NewView { New-WtAttendanceView } `
     -Refresh { param($view) Update-WtAttendanceView } `
     -HomeCard { New-WtAttendanceHomeCard } `
-    -ImportLegacy { param($folder) Import-WtAttendanceLegacy $folder }
+    -ImportLegacy { param($folder) Import-WtAttendanceLegacy $folder } `
+    -Help '근태는 보기만 합니다. 기록 · 지금 출근은 2단계에서 옮깁니다.'
 
 Export-ModuleMember -Function Get-WtAttendanceItems, Test-WtAttInMonth, Get-WtAttMinutes, Get-WtAttendanceSummary,
     Format-WtHours, Import-WtAttendanceLegacy

@@ -3,19 +3,18 @@
     활성 작업의 설정·표·닫기를 가짜 데이터와 전용 테스트 창으로 검사한다.
 .DESCRIPTION
     사용자 창/브라우저/데이터는 읽거나 닫지 않는다. UI Automation 검사는 이 스크립트가 만든 창 핸들만 사용한다.
+    tests\Test-Core.ps1이 찾아서 돌린다.
 .EXAMPLE
-    pwsh -NoProfile -STA -File apps/WorkTool/wpf/tests/Test-ActiveTasks.ps1
+    pwsh -NoProfile -STA -File apps/WorkTool/wpf/addons/active-tasks/Test-ActiveTasks.ps1
 #>
 #Requires -Version 7.0
 [CmdletBinding()]
 param([string]$PreviewPath, [string[]]$BrowserPath = @())
 
 $ErrorActionPreference = 'Stop'
-$root = Split-Path $PSScriptRoot -Parent
-foreach ($name in 'Storage', 'Settings', 'Theme', 'Ui', 'Highlight', 'Markdown', 'Mermaid', 'Addons', 'Pages', 'Shell') {
-    Import-Module (Join-Path $root "core/$name.psm1") -Force -DisableNameChecking
-}
-Import-Module (Join-Path $root 'addons/active-tasks/ActiveTasks.psm1') -Force -DisableNameChecking
+. (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'tests/TestKit.ps1')
+Import-WtTestCore
+Import-Module (Join-Path $PSScriptRoot 'ActiveTasks.psm1') -Force -DisableNameChecking
 $module = Get-Module ActiveTasks
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('wt-active-' + [guid]::NewGuid().ToString('N'))
 [void](New-Item -ItemType Directory -Path $tmp)

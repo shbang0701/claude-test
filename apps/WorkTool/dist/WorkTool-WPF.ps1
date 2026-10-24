@@ -4184,7 +4184,8 @@ Export-ModuleMember -Function ConvertFrom-WtMermaid, Get-WtMermaidLayout, New-Wt
 # ---- core\Addons.psm1 ----
 New-Module -Name 'WorkTool.Addons' -ScriptBlock {
 # 애드온(탭) 목록. 탭 하나 = addons\<이름>\ 폴더 하나이고, 그 모듈이 불러와질 때 Register-WtAddon으로 자기를 등록한다.
-# 셸은 이 목록만 보고 메뉴를 만든다. 탭을 더하거나 빼도 셸 코드는 고치지 않는다.
+# 셸 · 홈 · 도움말은 이 목록만 보고 메뉴 · 카드 · 설명을 만든다. 탭을 더하거나 빼도 코어 코드는 고치지 않는다.
+# 탭의 검사는 같은 폴더의 Test-<이름>.ps1에 두면 tests\Test-Core.ps1이 찾아서 돌린다.
 
 $ErrorActionPreference = 'Stop'
 
@@ -4204,6 +4205,10 @@ $script:addons = [System.Collections.Generic.List[hashtable]]::new()
   OnExit       { } → 끝내기 직전(SavePending 확인 뒤) 타이머·조회 등 실행 자원을 정리한다 (선택)
   SavePending  { } → 이 화면을 떠날 때 · 끝낼 때 저장. 실패하면 $false를 돌려준다.
                      그러면 셸이 다시 시도 · 저장하지 않고 이동(끝내기) · 취소를 묻는다 (선택)
+  Help         도움말 「이 버전」에 넣을 설명 문단들 (선택)
+  Shortcuts    도움말 「단축키」에 넣을 @('키', '설명') 목록. 키 처리는 탭 화면이 직접 한다 (선택)
+               하나만 줄 때는 앞에 쉼표를 붙인다: -Shortcuts (, @('F5', '새로 고침'))
+  HelpCard     { } → 도움말에 따로 놓을 카드 요소를 돌려준다 (선택)
 #>
 function Register-WtAddon {
     param(
@@ -4218,8 +4223,16 @@ function Register-WtAddon {
         [scriptblock]$ImportLegacy,
         [scriptblock]$OnExit,
         [scriptblock]$SavePending,
-        [string]$Description = ''
+        [string]$Description = '',
+        [string[]]$Help = @(),
+        [object[]]$Shortcuts = @(),
+        [scriptblock]$HelpCard
     )
+    # 쉼표 없이 한 쌍만 주면 배열이 펴져서 들어온다 → 한 쌍으로 되돌린다
+    if ($Shortcuts.Count -and $Shortcuts[0] -is [string]) { $Shortcuts = @(, $Shortcuts) }
+    foreach ($s in $Shortcuts) {
+        if (@($s).Count -ne 2) { throw "애드온 '$Id'의 단축키는 @('키', '설명') 모양이어야 합니다." }
+    }
     for ($i = $script:addons.Count - 1; $i -ge 0; $i--) {
         if ($script:addons[$i].Id -eq $Id) { $script:addons.RemoveAt($i) }
     }
@@ -4228,6 +4241,7 @@ function Register-WtAddon {
             NewView = $NewView; Refresh = $Refresh; HomeCard = $HomeCard; ImportLegacy = $ImportLegacy; OnExit = $OnExit
             Description = $Description
             SavePending = $SavePending
+            Help = @($Help); Shortcuts = @($Shortcuts); HelpCard = $HelpCard
         })
 }
 
@@ -4256,44 +4270,6 @@ $script:addonChecks = @()
 $script:opacityLabel = $null
 $script:opacityTimer = $null
 $script:pendingOpacity = 100
-$script:helpMd = $null
-$script:helpRaw = $null
-
-# 도움말의 마크다운 예시. 원문 · 보기를 바꿔 가며 문법을 본다
-$script:markdownSample = @'
-# 제목은 `#`, 소제목은 `##`
-
-**굵게**, *기울임*, ~~취소선~~, ==형광펜==, `코드`, [링크](https://github.com)
-[[메모 제목]]을 누르면 그 메모로, #태그 를 누르면 그 태그로 찾습니다.
-줄을 한 번만 바꿔도 줄이 바뀝니다 (Obsidian과 같음).
-
-- [x] 끝낸 일
-- [ ] 할 일
-- 목록
-    1. 안쪽 번호 목록
-
-> [!tip] 콜아웃
-> `> [!종류] 제목`으로 씁니다. 종류: note · info · tip · success · question · warning · danger · bug · example · quote
-
-> [!warning]- 접는 콜아웃 (눌러서 펼치기)
-> `-`는 접힌 채로, `+`는 펼친 채로 시작합니다.
-
-| 서버 | IP | 상태 |
-|:--|:--|:-:|
-| SRV-01 | 10.0.0.10 | 정상 |
-| SRV-02 | 10.0.0.11 | 점검 |
-
-```powershell
-Get-Service | Where-Object Status -eq 'Running'   # 코드 블록은 [복사]로 한 번에 복사
-```
-
-```mermaid
-flowchart LR
-    A[요청] --> B{승인?}
-    B -->|예| C[작업]
-    B -->|아니오| D([반려])
-```
-'@
 
 # ---- 설정 -------------------------------------------------------------------------------------
 
@@ -4446,7 +4422,8 @@ function New-WtDataCard {
     $again = New-WtButton '다시 가져오기' -Kind Primary
     $again.IsEnabled = [bool]$legacy
     $again.Add_Click({
-            if (-not (Confirm-WtYesNo "예전 WorkTool 데이터로 새 버전의 메모 · 일정 · 근태를 다시 채웁니다.`n새 버전에서 쓰거나 고친 메모는 사라집니다 (지금 파일은 .bak으로 하나 남음). 계속할까요?")) { return }
+            $tabs = @(Get-WtAddon -All | Where-Object { $_.ImportLegacy } | ForEach-Object { $_.Title }) -join ' · '
+            if (-not (Confirm-WtYesNo "예전 WorkTool 데이터로 새 버전의 데이터($tabs)를 다시 채웁니다.`n새 버전에서 쓰거나 고친 내용은 사라집니다 (지금 파일은 .bak으로 하나 남음). 계속할까요?")) { return }
             try {
                 $r = Import-WtLegacyData -Force
                 Reset-WtViews
@@ -4479,6 +4456,21 @@ function New-WtKeyRow([string]$Keys, [string]$What) {
     New-WtListRow @($k, (New-WtText $What 'T.Body'))
 }
 
+# 탭이 등록한 단축키를 메뉴 순서대로 모은다. 키와 설명이 같으면 한 줄로 묶는다 (예: 문서 · 활성 작업: 새로 고침)
+function Get-WtShortcutRows {
+    $rows = [System.Collections.Generic.List[object]]::new()
+    foreach ($a in @(Get-WtAddon)) {
+        foreach ($s in @($a.Shortcuts)) {
+            $same = $rows | Where-Object { $_.Key -ceq $s[0] -and $_.What -ceq $s[1] } | Select-Object -First 1
+            if ($same) { $same.Titles.Add($a.Title); continue }
+            $titles = [System.Collections.Generic.List[string]]::new()
+            $titles.Add($a.Title)
+            $rows.Add([pscustomobject]@{ Key = [string]$s[0]; What = [string]$s[1]; Titles = $titles })
+        }
+    }
+    foreach ($r in $rows) { [pscustomobject]@{ Key = $r.Key; Text = '{0}: {1}' -f ($r.Titles -join ' · '), $r.What } }
+}
+
 function New-WtHelpPage {
     $page = New-WtPage
     [void](Add-WtChild $page.Panel (New-WtPageHeader '도움말'))
@@ -4487,9 +4479,9 @@ function New-WtHelpPage {
     $col = New-WtStack Vertical 6
     [void](Add-WtChild $col (New-WtCardHeader '이 버전 (1단계 미리보기)'))
     [void](Add-WtChild $col (New-WtText '창 틀 · 메뉴 · 테마 · 설정, 그리고 예전 WorkTool 데이터를 읽어서 보여 주는 기능까지 들어 있습니다.' 'T.Body'))
-    [void](Add-WtChild $col (New-WtText '메모는 쓰고 고칠 수 있습니다. 일정 · 근태 편집과 알람은 2단계에서 옮깁니다.' 'T.Body'))
-    [void](Add-WtChild $col (New-WtText '활성 작업은 열린 창·Chrome/Edge 탭을 모아 보고 선택한 항목을 닫습니다. 새로 고침 버튼을 우클릭하면 수동·자동을 고를 수 있고, 자동은 분 단위 간격을 설정합니다.' 'T.Body'))
-    [void](Add-WtChild $col (New-WtText '자동 갱신은 활성 작업 탭을 보는 동안만 동작합니다. 읽기 제한 항목은 원래 프로그램에서 확인하세요. 닫을 때 저장 확인도 원래 프로그램에서 처리합니다.' 'T.Body'))
+    foreach ($a in @(Get-WtAddon)) {
+        foreach ($line in @($a.Help)) { [void](Add-WtChild $col (New-WtText $line 'T.Body')) }
+    }
     $about.Child = $col
     [void](Add-WtChild $page.Panel $about)
 
@@ -4501,20 +4493,22 @@ function New-WtHelpPage {
             @('Ctrl + B', '메뉴 접기 / 펼치기'),
             @('F11', '전체 화면 (Esc로 나가기)'),
             @('Ctrl + ,', '설정'),
-            @('F1', '도움말'),
-            @('Ctrl + N', '메모: 새 메모'),
-            @('Ctrl + S', '메모: 바로 저장 (보통은 자동 저장)'),
-            @('Ctrl + E', '메모: 편집 / 미리보기'),
-            @('Enter', '문서: 고른 파일 열기 · 폴더 들어가기'),
-            @('Alt + ↑', '문서: 위 폴더'),
-            @('F5', '문서 · 활성 작업: 새로 고침'),
-            @('Ctrl + F', '문서 · 활성 작업: 이름으로 거르기'),
-            @('Shift + F10', '활성 작업: 새로 고침 버튼의 수동/자동 메뉴'))) {
+            @('F1', '도움말'))) {
         [void](Add-WtChild $col (New-WtKeyRow $r[0] $r[1]))
     }
+    foreach ($r in @(Get-WtShortcutRows)) { [void](Add-WtChild $col (New-WtKeyRow $r.Key $r.Text)) }
     $keys.Child = $col
     [void](Add-WtChild $page.Panel $keys)
-    [void](Add-WtChild $page.Panel (New-WtMarkdownHelpCard))
+
+    # 탭이 따로 둔 도움말 카드 (메모의 마크다운 예시 등). 하나가 실패해도 도움말은 연다
+    foreach ($a in @(Get-WtAddon)) {
+        if (-not $a.HelpCard) { continue }
+        try {
+            foreach ($el in @(& $a.HelpCard)) { if ($el -is [System.Windows.UIElement]) { [void](Add-WtChild $page.Panel $el) } }
+        } catch {
+            [void](Add-WtChild $page.Panel (New-WtText "$($a.Title) 도움말을 만들지 못했습니다: $($_.Exception.Message)" 'T.Sub'))
+        }
+    }
 
     $win = New-WtCard
     $col = New-WtStack Vertical 6
@@ -4530,38 +4524,6 @@ function New-WtHelpPage {
     [void](Add-WtChild $page.Panel $win)
 
     $page.Root
-}
-
-function New-WtMarkdownHelpCard {
-    $card = New-WtCard
-    $col = New-WtStack Vertical 8
-    [void](Add-WtChild $col (New-WtCardHeader '마크다운'))
-    [void](Add-WtChild $col (New-WtText '메모 본문은 마크다운으로 보입니다. 원문을 누르면 아래 보기를 만든 글이 나옵니다.' 'T.Sub'))
-    $mode = New-WtSegmented @(@('preview', '보기'), @('raw', '원문')) 'preview' 'WtHelpMd' {
-        param($value)
-        $script:helpMd.Visibility = if ($value -eq 'raw') { 'Collapsed' } else { 'Visible' }
-        $script:helpRaw.Visibility = if ($value -eq 'raw') { 'Visible' } else { 'Collapsed' }
-    }
-    [void](Add-WtChild $col $mode)
-    # 도움말에서는 [[링크]] · #태그가 갈 곳이 없으므로 무엇을 하는지만 알려 준다
-    $script:helpMd = New-WtMarkdownView -OnLink {
-        param($link)
-        if ($link.Kind -eq 'wiki') { Show-WtMessage '메모에서 누르면 제목이 같은 메모를 엽니다.'; return $true }
-        if ($link.Kind -eq 'tag') { Show-WtMessage '메모에서 누르면 이 태그로 찾습니다.'; return $true }
-        $false
-    }
-    $script:helpMd.Margin = [System.Windows.Thickness]::new(0, 8, 0, 0)
-    Set-WtMarkdownText $script:helpMd $script:markdownSample
-    $script:helpRaw = [System.Windows.Controls.TextBox]::new()
-    Set-WtStyle $script:helpRaw 'Reader'
-    Set-WtResource $script:helpRaw 'FontFamily' 'Font.Mono'
-    $script:helpRaw.Text = $script:markdownSample
-    $script:helpRaw.Visibility = 'Collapsed'
-    $script:helpRaw.Margin = [System.Windows.Thickness]::new(0, 8, 0, 0)
-    [void](Add-WtChild $col $script:helpMd)
-    [void](Add-WtChild $col $script:helpRaw)
-    $card.Child = $col
-    $card
 }
 
 Export-ModuleMember -Function New-WtSettingsPage, New-WtHelpPage
@@ -5008,7 +4970,7 @@ function New-WtTrayIcon([System.Drawing.Icon]$Icon) {
 # 예전 WorkTool(WinForms) data 폴더에서 탭마다 데이터를 가져온다.
 # -Force가 없으면 아직 저장소가 없는 탭만 가져온다 (처음 실행할 때).
 function Import-WtLegacyData([switch]$Force) {
-    if ($Force -and -not (Save-WtPendingChanges)) { throw '저장하지 못한 메모가 있어 가져오기를 취소했습니다.' }
+    if ($Force -and -not (Save-WtPendingChanges)) { throw '저장하지 못한 내용이 있어 가져오기를 취소했습니다.' }
     $folder = Find-WtLegacyFolder
     $result = @{ Folder = $folder; Count = 0; Tabs = @(); At = $null }
     if (-not $folder) { return $result }
@@ -5765,7 +5727,11 @@ function New-WtActiveTasksView {
 }
 
 Register-WtAddon -Id 'active-tasks' -Title '활성 작업' -Icon 0xE7C4 -Order 60 `
-    -NewView { New-WtActiveTasksView } -Refresh { param($view) Start-WtTaskJob 'scan' } -OnExit { Stop-WtTasks }
+    -NewView { New-WtActiveTasksView } -Refresh { param($view) Start-WtTaskJob 'scan' } -OnExit { Stop-WtTasks } `
+    -Help @(
+        '활성 작업은 열린 창과 Chrome·Edge·웨일 탭을 모아 보고 선택한 항목을 닫습니다. 새로 고침 버튼을 우클릭하면 수동·자동을 고를 수 있고, 자동은 분 단위 간격을 설정합니다.'
+        '자동 갱신은 활성 작업 탭을 보는 동안만 동작합니다. 읽기 제한 항목은 원래 프로그램에서 확인하세요. 닫을 때 저장 확인도 원래 프로그램에서 처리합니다.') `
+    -Shortcuts @(@('F5', '새로 고침'), @('Ctrl + F', '이름으로 거르기'), @('Shift + F10', '새로 고침 버튼의 수동/자동 메뉴'))
 
 Export-ModuleMember -Function ConvertTo-WtTaskMinutes, Get-WtTaskRefresh, Set-WtTaskRefresh, Test-WtTaskAutoDue,
     Find-WtTaskItems, Get-WtTaskCheckState, Get-WtTaskWorker, Get-WtTaskHostIds
@@ -5964,7 +5930,8 @@ Register-WtAddon -Id 'attendance' -Title '근태' -Icon 0xE823 -Order 30 `
     -NewView { New-WtAttendanceView } `
     -Refresh { param($view) Update-WtAttendanceView } `
     -HomeCard { New-WtAttendanceHomeCard } `
-    -ImportLegacy { param($folder) Import-WtAttendanceLegacy $folder }
+    -ImportLegacy { param($folder) Import-WtAttendanceLegacy $folder } `
+    -Help '근태는 보기만 합니다. 기록 · 지금 출근은 2단계에서 옮깁니다.'
 
 Export-ModuleMember -Function Get-WtAttendanceItems, Test-WtAttInMonth, Get-WtAttMinutes, Get-WtAttendanceSummary,
     Format-WtHours, Import-WtAttendanceLegacy
@@ -6711,7 +6678,9 @@ Register-WtAddon -Id 'docs' -Title '문서' -Icon 0xE8B7 -Order 50 `
     -NewView { New-WtDocsView } `
     -Refresh { param($view) Update-WtDocsView } `
     -HomeCard { New-WtDocsHomeCard } `
-    -OnExit { Stop-WtDocs }
+    -OnExit { Stop-WtDocs } `
+    -Help '문서는 고른 폴더의 파일을 보고 원래 프로그램으로 엽니다. 파일 내용은 읽거나 옮기지 않습니다.' `
+    -Shortcuts @(@('Enter', '고른 파일 열기 · 폴더 들어가기'), @('Alt + ↑', '위 폴더'), @('F5', '새로 고침'), @('Ctrl + F', '이름으로 거르기'))
 
 Export-ModuleMember -Function Get-WtDocKind, Format-WtDocSize, Get-WtDocEntries, Get-WtDocSubfolders, Get-WtDocPinEntries,
     Test-WtDocPinned, Switch-WtDocPin, Get-WtDocRoots, Get-WtDocChain, Find-WtDocEntry, Format-WtDocPathLabel
@@ -7310,13 +7279,89 @@ function New-WtMemoHomeCard {
     $card
 }
 
+# ---- 도움말 -----------------------------------------------------------------------------------
+
+$script:helpMd = $null
+$script:helpRaw = $null
+
+# 도움말의 마크다운 예시. 원문 · 보기를 바꿔 가며 문법을 본다
+$script:markdownSample = @'
+# 제목은 `#`, 소제목은 `##`
+
+**굵게**, *기울임*, ~~취소선~~, ==형광펜==, `코드`, [링크](https://github.com)
+[[메모 제목]]을 누르면 그 메모로, #태그 를 누르면 그 태그로 찾습니다.
+줄을 한 번만 바꿔도 줄이 바뀝니다 (Obsidian과 같음).
+
+- [x] 끝낸 일
+- [ ] 할 일
+- 목록
+    1. 안쪽 번호 목록
+
+> [!tip] 콜아웃
+> `> [!종류] 제목`으로 씁니다. 종류: note · info · tip · success · question · warning · danger · bug · example · quote
+
+> [!warning]- 접는 콜아웃 (눌러서 펼치기)
+> `-`는 접힌 채로, `+`는 펼친 채로 시작합니다.
+
+| 서버 | IP | 상태 |
+|:--|:--|:-:|
+| SRV-01 | 10.0.0.10 | 정상 |
+| SRV-02 | 10.0.0.11 | 점검 |
+
+```powershell
+Get-Service | Where-Object Status -eq 'Running'   # 코드 블록은 [복사]로 한 번에 복사
+```
+
+```mermaid
+flowchart LR
+    A[요청] --> B{승인?}
+    B -->|예| C[작업]
+    B -->|아니오| D([반려])
+```
+'@
+
+function New-WtMemoMarkdownHelpCard {
+    $card = New-WtCard
+    $col = New-WtStack Vertical 8
+    [void](Add-WtChild $col (New-WtCardHeader '마크다운'))
+    [void](Add-WtChild $col (New-WtText '메모 본문은 마크다운으로 보입니다. 원문을 누르면 아래 보기를 만든 글이 나옵니다.' 'T.Sub'))
+    $mode = New-WtSegmented @(@('preview', '보기'), @('raw', '원문')) 'preview' 'WtHelpMd' {
+        param($value)
+        $script:helpMd.Visibility = if ($value -eq 'raw') { 'Collapsed' } else { 'Visible' }
+        $script:helpRaw.Visibility = if ($value -eq 'raw') { 'Visible' } else { 'Collapsed' }
+    }
+    [void](Add-WtChild $col $mode)
+    # 도움말에서는 [[링크]] · #태그가 갈 곳이 없으므로 무엇을 하는지만 알려 준다
+    $script:helpMd = New-WtMarkdownView -OnLink {
+        param($link)
+        if ($link.Kind -eq 'wiki') { Show-WtMessage '메모에서 누르면 제목이 같은 메모를 엽니다.'; return $true }
+        if ($link.Kind -eq 'tag') { Show-WtMessage '메모에서 누르면 이 태그로 찾습니다.'; return $true }
+        $false
+    }
+    $script:helpMd.Margin = [System.Windows.Thickness]::new(0, 8, 0, 0)
+    Set-WtMarkdownText $script:helpMd $script:markdownSample
+    $script:helpRaw = [System.Windows.Controls.TextBox]::new()
+    Set-WtStyle $script:helpRaw 'Reader'
+    Set-WtResource $script:helpRaw 'FontFamily' 'Font.Mono'
+    $script:helpRaw.Text = $script:markdownSample
+    $script:helpRaw.Visibility = 'Collapsed'
+    $script:helpRaw.Margin = [System.Windows.Thickness]::new(0, 8, 0, 0)
+    [void](Add-WtChild $col $script:helpMd)
+    [void](Add-WtChild $col $script:helpRaw)
+    $card.Child = $col
+    $card
+}
+
 Register-WtAddon -Id 'memo' -Title '메모' -Icon 0xE70B -Order 40 `
     -NewView { New-WtMemoView } `
     -Refresh { param($view) Update-WtMemoView } `
     -HomeCard { New-WtMemoHomeCard } `
     -ImportLegacy { param($folder) Import-WtMemoLegacy $folder } `
     -SavePending { if ($script:ui.Count) { Save-WtMemoNow } else { $true } } `
-    -OnExit { if ($script:ui.Count) { [void](Save-WtMemoNow) }; if ($script:saveTimer) { $script:saveTimer.Stop() }; if ($script:undoTimer) { $script:undoTimer.Stop() } }
+    -OnExit { if ($script:ui.Count) { [void](Save-WtMemoNow) }; if ($script:saveTimer) { $script:saveTimer.Stop() }; if ($script:undoTimer) { $script:undoTimer.Stop() } } `
+    -Help '메모는 쓰고 고칠 수 있습니다.' `
+    -Shortcuts @(@('Ctrl + N', '새 메모'), @('Ctrl + S', '바로 저장 (보통은 자동 저장)'), @('Ctrl + E', '편집 / 미리보기')) `
+    -HelpCard { New-WtMemoMarkdownHelpCard }
 
 Export-ModuleMember -Function Get-WtMemoItems, Get-WtMemoSorted, Find-WtMemo, Format-WtMemoTime, Import-WtMemoLegacy,
     New-WtMemo, Get-WtMemoTags, Set-WtMemoContent, Save-WtMemoItems
@@ -7478,7 +7523,8 @@ Register-WtAddon -Id 'schedule' -Title '일정' -Icon 0xE787 -Order 20 `
     -NewView { New-WtScheduleView } `
     -Refresh { param($view) Update-WtScheduleView } `
     -HomeCard { New-WtScheduleHomeCards } `
-    -ImportLegacy { param($folder) Import-WtScheduleLegacy $folder }
+    -ImportLegacy { param($folder) Import-WtScheduleLegacy $folder } `
+    -Help '일정은 보기만 합니다. 편집과 알람은 2단계에서 옮깁니다.'
 
 Export-ModuleMember -Function Get-WtScheduleItems, Test-WtScheduleOn, Get-WtScheduleOn, Format-WtAlarm, Import-WtScheduleLegacy
 } | Import-Module -Force -DisableNameChecking

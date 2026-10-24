@@ -151,6 +151,7 @@ Register-WtAddon -Id 'schedule' -Title '일정' -Icon 0xE787 -Order 20 `
     -NewView { New-WtScheduleView } `
     -Refresh { param($view) Update-WtScheduleView } `
     -HomeCard { New-WtScheduleHomeCards } `
-    -ImportLegacy { param($folder) Import-WtScheduleLegacy $folder }
+    -ImportLegacy { param($folder) Import-WtScheduleLegacy $folder } `
+    -Help '일정은 보기만 합니다. 편집과 알람은 2단계에서 옮깁니다.'
 
 Export-ModuleMember -Function Get-WtScheduleItems, Test-WtScheduleOn, Get-WtScheduleOn, Format-WtAlarm, Import-WtScheduleLegacy

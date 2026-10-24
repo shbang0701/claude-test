@@ -7,44 +7,6 @@ $script:addonChecks = @()
 $script:opacityLabel = $null
 $script:opacityTimer = $null
 $script:pendingOpacity = 100
-$script:helpMd = $null
-$script:helpRaw = $null
-
-# 도움말의 마크다운 예시. 원문 · 보기를 바꿔 가며 문법을 본다
-$script:markdownSample = @'
-# 제목은 `#`, 소제목은 `##`
-
-**굵게**, *기울임*, ~~취소선~~, ==형광펜==, `코드`, [링크](https://github.com)
-[[메모 제목]]을 누르면 그 메모로, #태그 를 누르면 그 태그로 찾습니다.
-줄을 한 번만 바꿔도 줄이 바뀝니다 (Obsidian과 같음).
-
-- [x] 끝낸 일
-- [ ] 할 일
-- 목록
-    1. 안쪽 번호 목록
-
-> [!tip] 콜아웃
-> `> [!종류] 제목`으로 씁니다. 종류: note · info · tip · success · question · warning · danger · bug · example · quote
-
-> [!warning]- 접는 콜아웃 (눌러서 펼치기)
-> `-`는 접힌 채로, `+`는 펼친 채로 시작합니다.
-
-| 서버 | IP | 상태 |
-|:--|:--|:-:|
-| SRV-01 | 10.0.0.10 | 정상 |
-| SRV-02 | 10.0.0.11 | 점검 |
-
-```powershell
-Get-Service | Where-Object Status -eq 'Running'   # 코드 블록은 [복사]로 한 번에 복사
-```
-
-```mermaid
-flowchart LR
-    A[요청] --> B{승인?}
-    B -->|예| C[작업]
-    B -->|아니오| D([반려])
-```
-'@
 
 # ---- 설정 -------------------------------------------------------------------------------------
 
@@ -197,7 +159,8 @@ function New-WtDataCard {
     $again = New-WtButton '다시 가져오기' -Kind Primary
     $again.IsEnabled = [bool]$legacy
     $again.Add_Click({
-            if (-not (Confirm-WtYesNo "예전 WorkTool 데이터로 새 버전의 메모 · 일정 · 근태를 다시 채웁니다.`n새 버전에서 쓰거나 고친 메모는 사라집니다 (지금 파일은 .bak으로 하나 남음). 계속할까요?")) { return }
+            $tabs = @(Get-WtAddon -All | Where-Object { $_.ImportLegacy } | ForEach-Object { $_.Title }) -join ' · '
+            if (-not (Confirm-WtYesNo "예전 WorkTool 데이터로 새 버전의 데이터($tabs)를 다시 채웁니다.`n새 버전에서 쓰거나 고친 내용은 사라집니다 (지금 파일은 .bak으로 하나 남음). 계속할까요?")) { return }
             try {
                 $r = Import-WtLegacyData -Force
                 Reset-WtViews
@@ -230,6 +193,21 @@ function New-WtKeyRow([string]$Keys, [string]$What) {
     New-WtListRow @($k, (New-WtText $What 'T.Body'))
 }
 
+# 탭이 등록한 단축키를 메뉴 순서대로 모은다. 키와 설명이 같으면 한 줄로 묶는다 (예: 문서 · 활성 작업: 새로 고침)
+function Get-WtShortcutRows {
+    $rows = [System.Collections.Generic.List[object]]::new()
+    foreach ($a in @(Get-WtAddon)) {
+        foreach ($s in @($a.Shortcuts)) {
+            $same = $rows | Where-Object { $_.Key -ceq $s[0] -and $_.What -ceq $s[1] } | Select-Object -First 1
+            if ($same) { $same.Titles.Add($a.Title); continue }
+            $titles = [System.Collections.Generic.List[string]]::new()
+            $titles.Add($a.Title)
+            $rows.Add([pscustomobject]@{ Key = [string]$s[0]; What = [string]$s[1]; Titles = $titles })
+        }
+    }
+    foreach ($r in $rows) { [pscustomobject]@{ Key = $r.Key; Text = '{0}: {1}' -f ($r.Titles -join ' · '), $r.What } }
+}
+
 function New-WtHelpPage {
     $page = New-WtPage
     [void](Add-WtChild $page.Panel (New-WtPageHeader '도움말'))
@@ -238,9 +216,9 @@ function New-WtHelpPage {
     $col = New-WtStack Vertical 6
     [void](Add-WtChild $col (New-WtCardHeader '이 버전 (1단계 미리보기)'))
     [void](Add-WtChild $col (New-WtText '창 틀 · 메뉴 · 테마 · 설정, 그리고 예전 WorkTool 데이터를 읽어서 보여 주는 기능까지 들어 있습니다.' 'T.Body'))
-    [void](Add-WtChild $col (New-WtText '메모는 쓰고 고칠 수 있습니다. 일정 · 근태 편집과 알람은 2단계에서 옮깁니다.' 'T.Body'))
-    [void](Add-WtChild $col (New-WtText '활성 작업은 열린 창·Chrome/Edge 탭을 모아 보고 선택한 항목을 닫습니다. 새로 고침 버튼을 우클릭하면 수동·자동을 고를 수 있고, 자동은 분 단위 간격을 설정합니다.' 'T.Body'))
-    [void](Add-WtChild $col (New-WtText '자동 갱신은 활성 작업 탭을 보는 동안만 동작합니다. 읽기 제한 항목은 원래 프로그램에서 확인하세요. 닫을 때 저장 확인도 원래 프로그램에서 처리합니다.' 'T.Body'))
+    foreach ($a in @(Get-WtAddon)) {
+        foreach ($line in @($a.Help)) { [void](Add-WtChild $col (New-WtText $line 'T.Body')) }
+    }
     $about.Child = $col
     [void](Add-WtChild $page.Panel $about)
 
@@ -252,20 +230,22 @@ function New-WtHelpPage {
             @('Ctrl + B', '메뉴 접기 / 펼치기'),
             @('F11', '전체 화면 (Esc로 나가기)'),
             @('Ctrl + ,', '설정'),
-            @('F1', '도움말'),
-            @('Ctrl + N', '메모: 새 메모'),
-            @('Ctrl + S', '메모: 바로 저장 (보통은 자동 저장)'),
-            @('Ctrl + E', '메모: 편집 / 미리보기'),
-            @('Enter', '문서: 고른 파일 열기 · 폴더 들어가기'),
-            @('Alt + ↑', '문서: 위 폴더'),
-            @('F5', '문서 · 활성 작업: 새로 고침'),
-            @('Ctrl + F', '문서 · 활성 작업: 이름으로 거르기'),
-            @('Shift + F10', '활성 작업: 새로 고침 버튼의 수동/자동 메뉴'))) {
+            @('F1', '도움말'))) {
         [void](Add-WtChild $col (New-WtKeyRow $r[0] $r[1]))
     }
+    foreach ($r in @(Get-WtShortcutRows)) { [void](Add-WtChild $col (New-WtKeyRow $r.Key $r.Text)) }
     $keys.Child = $col
     [void](Add-WtChild $page.Panel $keys)
-    [void](Add-WtChild $page.Panel (New-WtMarkdownHelpCard))
+
+    # 탭이 따로 둔 도움말 카드 (메모의 마크다운 예시 등). 하나가 실패해도 도움말은 연다
+    foreach ($a in @(Get-WtAddon)) {
+        if (-not $a.HelpCard) { continue }
+        try {
+            foreach ($el in @(& $a.HelpCard)) { if ($el -is [System.Windows.UIElement]) { [void](Add-WtChild $page.Panel $el) } }
+        } catch {
+            [void](Add-WtChild $page.Panel (New-WtText "$($a.Title) 도움말을 만들지 못했습니다: $($_.Exception.Message)" 'T.Sub'))
+        }
+    }
 
     $win = New-WtCard
     $col = New-WtStack Vertical 6
@@ -281,38 +261,6 @@ function New-WtHelpPage {
     [void](Add-WtChild $page.Panel $win)
 
     $page.Root
-}
-
-function New-WtMarkdownHelpCard {
-    $card = New-WtCard
-    $col = New-WtStack Vertical 8
-    [void](Add-WtChild $col (New-WtCardHeader '마크다운'))
-    [void](Add-WtChild $col (New-WtText '메모 본문은 마크다운으로 보입니다. 원문을 누르면 아래 보기를 만든 글이 나옵니다.' 'T.Sub'))
-    $mode = New-WtSegmented @(@('preview', '보기'), @('raw', '원문')) 'preview' 'WtHelpMd' {
-        param($value)
-        $script:helpMd.Visibility = if ($value -eq 'raw') { 'Collapsed' } else { 'Visible' }
-        $script:helpRaw.Visibility = if ($value -eq 'raw') { 'Visible' } else { 'Collapsed' }
-    }
-    [void](Add-WtChild $col $mode)
-    # 도움말에서는 [[링크]] · #태그가 갈 곳이 없으므로 무엇을 하는지만 알려 준다
-    $script:helpMd = New-WtMarkdownView -OnLink {
-        param($link)
-        if ($link.Kind -eq 'wiki') { Show-WtMessage '메모에서 누르면 제목이 같은 메모를 엽니다.'; return $true }
-        if ($link.Kind -eq 'tag') { Show-WtMessage '메모에서 누르면 이 태그로 찾습니다.'; return $true }
-        $false
-    }
-    $script:helpMd.Margin = [System.Windows.Thickness]::new(0, 8, 0, 0)
-    Set-WtMarkdownText $script:helpMd $script:markdownSample
-    $script:helpRaw = [System.Windows.Controls.TextBox]::new()
-    Set-WtStyle $script:helpRaw 'Reader'
-    Set-WtResource $script:helpRaw 'FontFamily' 'Font.Mono'
-    $script:helpRaw.Text = $script:markdownSample
-    $script:helpRaw.Visibility = 'Collapsed'
-    $script:helpRaw.Margin = [System.Windows.Thickness]::new(0, 8, 0, 0)
-    [void](Add-WtChild $col $script:helpMd)
-    [void](Add-WtChild $col $script:helpRaw)
-    $card.Child = $col
-    $card
 }
 
 Export-ModuleMember -Function New-WtSettingsPage, New-WtHelpPage

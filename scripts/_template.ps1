@@ -17,7 +17,10 @@
 #>
 #Requires -Version 7.0
 [CmdletBinding(SupportsShouldProcess)]
-param()
+param(
+    # 실행할 때마다 바뀌는 값은 param으로 받는다. WorkTool 업무 탭이 이것으로 입력 폼을 만든다.
+    # 줄 끝 주석이 폼의 칸 설명이 된다. 예: [string]$TargetFile   # 읽을 파일 (비우면 설정 블록의 값)
+)
 
 # ===== 설정 (여기만 고친다) =====
 $Config = @{

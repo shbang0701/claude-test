@@ -1,5 +1,6 @@
 # 애드온(탭) 목록. 탭 하나 = addons\<이름>\ 폴더 하나이고, 그 모듈이 불러와질 때 Register-WtAddon으로 자기를 등록한다.
-# 셸은 이 목록만 보고 메뉴를 만든다. 탭을 더하거나 빼도 셸 코드는 고치지 않는다.
+# 셸 · 홈 · 도움말은 이 목록만 보고 메뉴 · 카드 · 설명을 만든다. 탭을 더하거나 빼도 코어 코드는 고치지 않는다.
+# 탭의 검사는 같은 폴더의 Test-<이름>.ps1에 두면 tests\Test-Core.ps1이 찾아서 돌린다.
 
 $ErrorActionPreference = 'Stop'
 
@@ -19,6 +20,10 @@ $script:addons = [System.Collections.Generic.List[hashtable]]::new()
   OnExit       { } → 끝내기 직전(SavePending 확인 뒤) 타이머·조회 등 실행 자원을 정리한다 (선택)
   SavePending  { } → 이 화면을 떠날 때 · 끝낼 때 저장. 실패하면 $false를 돌려준다.
                      그러면 셸이 다시 시도 · 저장하지 않고 이동(끝내기) · 취소를 묻는다 (선택)
+  Help         도움말 「이 버전」에 넣을 설명 문단들 (선택)
+  Shortcuts    도움말 「단축키」에 넣을 @('키', '설명') 목록. 키 처리는 탭 화면이 직접 한다 (선택)
+               하나만 줄 때는 앞에 쉼표를 붙인다: -Shortcuts (, @('F5', '새로 고침'))
+  HelpCard     { } → 도움말에 따로 놓을 카드 요소를 돌려준다 (선택)
 #>
 function Register-WtAddon {
     param(
@@ -33,8 +38,16 @@ function Register-WtAddon {
         [scriptblock]$ImportLegacy,
         [scriptblock]$OnExit,
         [scriptblock]$SavePending,
-        [string]$Description = ''
+        [string]$Description = '',
+        [string[]]$Help = @(),
+        [object[]]$Shortcuts = @(),
+        [scriptblock]$HelpCard
     )
+    # 쉼표 없이 한 쌍만 주면 배열이 펴져서 들어온다 → 한 쌍으로 되돌린다
+    if ($Shortcuts.Count -and $Shortcuts[0] -is [string]) { $Shortcuts = @(, $Shortcuts) }
+    foreach ($s in $Shortcuts) {
+        if (@($s).Count -ne 2) { throw "애드온 '$Id'의 단축키는 @('키', '설명') 모양이어야 합니다." }
+    }
     for ($i = $script:addons.Count - 1; $i -ge 0; $i--) {
         if ($script:addons[$i].Id -eq $Id) { $script:addons.RemoveAt($i) }
     }
@@ -43,6 +56,7 @@ function Register-WtAddon {
             NewView = $NewView; Refresh = $Refresh; HomeCard = $HomeCard; ImportLegacy = $ImportLegacy; OnExit = $OnExit
             Description = $Description
             SavePending = $SavePending
+            Help = @($Help); Shortcuts = @($Shortcuts); HelpCard = $HelpCard
         })
 }
 

@@ -523,13 +523,89 @@ function New-WtMemoHomeCard {
     $card
 }
 
+# ---- 도움말 -----------------------------------------------------------------------------------
+
+$script:helpMd = $null
+$script:helpRaw = $null
+
+# 도움말의 마크다운 예시. 원문 · 보기를 바꿔 가며 문법을 본다
+$script:markdownSample = @'
+# 제목은 `#`, 소제목은 `##`
+
+**굵게**, *기울임*, ~~취소선~~, ==형광펜==, `코드`, [링크](https://github.com)
+[[메모 제목]]을 누르면 그 메모로, #태그 를 누르면 그 태그로 찾습니다.
+줄을 한 번만 바꿔도 줄이 바뀝니다 (Obsidian과 같음).
+
+- [x] 끝낸 일
+- [ ] 할 일
+- 목록
+    1. 안쪽 번호 목록
+
+> [!tip] 콜아웃
+> `> [!종류] 제목`으로 씁니다. 종류: note · info · tip · success · question · warning · danger · bug · example · quote
+
+> [!warning]- 접는 콜아웃 (눌러서 펼치기)
+> `-`는 접힌 채로, `+`는 펼친 채로 시작합니다.
+
+| 서버 | IP | 상태 |
+|:--|:--|:-:|
+| SRV-01 | 10.0.0.10 | 정상 |
+| SRV-02 | 10.0.0.11 | 점검 |
+
+```powershell
+Get-Service | Where-Object Status -eq 'Running'   # 코드 블록은 [복사]로 한 번에 복사
+```
+
+```mermaid
+flowchart LR
+    A[요청] --> B{승인?}
+    B -->|예| C[작업]
+    B -->|아니오| D([반려])
+```
+'@
+
+function New-WtMemoMarkdownHelpCard {
+    $card = New-WtCard
+    $col = New-WtStack Vertical 8
+    [void](Add-WtChild $col (New-WtCardHeader '마크다운'))
+    [void](Add-WtChild $col (New-WtText '메모 본문은 마크다운으로 보입니다. 원문을 누르면 아래 보기를 만든 글이 나옵니다.' 'T.Sub'))
+    $mode = New-WtSegmented @(@('preview', '보기'), @('raw', '원문')) 'preview' 'WtHelpMd' {
+        param($value)
+        $script:helpMd.Visibility = if ($value -eq 'raw') { 'Collapsed' } else { 'Visible' }
+        $script:helpRaw.Visibility = if ($value -eq 'raw') { 'Visible' } else { 'Collapsed' }
+    }
+    [void](Add-WtChild $col $mode)
+    # 도움말에서는 [[링크]] · #태그가 갈 곳이 없으므로 무엇을 하는지만 알려 준다
+    $script:helpMd = New-WtMarkdownView -OnLink {
+        param($link)
+        if ($link.Kind -eq 'wiki') { Show-WtMessage '메모에서 누르면 제목이 같은 메모를 엽니다.'; return $true }
+        if ($link.Kind -eq 'tag') { Show-WtMessage '메모에서 누르면 이 태그로 찾습니다.'; return $true }
+        $false
+    }
+    $script:helpMd.Margin = [System.Windows.Thickness]::new(0, 8, 0, 0)
+    Set-WtMarkdownText $script:helpMd $script:markdownSample
+    $script:helpRaw = [System.Windows.Controls.TextBox]::new()
+    Set-WtStyle $script:helpRaw 'Reader'
+    Set-WtResource $script:helpRaw 'FontFamily' 'Font.Mono'
+    $script:helpRaw.Text = $script:markdownSample
+    $script:helpRaw.Visibility = 'Collapsed'
+    $script:helpRaw.Margin = [System.Windows.Thickness]::new(0, 8, 0, 0)
+    [void](Add-WtChild $col $script:helpMd)
+    [void](Add-WtChild $col $script:helpRaw)
+    $card.Child = $col
+    $card
+}
+
 Register-WtAddon -Id 'memo' -Title '메모' -Icon 0xE70B -Order 40 `
     -NewView { New-WtMemoView } `
     -Refresh { param($view) Update-WtMemoView } `
     -HomeCard { New-WtMemoHomeCard } `
     -ImportLegacy { param($folder) Import-WtMemoLegacy $folder } `
     -SavePending { if ($script:ui.Count) { Save-WtMemoNow } else { $true } } `
-    -OnExit { if ($script:ui.Count) { [void](Save-WtMemoNow) }; if ($script:saveTimer) { $script:saveTimer.Stop() }; if ($script:undoTimer) { $script:undoTimer.Stop() } }
+    -OnExit { if ($script:ui.Count) { [void](Save-WtMemoNow) }; if ($script:saveTimer) { $script:saveTimer.Stop() }; if ($script:undoTimer) { $script:undoTimer.Stop() } } `
+    -Help '메모는 쓰고 고칠 수 있습니다.' `
+    -Shortcuts @(@('Ctrl + N', '새 메모'), @('Ctrl + S', '바로 저장 (보통은 자동 저장)'), @('Ctrl + E', '편집 / 미리보기')) `
+    -HelpCard { New-WtMemoMarkdownHelpCard }
 
 Export-ModuleMember -Function Get-WtMemoItems, Get-WtMemoSorted, Find-WtMemo, Format-WtMemoTime, Import-WtMemoLegacy,
     New-WtMemo, Get-WtMemoTags, Set-WtMemoContent, Save-WtMemoItems

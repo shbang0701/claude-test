@@ -17,7 +17,8 @@
 1. [_template.ps1](_template.ps1)을 복사해서 시작합니다.
 2. 이름은 `동사-명사.ps1`로 짓습니다 (예: `Export-SheetList.ps1`, `Get-DiskUsage.ps1`).
    동사는 PowerShell 표준 동사를 씁니다: Get, Set, New, Export, Import, Convert, Find, Test 등.
-3. 아래 **목록**과 루트 [README.md](../README.md)에 한 줄씩 추가합니다.
+3. 실행할 때마다 바뀌는 값은 `param`으로 받고, 줄 끝 주석으로 설명합니다. WorkTool 업무 탭이 이것으로 입력 폼을 만듭니다. 약속은 [업무 탭 설계](../docs/plans/workflows-design.md) 「스크립트 약속」에 있습니다.
+4. 아래 **목록**과 루트 [README.md](../README.md)에 한 줄씩 추가합니다.
 
 ## 업무 PC에서 실행하기
 

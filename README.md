@@ -10,7 +10,8 @@
 - **[apps/design.md](apps/design.md)** — 모든 GUI 앱의 공통 디자인 원칙 (Windows 디자인 지침 기반)
 - **[worktool.zip](worktool.zip)** — WorkTool 새 버전(WPF)을 바로 실행하는 묶음. 압축을 풀고 `Start-WorkTool.cmd`를 더블클릭 (개인 PC용, 아래 「업무 PC로 가져가기」 참고)
   - 실행 보조 파일 원본: [start-worktool.cmd](apps/WorkTool/wpf/build/start-worktool.cmd) · [start-launcher.ps1](apps/WorkTool/wpf/build/start-launcher.ps1). 시작 뒤 콘솔 창을 남기지 않습니다.
-  - [실행 파일 검사](apps/WorkTool/wpf/tests/Test-Launcher.ps1) — 임시 전용 GUI로 콘솔 없는 실행·아이콘·특수문자 경로·시작 오류를 검사합니다.
+  - 저장소를 받아 둔 PC는 zip 대신 [start-dev.cmd](apps/WorkTool/wpf/start-dev.cmd)를 더블클릭 — 원본을 바로 띄워서 고친 내용이 바로 보입니다.
+  - [실행 파일 검사](apps/WorkTool/wpf/tests/Test-Launcher.ps1) — 임시 전용 GUI로 콘솔 없는 실행·아이콘·특수문자 경로·시작 오류와 `start-dev.cmd`를 검사합니다.
 - **[apps/WorkTool/](apps/WorkTool/)** — 업무 통합 GUI 앱 (메모 · 근태 · 일정·알람, 트레이 상주)
   - [design/](apps/WorkTool/design/) — 새 화면 시안 (WPF 전환 기준)
     - [활성 작업 목업](apps/WorkTool/design/README.md#활성-작업-목업) — 프로그램별 창·브라우저 탭 표, 선택 닫기. 폰용 확대본·자동 새로 고침 설정·가짜 데이터·목업 생성 스크립트 포함
@@ -40,6 +41,7 @@
 - 기존 WinForms의 일정 편집·알람·근태 입력을 계속 쓸 때는 `apps/WorkTool/dist/WorkTool.ps1`을 복사합니다. 두 버전의 차이는 [WPF README](apps/WorkTool/wpf/README.md)에 있습니다.
 
 **개인 PC: worktool.zip**
+- 저장소를 받아 둔 PC(`git clone`)는 zip이 필요 없습니다. `apps/WorkTool/wpf/start-dev.cmd`를 더블클릭합니다.
 - 받은 `worktool.zip` 우클릭 → 속성 → 「차단 해제」 체크 → 압축 풀기 → `Start-WorkTool.cmd` 더블클릭
 - 차단 해제를 안 하면 인터넷에서 받은 스크립트라 실행 정책(RemoteSigned)에 막힙니다. 실행 파일이 이 경우를 알려 줍니다.
 - 업무 PC에는 쓰지 않습니다. 스크립트가 든 zip은 보안 장비가 가장 민감하게 봅니다 (아래 「쓰지 않는 것」). 업무 PC는 `WorkTool-WPF.ps1`을 복사해 붙여 넣습니다.

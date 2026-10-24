@@ -16,18 +16,68 @@ $root = Split-Path $PSScriptRoot -Parent
 . (Join-Path $root 'build/start-launcher.ps1')
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('wt-launcher-' + [guid]::NewGuid().ToString('N'))
 $fixture = Join-Path $tmp "한글 O'Brien & (검사)! %test%"
+# 저장소 구성(start-dev.cmd · build\start-launcher.ps1 · Start-WorkTool.ps1)을 흉내 내는 폴더
+$devFixture = Join-Path $tmp "원본 O'Brien & (검사)! %test%"
 [void][IO.Directory]::CreateDirectory($fixture)
-$bootstrap = $null; $gui = $null
+[void][IO.Directory]::CreateDirectory((Join-Path $devFixture 'build'))
+$owned = [Collections.Generic.List[Diagnostics.Process]]::new()
 
 function Assert-Launcher([string]$Name, [bool]$Ok) {
     if (-not $Ok) { throw "FAIL 실행 파일: $Name" }
     Write-Host "PASS 실행 파일: $Name"
 }
 
+# 저장소의 .cmd를 zip에 넣을 때처럼 CRLF로 바꿔 복사한다
+function Copy-WtLauncherCmd([string]$Source, [string]$Destination) {
+    $cmd = [IO.File]::ReadAllText($Source).Replace("`r`n", "`n").Replace("`n", "`r`n")
+    [IO.File]::WriteAllText($Destination, $cmd, [Text.UTF8Encoding]::new($false))
+}
+
+# 더블클릭처럼 .cmd를 실행하고, 실행 보조가 끝난 뒤 전용 GUI가 남긴 상태를 읽는다
+function Invoke-WtLauncherCmd([string]$Dir, [string]$CmdName) {
+    $cmdInfo = [Diagnostics.ProcessStartInfo]::new()
+    $cmdInfo.FileName = Join-Path ([Environment]::SystemDirectory) 'cmd.exe'
+    # 현재 폴더를 명령 검색에서 빼는 환경(NoDefaultCurrentDirectoryInExePath)에서도 찾도록 .\를 붙인다
+    $cmdInfo.Arguments = "/d /c .\$CmdName"
+    $cmdInfo.WorkingDirectory = $Dir
+    $cmdInfo.UseShellExecute = $false; $cmdInfo.CreateNoWindow = $true
+    $cmdInfo.RedirectStandardOutput = $true; $cmdInfo.RedirectStandardError = $true
+    $bootstrap = [Diagnostics.Process]::Start($cmdInfo)
+    $script:owned.Add($bootstrap)
+    # GUI가 출력 핸들을 물려받으므로, 출력은 GUI가 끝나야 다 읽힌다
+    $run = [pscustomobject]@{
+        Bootstrap = $bootstrap; Gui = $null; State = $null
+        Out = $bootstrap.StandardOutput.ReadToEndAsync(); Err = $bootstrap.StandardError.ReadToEndAsync()
+    }
+    if (-not $bootstrap.WaitForExit(15000)) { throw '실행 보조 프로세스가 종료되지 않았습니다.' }
+    if ($bootstrap.ExitCode -ne 0) { throw "실행 보조 실패: $($run.Out.GetAwaiter().GetResult()) $($run.Err.GetAwaiter().GetResult())" }
+    $statePath = Join-Path $Dir 'state.json'
+    $watch = [Diagnostics.Stopwatch]::StartNew()
+    while (-not (Test-Path -LiteralPath $statePath)) {
+        if ($watch.Elapsed.TotalSeconds -gt 15) { throw '전용 GUI 창이 시작되지 않았습니다.' }
+        Start-Sleep -Milliseconds 50
+    }
+    # 파일 작성이 끝난 뒤 읽는다.
+    for ($i=0; $i -lt 20 -and -not $run.State; $i++) {
+        try { $run.State = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json } catch { Start-Sleep -Milliseconds 25 }
+    }
+    if (-not $run.State) { throw '전용 GUI 검사 결과를 읽지 못했습니다.' }
+    $run.Gui = [Diagnostics.Process]::GetProcessById($run.State.Pid)
+    $script:owned.Add($run.Gui)
+    $run
+}
+
+# 전용 GUI에 끝내라고 알리고, 제때 끝났는지 돌려준다
+function Stop-WtLauncherGui($Run, [string]$Dir) {
+    Set-Content -LiteralPath (Join-Path $Dir 'stop') -Value 'stop' -Encoding utf8
+    if (-not $Run.Gui.WaitForExit(10000)) { return $false }
+    [void]$Run.Out.GetAwaiter().GetResult(); [void]$Run.Err.GetAwaiter().GetResult()
+    $true
+}
+
 try {
     Copy-Item -LiteralPath (Join-Path $root 'build/start-launcher.ps1') -Destination (Join-Path $fixture 'Start-WorkTool-Launcher.ps1')
-    $cmd = [IO.File]::ReadAllText((Join-Path $root 'build/start-worktool.cmd')).Replace("`r`n", "`n").Replace("`n", "`r`n")
-    [IO.File]::WriteAllText((Join-Path $fixture 'Start-WorkTool.cmd'), $cmd, [Text.UTF8Encoding]::new($false))
+    Copy-WtLauncherCmd (Join-Path $root 'build/start-worktool.cmd') (Join-Path $fixture 'Start-WorkTool.cmd')
     Set-Content -LiteralPath (Join-Path $fixture 'datapath.txt') -Value (Join-Path $fixture 'data') -Encoding utf8
     $entry = Join-Path $fixture 'WorkTool-WPF.ps1'
     $sample = @'
@@ -65,39 +115,23 @@ try { Start-WtApp -AppRoot $PSScriptRoot } finally { $script:sampleTimer.Stop() 
 '@
     $sample = $sample.Replace('__SOURCE__', $root.Replace("'", "''"))
     [IO.File]::WriteAllText($entry, $sample, [Text.UTF8Encoding]::new($false))
+    # 저장소 구성: start-dev.cmd가 build\start-launcher.ps1로 옆의 Start-WorkTool.ps1을 띄운다
+    Copy-Item -LiteralPath (Join-Path $root 'build/start-launcher.ps1') -Destination (Join-Path $devFixture 'build/start-launcher.ps1')
+    Copy-WtLauncherCmd (Join-Path $root 'start-dev.cmd') (Join-Path $devFixture 'start-dev.cmd')
+    Set-Content -LiteralPath (Join-Path $devFixture 'datapath.txt') -Value (Join-Path $devFixture 'data') -Encoding utf8
+    [IO.File]::WriteAllText((Join-Path $devFixture 'Start-WorkTool.ps1'), $sample, [Text.UTF8Encoding]::new($false))
+
     $info = New-WtLaunchStartInfo $entry
     Assert-Launcher '콘솔 생성과 셸 실행을 끈다' ($info.CreateNoWindow -and -not $info.UseShellExecute)
     Assert-Launcher '특수문자 경로를 하나의 파일 인수로 전달한다' ($info.ArgumentList.Count -eq 5 -and $info.ArgumentList[4] -ceq $entry -and $info.WorkingDirectory -ceq $fixture)
     Assert-Launcher '실행 정책 우회 옵션을 넣지 않는다' (-not ($info.ArgumentList -match 'ExecutionPolicy|Bypass|EncodedCommand'))
+    Push-Location -LiteralPath $fixture
+    try { $relative = New-WtLaunchStartInfo '.\WorkTool-WPF.ps1' } finally { Pop-Location }
+    Assert-Launcher '상대 경로는 지금 위치 기준 전체 경로로 넘긴다' ($relative.ArgumentList[4] -ceq $entry -and $relative.WorkingDirectory -ceq $fixture)
 
-    $cmdInfo = [Diagnostics.ProcessStartInfo]::new()
-    $cmdInfo.FileName = Join-Path ([Environment]::SystemDirectory) 'cmd.exe'
-    # 현재 폴더를 명령 검색에서 빼는 환경(NoDefaultCurrentDirectoryInExePath)에서도 찾도록 .\를 붙인다
-    $cmdInfo.Arguments = '/d /c .\Start-WorkTool.cmd'
-    $cmdInfo.WorkingDirectory = $fixture
-    $cmdInfo.UseShellExecute = $false; $cmdInfo.CreateNoWindow = $true
-    $cmdInfo.RedirectStandardOutput = $true; $cmdInfo.RedirectStandardError = $true
-    $bootstrap = [Diagnostics.Process]::Start($cmdInfo)
-    $outTask = $bootstrap.StandardOutput.ReadToEndAsync(); $errTask = $bootstrap.StandardError.ReadToEndAsync()
-    if (-not $bootstrap.WaitForExit(15000)) { throw '실행 보조 프로세스가 종료되지 않았습니다.' }
-    if ($bootstrap.ExitCode -ne 0) {
-        $stdout = $outTask.GetAwaiter().GetResult(); $stderr = $errTask.GetAwaiter().GetResult()
-        throw "실행 보조 실패: $stdout $stderr"
-    }
-    $statePath = Join-Path $fixture 'state.json'
-    $watch = [Diagnostics.Stopwatch]::StartNew()
-    while (-not (Test-Path -LiteralPath $statePath)) {
-        if ($watch.Elapsed.TotalSeconds -gt 15) { throw '전용 GUI 창이 시작되지 않았습니다.' }
-        Start-Sleep -Milliseconds 50
-    }
-    # 파일 작성이 끝난 뒤 읽는다.
-    $state = $null
-    for ($i=0; $i -lt 20 -and -not $state; $i++) {
-        try { $state = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json } catch { Start-Sleep -Milliseconds 25 }
-    }
-    if (-not $state) { throw '전용 GUI 검사 결과를 읽지 못했습니다.' }
-    $gui = [Diagnostics.Process]::GetProcessById($state.Pid)
-    Assert-Launcher 'CMD는 끝나고 별도 GUI 프로세스만 계속 실행한다' ($bootstrap.HasExited -and -not $gui.HasExited -and $state.Visible)
+    $run = Invoke-WtLauncherCmd $fixture 'Start-WorkTool.cmd'
+    $state = $run.State
+    Assert-Launcher 'CMD는 끝나고 별도 GUI 프로세스만 계속 실행한다' ($run.Bootstrap.HasExited -and -not $run.Gui.HasExited -and $state.Visible)
     # 상속된 표준 입력 핸들이 있어도 콘솔 창이 있다는 뜻은 아니다. 이 검사에서 만든 PID의 창만 확인한다.
     Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
     $ownedCondition = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ProcessIdProperty, [int]$state.Pid)
@@ -105,9 +139,11 @@ try { Start-WtApp -AppRoot $PSScriptRoot } finally { $script:sampleTimer.Stop() 
     Assert-Launcher '이 프로세스에는 WorkTool GUI 창 하나만 있다' ($ownedWindows.Count -eq 1 -and $ownedWindows[0].Current.Name -eq 'WorkTool')
     Assert-Launcher 'GUI는 STA·보통 창 상태로 실행한다' ($state.Apartment -eq 'STA' -and $state.WindowState -eq 'Normal')
     Assert-Launcher '전체 창 아이콘을 적용하고 작은 배지를 제거한다' ($state.IconWidth -eq 32 -and -not $state.HasOverlay -and $state.Description -eq 'WorkTool')
-    Set-Content -LiteralPath (Join-Path $fixture 'stop') -Value 'stop' -Encoding utf8
-    Assert-Launcher 'GUI 종료 뒤 프로세스도 끝난다' ($gui.WaitForExit(10000))
-    [void]$outTask.GetAwaiter().GetResult(); [void]$errTask.GetAwaiter().GetResult()
+    Assert-Launcher 'GUI 종료 뒤 프로세스도 끝난다' (Stop-WtLauncherGui $run $fixture)
+
+    $dev = Invoke-WtLauncherCmd $devFixture 'start-dev.cmd'
+    Assert-Launcher '저장소 실행 파일(start-dev.cmd)도 CMD는 끝나고 원본 GUI만 STA로 남는다' ($dev.Bootstrap.HasExited -and -not $dev.Gui.HasExited -and $dev.State.Visible -and $dev.State.Apartment -eq 'STA')
+    Assert-Launcher '저장소 실행 파일의 GUI도 종료 뒤 프로세스가 끝난다' (Stop-WtLauncherGui $dev $devFixture)
 
     $bad = Join-Path $fixture 'bad.ps1'
     Set-Content -LiteralPath $bad -Value 'function {' -Encoding utf8
@@ -122,12 +158,12 @@ try { Start-WtApp -AppRoot $PSScriptRoot } finally { $script:sampleTimer.Stop() 
     try { [void](New-WtLaunchStartInfo $entry) } catch { $rejected = $true }
     Assert-Launcher '다운로드 차단 표시는 우회하지 않고 알린다' $rejected
 } finally {
-    if (Test-Path -LiteralPath $fixture) { Set-Content -LiteralPath (Join-Path $fixture 'stop') -Value 'stop' -Encoding utf8 }
-    foreach ($owned in @($gui, $bootstrap)) {
-        if ($owned) {
-            if (-not $owned.HasExited -and -not $owned.WaitForExit(5000)) { $owned.Kill(); $owned.WaitForExit() }
-            $owned.Dispose()
-        }
+    foreach ($dir in @($fixture, $devFixture)) {
+        if (Test-Path -LiteralPath $dir) { Set-Content -LiteralPath (Join-Path $dir 'stop') -Value 'stop' -Encoding utf8 }
+    }
+    foreach ($process in $owned) {
+        if (-not $process.HasExited -and -not $process.WaitForExit(5000)) { $process.Kill(); $process.WaitForExit() }
+        $process.Dispose()
     }
     $safe = [IO.Path]::GetFullPath($tmp)
     if ((Split-Path $safe -Leaf) -notmatch '^wt-launcher-[a-f0-9]{32}$' -or -not $safe.StartsWith([IO.Path]::GetFullPath([IO.Path]::GetTempPath()), [StringComparison]::OrdinalIgnoreCase)) { throw '임시 경로 검증 실패' }
